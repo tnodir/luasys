@@ -138,7 +138,7 @@ evq_modify (struct event *ev, unsigned int flags)
     return 0;
 }
 
-struct event *
+int
 evq_wait (struct event_queue *evq, msec_t timeout)
 {
     struct event *ev_ready;
