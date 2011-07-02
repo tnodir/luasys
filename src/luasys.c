@@ -43,7 +43,16 @@ sys_strerror (lua_State *L)
     const int err = luaL_optint(L, -1, SYS_ERRNO);
 
 #ifndef _WIN32
+#if (_POSIX_C_SOURCE >= 200112L || _XOPEN_SORCE >= 600)
+    char buf[512];
+
+    if (!strerror_r(err, buf, sizeof(buf)))
+	lua_pushstring(L, buf);
+    else
+	lua_pushfstring(L, "System error %i", err);
+#else
     lua_pushstring(L, strerror(err));
+#endif
 #else
     const int flags = FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM;
     WCHAR buf[512];
