@@ -16,9 +16,13 @@ sys_random (lua_State *L)
 #ifndef _WIN32
     fd_t *fdp = lua_newuserdata(L, sizeof(fd_t));
 
+#if defined(__OpenBSD__)
     *fdp = open("/dev/arandom", O_RDONLY, 0);
     if (*fdp == (fd_t) -1)
 	*fdp = open("/dev/urandom", O_RDONLY, 0);
+#else
+    *fdp = open("/dev/urandom", O_RDONLY, 0);
+#endif
     if (*fdp != (fd_t) -1) {
 #else
     HCRYPTPROV *p = lua_newuserdata(L, sizeof(void *));
