@@ -403,8 +403,7 @@ thread_run (lua_State *L)
 	goto err;
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
-    res = pthread_create(&td->tid, &attr,
-     (thread_func_t) thread_start, td);
+    res = pthread_create(&td->tid, &attr, (thread_func_t) thread_start, td);
     pthread_attr_destroy(&attr);
     if (!res) {
 #else
