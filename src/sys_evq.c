@@ -406,7 +406,7 @@ levq_mod_socket (lua_State *L)
     flags = ev->flags & (EVENT_READ | EVENT_WRITE);
     for (; *evstr; ++evstr) {
 	if (*evstr == '+' || *evstr == '-')
-	    change = (*evstr++ == '+') ? 1 : -1;
+	    change = (*evstr == '+') ? 1 : -1;
 	else {
 	    int rw = (*evstr == 'r') ? EVENT_READ : EVENT_WRITE;
 	    switch (change) {
@@ -661,14 +661,19 @@ levq_loop (lua_State *L)
 			lua_call(L, 7, 0);
 		    else {
 			lua_State *co = lua_tothread(L, ARG_LAST+4);
-			int status;
 
 			lua_xmove(L, co, 7);
 			lua_pop(L, 1);  /* pop coroutine */
-			status = lua_resume(co, 7);
-			if (status == 0 || status == LUA_YIELD)
+			switch (lua_resume(co, 7)) {
+			case 0:
 			    lua_settop(co, 0);
-			else {
+			    ev->flags |= EVENT_DELETE;
+			    evq_del(ev, 0);
+			    break;
+			case LUA_YIELD:
+			    lua_settop(co, 0);
+			    break;
+			default:
 			    lua_xmove(co, L, 1);  /* error message */
 			    lua_error(L);
 			}
@@ -830,6 +835,19 @@ levq_notify (lua_State *L)
 
 /*
  * Arguments: evq_udata
+ * Returns: number
+ */
+static int
+levq_size (lua_State *L)
+{
+    struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
+
+    lua_pushinteger(L, evq->nevents);
+    return 1;
+}
+
+/*
+ * Arguments: evq_udata
  * Returns: string
  */
 static int
@@ -866,6 +884,7 @@ static luaL_reg evq_meth[] = {
     {"now",		levq_now},
     {"notify",		levq_notify},
     {"__gc",		levq_done},
+    {"__len",		levq_size},
     {"__tostring",	levq_tostring},
     {NULL, NULL}
 };
