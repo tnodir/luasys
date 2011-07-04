@@ -480,10 +480,10 @@ levq_del (lua_State *L)
 	    if (ev == *ev_head)
 		*ev_head = ev->next_object;
 	    else {
-		struct event *virt = *ev_head;
-		while (virt->next_object != ev)
-		    virt = virt->next_object;
-		virt->next_object = ev->next_object;
+		struct event *obj = *ev_head;
+		while (obj->next_object != ev)
+		    obj = obj->next_object;
+		obj->next_object = ev->next_object;
 	    }
 	    if (vmtd != evq->vmtd) sys_vm2_leave(vmtd);
 	}
@@ -667,8 +667,10 @@ levq_loop (lua_State *L)
 			switch (lua_resume(co, 7)) {
 			case 0:
 			    lua_settop(co, 0);
-			    ev->flags |= EVENT_DELETE;
-			    evq_del(ev, 0);
+			    if (!event_deleted(ev)) {
+				ev->flags |= EVENT_DELETE;
+				evq_del(ev, 0);
+			    }
 			    break;
 			case LUA_YIELD:
 			    lua_settop(co, 0);
@@ -883,8 +885,9 @@ static luaL_reg evq_meth[] = {
     {"stop",		levq_stop},
     {"now",		levq_now},
     {"notify",		levq_notify},
-    {"__gc",		levq_done},
+    {"size",		levq_size},
     {"__len",		levq_size},
+    {"__gc",		levq_done},
     {"__tostring",	levq_tostring},
     {NULL, NULL}
 };
