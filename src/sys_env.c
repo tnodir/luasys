@@ -68,7 +68,7 @@ sys_env (lua_State *L)
 {
     const char *name, *value, *end;
 #ifndef _WIN32
-    const char **env = (const char **) environ;
+    char **env = environ;
 #else
     char *env = GetEnvironmentStringsA();
 #endif
