@@ -1,8 +1,8 @@
 /* Lua System: Threading: VM-Threads Communication */
 
 #define MSG_MAXSIZE		512
-
-#define MSG_BUFF_INITIALSIZE	8 * MSG_MAXSIZE
+#define MSG_BUFF_INITIALSIZE	(8 * MSG_MAXSIZE)
+#define MSG_ITEM_ALIGN		4
 
 struct message_item {
     int type: 8;  /* lua type */
@@ -17,7 +17,8 @@ struct message_item {
 
 struct message {
     struct sys_thread *src_td;  /* source */
-    int size;  /* size of message in bytes */
+    int size: 16;  /* size of message in bytes */
+    int nitems: 16;  /* number of message items */
     char items[MSG_MAXSIZE];  /* array of message items */
 };
 
@@ -29,7 +30,7 @@ static void
 thread_msg_build (lua_State *L, struct message *msg)
 {
     char *cp = msg->items;
-    char *endp = cp + MSG_MAXSIZE;
+    char *endp = cp + MSG_MAXSIZE - MSG_ITEM_ALIGN;
     int i, top = lua_gettop(L);
 
     for (i = 2; i <= top; ++i) {
@@ -38,7 +39,7 @@ thread_msg_build (lua_State *L, struct message *msg)
 	const char *s = NULL;
 	size_t len = sizeof(item->v);
 
-	cp += sizeof(struct message_item) - sizeof(item->v);
+	cp += offsetof(struct message_item, v);
 	if (type == LUA_TSTRING)
 	    s = lua_tolstring(L, i, &len);
 
@@ -71,8 +72,10 @@ thread_msg_build (lua_State *L, struct message *msg)
 	item->type = type;
 	item->len = len;
 	cp += len;
+	cp += (len & (MSG_ITEM_ALIGN-1)) ? MSG_ITEM_ALIGN - (len & (MSG_ITEM_ALIGN-1)) : 0;
     }
-    msg->size = (sizeof(struct message) - MSG_MAXSIZE) + cp - msg->items;
+    msg->nitems = top;
+    msg->size = offsetof(struct message, items) + cp - msg->items;
 }
 
 /*
@@ -85,6 +88,7 @@ thread_msg_parse (lua_State *L, struct message *msg)
     char *endp = (char *) msg + msg->size;
     int i;
 
+    luaL_checkstack(L, msg->nitems, "too large message");
     lua_pushlightuserdata(L, msg->src_td);
 
     for (i = 1; cp < endp; ++i) {
@@ -107,7 +111,8 @@ thread_msg_parse (lua_State *L, struct message *msg)
 	default:
 	    lua_pushlightuserdata(L, item->v.ptr);
 	}
-	cp += sizeof(struct message_item) - sizeof(item->v) + len;
+	cp += offsetof(struct message_item, v) + len;
+	cp += (len & (MSG_ITEM_ALIGN-1)) ? MSG_ITEM_ALIGN - (len & (MSG_ITEM_ALIGN-1)) : 0;
     }
     return i;
 }

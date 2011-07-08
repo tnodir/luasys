@@ -61,11 +61,9 @@ struct thread_msg_buf {
 /* Main vm-thread's data */
 struct sys_vmthread {
     struct sys_thread td;
-
 #ifndef _WIN32
     pthread_mutex_t vmmutex;
 #endif
-
 #ifdef _WIN32
     thread_critsect_t bufcs;  /* guard access to buffer */
 #endif
@@ -524,6 +522,8 @@ thread_runvm (lua_State *L)
     lua_pushlightuserdata(NL, vmtd);  /* master */
     {
 	int i, top = lua_gettop(L);
+
+	luaL_checkstack(NL, top + LUA_MINSTACK, "too many arguments");
 
 	for (i = 2; i <= top; ++i) {
 	    switch (lua_type(L, i)) {
