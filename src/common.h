@@ -93,7 +93,8 @@ extern int is_WinNT;
  */
 
 #if defined(_MSC_VER) || defined(__BORLANDC__)
-typedef __int64	int64_t;
+typedef __int64			int64_t;
+typedef unsigned __int64	uint64_t;
 #endif
 
 #define INT64_MAKE(lo,hi)	(((int64_t) (hi) << 32) | (unsigned int) (lo))

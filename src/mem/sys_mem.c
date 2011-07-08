@@ -347,7 +347,7 @@ mem_map (lua_State *L)
 	if (fd == -1 || fstat(fd, &sb) == -1)
 	    goto err;
 	sb.st_size -= off;
-	len = (sb.st_size < (off_t) ~((size_t) 0))
+	len = ((uint64_t) sb.st_size < (uint64_t) ~((size_t) 0))
 	 ? (size_t) sb.st_size : ~((size_t) 0);
     }
     /* protection and flags */
@@ -388,7 +388,7 @@ mem_map (lua_State *L)
 	if (size_lo == -1L && SYS_ERRNO != NO_ERROR)
 	    goto err;
 	size = INT64_MAKE(size_lo, size_hi) - off;
-	len = (size < (int64_t) ~((DWORD) 0))
+	len = ((uint64_t) size < (uint64_t) ~((DWORD) 0))
 	 ? (DWORD) size : ~((DWORD) 0);
     }
     /* protection and flags */
