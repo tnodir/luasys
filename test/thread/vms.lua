@@ -1,5 +1,6 @@
 #!/usr/bin/env lua
 
+local string = require"string"
 local sys = require"sys"
 
 local thread = sys.thread

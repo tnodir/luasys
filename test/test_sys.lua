@@ -1,5 +1,6 @@
 #!/usr/bin/env lua
 
+local io = require("io")
 local sys = require("sys")
 local sock = require("sys.sock")
 
