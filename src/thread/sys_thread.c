@@ -685,6 +685,14 @@ static luaL_reg thread_lib[] = {
 static void
 luaopen_sys_thread (lua_State *L)
 {
+    /* already initialized? */
+    luaL_getmetatable(L, DPOOL_TYPENAME);
+    {
+	int is_reg = !lua_isnil(L, -1);
+	lua_pop(L, 1);
+	if (is_reg) return;
+    }
+
     luaL_newmetatable(L, DPOOL_TYPENAME);
     lua_pushvalue(L, -1);  /* push metatable */
     lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
