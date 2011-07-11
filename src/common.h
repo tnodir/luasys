@@ -45,13 +45,14 @@ extern int is_WinNT;
 
 #include <sys/time.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <signal.h>
 #include <fcntl.h>
 
 #define SYS_ERRNO	errno
 #define SYS_EAGAIN(e)	((e) == EAGAIN || (e) == EWOULDBLOCK)
 
-#define SYS_SIGINTR	SIGWINCH
+#define SYS_SIGINTR	SIGUSR2
 
 #endif
 

@@ -27,20 +27,9 @@ signal_handler (int signo)
 int
 evq_interrupt (struct event_queue *evq)
 {
-    const int signo = SYS_SIGINTR;
-
-#ifdef USE_KQUEUE
     (void) evq;
-    return kill(getpid(), signo);
-#else
-    const fd_t fd = evq->sig_fd[1];
-    int nw;
 
-    do nw = write(fd, &signo, 1);
-    while (nw == -1 && errno == EINTR);
-
-    return (nw == -1) ? -1 : 0;
-#endif
+    return kill(getpid(), SYS_SIGINTR);
 }
 
 int
