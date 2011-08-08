@@ -19,6 +19,8 @@ evq_init (struct event_queue *evq)
 	return -1;
     }
 
+    pthread_mutex_init(&evq->cs, NULL);
+
     sig_fd[0] = sig_fd[1] = (fd_t) -1;
     if (pipe(sig_fd) || fcntl(sig_fd[0], F_SETFL, O_NONBLOCK)) {
 	evq_done(evq);
@@ -41,6 +43,8 @@ evq_init (struct event_queue *evq)
 void
 evq_done (struct event_queue *evq)
 {
+    pthread_mutex_destroy(&evq->cs);
+
     close(evq->sig_fd[0]);
     close(evq->sig_fd[1]);
 
@@ -195,7 +199,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     ev_ready = NULL;
     if (fdset[0].revents & POLLIN) {
 	fdset[0].revents = 0;
-	ev_ready = signal_process(evq, ev_ready, timeout);
+	ev_ready = signal_process_interrupt(evq, ev_ready, timeout);
 	--nready;
     }
 

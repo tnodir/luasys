@@ -13,7 +13,9 @@
 
 #define EVQ_EXTRA							\
     struct timeout_queue *tq;						\
-    fd_t sig_fd[2];  /* pipe to notify about signals */			\
+    pthread_mutex_t cs;							\
+    int volatile sig_ready;  /* triggered signals */			\
+    fd_t sig_fd[2];  /* pipe to interrupt the loop */			\
     unsigned int npolls, max_polls;					\
     struct event **events;						\
     struct pollfd *fdset;

@@ -2,6 +2,7 @@
 #define EPOLL_H
 
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <sys/inotify.h>
 
 #define EVQ_SOURCE	"epoll.c"
@@ -13,7 +14,9 @@
 
 #define EVQ_EXTRA							\
     struct timeout_queue *tq;						\
-    fd_t sig_fd[2];  /* pipe to notify about signals */			\
+    pthread_mutex_t cs;							\
+    int volatile sig_ready;  /* triggered signals */			\
+    int sig_fd;  /* eventfd to interrupt the loop */			\
     int epoll_fd;  /* epoll descriptor */
 
 #endif

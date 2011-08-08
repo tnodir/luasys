@@ -9,9 +9,22 @@ evq_init (struct event_queue *evq)
     if (evq->kqueue_fd == -1)
 	return -1;
 
-    if (evq_ignore_signal(evq, SYS_SIGINTR, 0)) {
-	close(evq->kqueue_fd);
-	return -1;
+    pthread_mutex_init(&evq->cs, NULL);
+
+    {
+	fd_t *sig_fd = evq->sig_fd;
+	struct kevent kev;
+
+	kev.filter = EV_ADD;
+	kev.flags = EVFILT_READ;
+	kev.udata = NULL;
+
+	sig_fd[0] = sig_fd[1] = (fd_t) -1;
+	if (pipe(sig_fd) || fcntl(sig_fd[0], F_SETFL, O_NONBLOCK)
+	 || (kev->ident = sig_fd[0], kevent(evq->kqueue_fd, &kev, 1, NULL, 0, NULL))) {
+	    evq_done(evq);
+	    return -1;
+	}
     }
 
     evq->now = get_milliseconds();
@@ -21,6 +34,11 @@ evq_init (struct event_queue *evq)
 void
 evq_done (struct event_queue *evq)
 {
+    pthread_mutex_destroy(&evq->cs);
+
+    close(evq->sig_fd[0]);
+    close(evq->sig_fd[1]);
+
     close(evq->kqueue_fd);
 }
 
@@ -216,15 +234,16 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	    continue;
 
 	if (filter == EVFILT_SIGNAL) {
-	    const int signo = kev->ident;
-
-	    ev_ready = (signo == SIGCHLD)
-	     ? signal_children(ev_ready, timeout)
-	     : signal_actives(signo, ev_ready, timeout);
+	    ev_ready = signal_process_actives(evq, kev->ident, ev_ready, timeout);
 	    continue;
 	}
 
 	ev = kev->udata;
+	if (!ev) {
+	    ev_ready = signal_process_interrupt(evq, ev_ready, timeout);
+	    continue;
+	}
+
 	ev->flags |= ((filter == EVFILT_READ) ? EVENT_READ_RES : EVENT_WRITE_RES)
 	 | ((flags & EV_EOF) ? EVENT_EOF_RES : 0);
 

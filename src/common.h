@@ -49,6 +49,14 @@ extern int is_WinNT;
 #include <signal.h>
 #include <fcntl.h>
 
+#include <pthread.h>
+
+#if !defined(PTHREAD_MUTEX_RECURSIVE)
+extern int pthread_mutexattr_setkind_np (pthread_mutexattr_t *attr, int kind);
+#define pthread_mutexattr_settype	pthread_mutexattr_setkind_np
+#define PTHREAD_MUTEX_RECURSIVE		PTHREAD_MUTEX_RECURSIVE_NP
+#endif
+
 #define SYS_ERRNO	errno
 #define SYS_EAGAIN(e)	((e) == EAGAIN || (e) == EWOULDBLOCK)
 

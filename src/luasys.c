@@ -302,6 +302,8 @@ luaopen_sys (lua_State *L)
     luaL_register(L, LUA_SYSLIBNAME, sys_lib);
     createmeta(L);
 
+    signal_init();
+
     luaopen_sys_mem(L);
     luaopen_sys_thread(L);
 
@@ -323,8 +325,6 @@ luaopen_sys (lua_State *L)
 #else
     /* Ignore sigpipe or it will crash us */
     signal_set(SIGPIPE, SIG_IGN);
-    /* To interrupt blocking syscalls */
-    signal_set(SYS_SIGINTR, NULL);
 #endif
     return 1;
 }

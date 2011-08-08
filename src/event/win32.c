@@ -56,9 +56,8 @@ evq_add (struct event_queue *evq, struct event *ev)
 
     ev->wth = wth;
 
-    if (ev_flags & EVENT_SIGNAL) {
+    if (ev_flags & EVENT_SIGNAL)
 	return signal_add(evq, ev);
-    }
 
     if (ev_flags & EVENT_WINMSG) {
 	evq->win_msg = ev;
@@ -300,7 +299,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     }
 
     if (sig_ready)
-	ev_ready = signal_process(sig_ready, ev_ready, timeout);
+	ev_ready = signal_process_interrupt(evq, sig_ready, ev_ready, timeout);
 
     for (; wth; wth = wth->next_ready) {
 	HANDLE *hp;  /* event handles */

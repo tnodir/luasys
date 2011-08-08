@@ -105,9 +105,12 @@ int evq_wait (struct event_queue *evq, msec_t timeout);
 int evq_set_timeout (struct event *ev, msec_t msec);
 int evq_add_timer (struct event_queue *evq, struct event *ev, msec_t msec);
 
+int evq_signal (struct event_queue *evq, int signo);
 int evq_ignore_signal (struct event_queue *evq, int signo, int ignore);
+
 int evq_interrupt (struct event_queue *evq);
 
+void signal_init (void);
 
 #ifndef _WIN32
 

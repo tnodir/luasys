@@ -15,8 +15,6 @@ typedef DWORD 			thread_key_t;
 
 #else
 
-#include <pthread.h>
-
 #define thread_getid		pthread_self
 
 #define THREAD_FUNC_API		void *

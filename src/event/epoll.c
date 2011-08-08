@@ -6,11 +6,11 @@
 int
 evq_init (struct event_queue *evq)
 {
-    fd_t *sig_fd = evq->sig_fd;
-
     evq->epoll_fd = epoll_create(NEVENT);
     if (evq->epoll_fd == -1)
 	return -1;
+
+    pthread_mutex_init(&evq->cs, NULL);
 
     {
 	struct epoll_event epev;
@@ -18,9 +18,9 @@ evq_init (struct event_queue *evq)
 	memset(&epev, 0, sizeof(struct epoll_event));
 	epev.events = EPOLLIN;
 
-	sig_fd[0] = sig_fd[1] = (fd_t) -1;
-	if (pipe(sig_fd) || fcntl(sig_fd[0], F_SETFL, O_NONBLOCK)
-	 || epoll_ctl(evq->epoll_fd, EPOLL_CTL_ADD, sig_fd[0], &epev)) {
+	evq->sig_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+	if (evq->sig_fd == -1
+	 || epoll_ctl(evq->epoll_fd, EPOLL_CTL_ADD, evq->sig_fd, &epev)) {
 	    evq_done(evq);
 	    return -1;
 	}
@@ -33,9 +33,9 @@ evq_init (struct event_queue *evq)
 void
 evq_done (struct event_queue *evq)
 {
-    close(evq->sig_fd[0]);
-    close(evq->sig_fd[1]);
+    pthread_mutex_destroy(&evq->cs);
 
+    close(evq->sig_fd);
     close(evq->epoll_fd);
 }
 
@@ -165,8 +165,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 
 	ev = epev->data.ptr;
 	if (!ev) {
-	    if (revents & EPOLLFD_READ)
-		ev_ready = signal_process(evq, ev_ready, timeout);
+	    ev_ready = signal_process_interrupt(evq, ev_ready, timeout);
 	    continue;
 	}
 
