@@ -43,7 +43,7 @@ sys_strerror (lua_State *L)
     const int err = luaL_optint(L, -1, SYS_ERRNO);
 
 #ifndef _WIN32
-#if (_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600)
+#if defined(BSD) || (_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600)
     char buf[512];
 
     if (!strerror_r(err, buf, sizeof(buf))) {

@@ -15,13 +15,13 @@ evq_init (struct event_queue *evq)
 	fd_t *sig_fd = evq->sig_fd;
 	struct kevent kev;
 
-	kev.filter = EV_ADD;
-	kev.flags = EVFILT_READ;
+	kev.filter = EVFILT_READ;
+	kev.flags = EV_ADD;
 	kev.udata = NULL;
 
 	sig_fd[0] = sig_fd[1] = (fd_t) -1;
 	if (pipe(sig_fd) || fcntl(sig_fd[0], F_SETFL, O_NONBLOCK)
-	 || (kev->ident = sig_fd[0], kevent(evq->kqueue_fd, &kev, 1, NULL, 0, NULL))) {
+	 || (kev.ident = sig_fd[0], kevent(evq->kqueue_fd, &kev, 1, NULL, 0, NULL))) {
 	    evq_done(evq);
 	    return -1;
 	}
