@@ -154,7 +154,8 @@ timeout_process (struct timeout_queue *tq, struct event *ev_ready, msec_t now)
 	if (ev_head) {
 	    struct event *ev = ev_head;
 
-	    while ((long) ev->timeout_at <= timeout_at) {
+	    while ((long) ev->timeout_at <= timeout_at
+	     && !(ev->flags & EVENT_ACTIVE)) {
 		ev->flags |= EVENT_ACTIVE | EVENT_TIMEOUT_RES;
 		ev->timeout_at = tq->msec + now;
 

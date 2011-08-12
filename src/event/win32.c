@@ -257,9 +257,12 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     }
     if (wait_res == (WAIT_OBJECT_0 + n + 1)) {
 	struct event *ev = evq->win_msg;
-	if (ev) ev->next_ready = NULL;
-	evq->ev_ready = ev;
-	return 0;
+	if (ev && !(ev->flags & EVENT_ACTIVE)) {
+	    ev->flags |= EVENT_ACTIVE;
+	    ev->next_ready = ev_ready;
+	    ev_ready = ev;
+	}
+	goto end;
     }
     if (wait_res == WAIT_FAILED)
 	return EVQ_FAILED;

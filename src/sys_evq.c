@@ -601,13 +601,9 @@ levq_loop (lua_State *L)
     lua_rawgeti(L, ARG_LAST+1, EVQ_OBJ_UDATA);
     lua_rawgeti(L, ARG_LAST+1, EVQ_CALLBACK);
 
-    while (!evq_is_empty(evq)) {
+    evq->stop = 0;
+    while (!evq->stop && !evq_is_empty(evq)) {
 	struct event *ev, *ev_next;
-
-	if (evq->stop) {
-	    evq->stop = 0;
-	    break;
-	}
 
 	if (!evq->ev_ready) {
 	    const int res = evq_wait(evq, timeout);
@@ -667,10 +663,8 @@ levq_loop (lua_State *L)
 			switch (lua_resume(co, 7)) {
 			case 0:
 			    lua_settop(co, 0);
-			    if (!event_deleted(ev)) {
-				ev->flags |= EVENT_DELETE;
+			    if (!event_deleted(ev))
 				evq_del(ev, 0);
-			    }
 			    break;
 			case LUA_YIELD:
 			    lua_settop(co, 0);

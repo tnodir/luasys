@@ -53,11 +53,12 @@ signal_init (void)
 int
 evq_signal (struct event_queue *evq, int signo)
 {
-    int res;
+    int res = 0;
 
     pthread_mutex_lock(&evq->cs);
+    if (!evq->sig_ready)
+	res = evq_interrupt(evq);
     evq->sig_ready |= 1 << signo;
-    res = evq_interrupt(evq);
     pthread_mutex_unlock(&evq->cs);
     return res;
 }
@@ -262,7 +263,11 @@ signal_process_interrupt (struct event_queue *evq, struct event *ev_ready, msec_
 	int nr;
 
 	do nr = read(fd, buf, sizeof(buf));
-	while (nr == sizeof(buf) || (nr == -1 && errno == EINTR));
+	while ((nr == -1 && errno == EINTR)
+#ifndef USE_EPOLL
+	 || nr == sizeof(buf)
+#endif
+	);
     }
     sig_ready = evq->sig_ready;
     evq->sig_ready = 0;
