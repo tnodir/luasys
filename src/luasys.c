@@ -212,7 +212,7 @@ sys_xpcall (lua_State *L)
 #include "sys_rand.c"
 
 
-static luaL_reg sys_lib[] = {
+static luaL_Reg sys_lib[] = {
     {"strerror",	sys_strerror},
     {"nprocs",		sys_nprocs},
     {"limit_nfiles",	sys_limit_nfiles},
@@ -243,7 +243,7 @@ createmeta (lua_State *L)
     const int top = lua_gettop(L);
     const struct meta_s {
 	const char *tname;
-	luaL_reg *meth;
+	luaL_Reg *meth;
 	int is_index;
     } meta[] = {
 	{DIR_TYPENAME,		dir_meth,	0},

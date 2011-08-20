@@ -158,7 +158,7 @@ log_report (lua_State *L)
 #define LOG_METHODS \
     {"log",		sys_log}
 
-static luaL_reg log_meth[] = {
+static luaL_Reg log_meth[] = {
     {"__index",		log_type},
     {"__call",		log_report},
     {"__gc",		log_close},

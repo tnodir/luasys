@@ -197,7 +197,7 @@ ecb_header (lua_State *L)
 }
 
 
-static luaL_reg ecb_meth[] = {
+static luaL_Reg ecb_meth[] = {
     {"getvar",		ecb_getvar},
     {"data",		ecb_data},
     {"read",		ecb_read},

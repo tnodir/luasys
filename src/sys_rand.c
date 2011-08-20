@@ -84,7 +84,7 @@ rand_next (lua_State *L)
 #define RAND_METHODS \
     {"random",		sys_random}
 
-static luaL_reg rand_meth[] = {
+static luaL_Reg rand_meth[] = {
     {"__call",		rand_next},
     {"__gc",		rand_close},
     {NULL, NULL}

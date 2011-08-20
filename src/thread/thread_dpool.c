@@ -293,7 +293,7 @@ dpool_get_trigger (lua_State *L, struct sys_thread **tdp)
 }
 
 
-static luaL_reg dpool_meth[] = {
+static luaL_Reg dpool_meth[] = {
     {"put",		dpool_put},
     {"get",		dpool_get},
     {"wait",		dpool_wait},

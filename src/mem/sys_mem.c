@@ -704,7 +704,7 @@ mem_tostring (lua_State *L)
 #include "membuf.c"
 
 
-static luaL_reg mem_meth[] = {
+static luaL_Reg mem_meth[] = {
     {"type",		mem_type},
     {"typesize",	mem_typesize},
     {"alloc",		mem_alloc},
@@ -739,7 +739,7 @@ static luaL_reg mem_meth[] = {
     {NULL, NULL}
 };
 
-static luaL_reg mem_lib[] = {
+static luaL_Reg mem_lib[] = {
     {"pointer",		mem_new},
     {NULL, NULL}
 };

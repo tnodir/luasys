@@ -249,7 +249,7 @@ period_get (lua_State *L)
     {"difftime",	sys_difftime}, \
     {"period",		sys_period}
 
-static luaL_reg period_meth[] = {
+static luaL_Reg period_meth[] = {
     {"start",	period_start},
     {"get",	period_get},
     {NULL, NULL}

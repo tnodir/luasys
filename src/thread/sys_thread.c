@@ -664,7 +664,7 @@ thread_get_trigger (lua_State *L, struct sys_vmthread **vmtdp)
 #include "thread_msg.c"
 
 
-static luaL_reg thread_lib[] = {
+static luaL_Reg thread_lib[] = {
     {"init",		thread_init},
     {"run",		thread_run},
     {"runvm",		thread_runvm},

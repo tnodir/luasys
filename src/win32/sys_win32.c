@@ -86,7 +86,7 @@ win32_beep (lua_State *L)
     {"mailslot",	win32_mailslot}, \
     {"mailslot_info",	win32_mailslot_info}
 
-static luaL_reg win32_lib[] = {
+static luaL_Reg win32_lib[] = {
     {"file_apis",	win32_file_apis},
     {"beep",		win32_beep},
     {"registry",	reg_new},

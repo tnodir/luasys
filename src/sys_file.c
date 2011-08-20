@@ -783,7 +783,7 @@ sys_tostring (lua_State *L)
 #define FD_METHODS \
     {"handle",		sys_file}
 
-static luaL_reg fd_meth[] = {
+static luaL_Reg fd_meth[] = {
     {"open",		sys_open},
     {"create",		sys_create},
     {"tempfile",	sys_tempfile},

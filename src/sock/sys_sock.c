@@ -739,7 +739,7 @@ sock_tostring (lua_State *L)
 }
 
 
-static luaL_reg sock_meth[] = {
+static luaL_Reg sock_meth[] = {
     {"socket",		sock_socket},
     {"close",		sock_close},
     {"shutdown",	sock_shutdown},
@@ -761,7 +761,7 @@ static luaL_reg sock_meth[] = {
     {NULL, NULL}
 };
 
-static luaL_reg sock_lib[] = {
+static luaL_Reg sock_lib[] = {
     {"handle",		sock_new},
     ADDR_METHODS,
     {NULL, NULL}

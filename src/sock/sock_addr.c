@@ -541,7 +541,7 @@ sock_addr_tostring (lua_State *L)
     {"inet_ntop",	sock_inet_ntop}, \
     {"addr",		sock_addr_new}
 
-static luaL_reg addr_meth[] = {
+static luaL_Reg addr_meth[] = {
     {"inet",		sock_addr_inet},
     {"file",		sock_addr_file},
     {"getsockname",	sock_addr_getsockname},

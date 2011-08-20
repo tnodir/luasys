@@ -613,7 +613,7 @@ sys_dir_next (lua_State *L)
     {"rmdir",		sys_rmdir}, \
     {"dir",		sys_dir}
 
-static luaL_reg dir_meth[] = {
+static luaL_Reg dir_meth[] = {
     {"__call",		sys_dir_next},
     {"__gc",		sys_dir_close},
     {NULL, NULL}

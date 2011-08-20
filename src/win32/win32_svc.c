@@ -282,7 +282,7 @@ svc_tostring (lua_State *L)
 }
 
 
-static luaL_reg svc_meth[] = {
+static luaL_Reg svc_meth[] = {
     {"status",		svc_status},
     {"wait",		svc_wait},
     {"__tostring",	svc_tostring},
@@ -290,7 +290,7 @@ static luaL_reg svc_meth[] = {
     {NULL, NULL}
 };
 
-static luaL_reg svc_lib[] = {
+static luaL_Reg svc_lib[] = {
     {"install",		svc_install},
     {"uninstall",	svc_uninstall},
     {"handle",		svc_handle},

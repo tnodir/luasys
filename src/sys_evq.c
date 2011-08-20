@@ -859,7 +859,7 @@ levq_tostring (lua_State *L)
 #define EVQ_METHODS \
     {"event_queue",	levq_new}
 
-static luaL_reg evq_meth[] = {
+static luaL_Reg evq_meth[] = {
     {"add",		levq_add},
     {"add_timer",	levq_add_timer},
     {"add_pid",		levq_add_pid},

@@ -303,7 +303,7 @@ reg_tostring (lua_State *L)
 }
 
 
-static luaL_reg reg_meth[] = {
+static luaL_Reg reg_meth[] = {
     {"open",		reg_open},
     {"create",		reg_create},
     {"close",		reg_close},
