@@ -15,14 +15,13 @@ levq_new (lua_State *L)
     struct event_queue *evq = lua_newuserdata(L, sizeof(struct event_queue));
 
     memset(evq, 0, sizeof(struct event_queue));
-    evq->vmtd = sys_get_vmthread(sys_get_thread());
     evq->buf_index = EVQ_BUF_IDX;
 
     if (!evq_init(evq)) {
 	luaL_getmetatable(L, EVQ_TYPENAME);
 	lua_setmetatable(L, -2);
 
-	lua_newtable(L);  /* environ. | {ev_ludata => get_trigger_func} */
+	lua_newtable(L);  /* environ. */
 	lua_newtable(L);  /* {ev_id => obj_udata} */
 	lua_rawseti(L, -2, EVQ_OBJ_UDATA);
 	lua_newtable(L);  /* {ev_id => cb_func} */
@@ -127,7 +126,7 @@ levq_del_event (lua_State *L, int idx, struct event_queue *evq, struct event *ev
  *	events (string: "r", "w", "rw") | signal (number),
  *	callback (function),
  *	[timeout (milliseconds), one_shot (boolean),
- *	event_flags (number), get_trigger_func (cfunction)]
+ *	event_flags (number)]
  * Returns: [ev_ludata]
  */
 static int
@@ -144,8 +143,6 @@ levq_add (lua_State *L)
      | (lua_toboolean(L, 6) ? EVENT_ONESHOT : 0)
      | (lua_isnil(L, 4) ? 0 : (EVENT_CALLBACK
      | (lua_isthread(L, 4) ? EVENT_CALLBACK_THREAD : 0)));
-    sys_get_trigger_t get_trigger = ev_flags
-     ? (sys_get_trigger_t) lua_tocfunction(L, 8) : NULL;
     struct event *ev;
     int res;
 
@@ -168,21 +165,6 @@ levq_add (lua_State *L)
 	evq->ev_free = levq_new_event(L, ARG_LAST+1, evq);
 
     if (ev_flags & EVENT_TIMER) {
-	if (ev_flags & EVENT_OBJECT) {
-	    struct sys_thread *vmtd;
-	    struct event **ev_head;
-
-	    lua_pushvalue(L, 2);
-	    ev_head = (void *) get_trigger(L, &vmtd);
-	    if (!ev_head) goto err;
-	    lua_pop(L, 1);
-
-	    if (vmtd != evq->vmtd) sys_vm2_enter(vmtd);
-	    ev->next_object = *ev_head;
-	    *ev_head = ev;
-	    if (vmtd != evq->vmtd) sys_vm2_leave(vmtd);
-	}
-
 	res = evq_add_timer(evq, ev, timeout);
     }
     else {
@@ -202,12 +184,6 @@ levq_add (lua_State *L)
 
 	lua_pushlightuserdata(L, ev);
 
-	/* get_trigger_func */
-	if (get_trigger) {
-	    lua_pushvalue(L, -1);
-	    lua_pushcfunction(L, (lua_CFunction) get_trigger);
-	    lua_rawset(L, ARG_LAST+1);
-	}
 	/* cb_fun */
 	if (ev_flags & EVENT_CALLBACK) {
 	    lua_pushvalue(L, 4);
@@ -219,7 +195,6 @@ levq_add (lua_State *L)
 
 	return 1;
     }
- err:
     levq_del_event(L, ARG_LAST+1, evq, ev);
     return sys_seterror(L, 0);
 }
@@ -294,34 +269,6 @@ levq_add_dirwatch (lua_State *L)
     lua_pushnil(L);  /* EVENT_ONESHOT */
     lua_pushinteger(L, EVENT_DIRWATCH
      | (filter << EVENT_EOF_SHIFT_RES));  /* event_flags */
-    return levq_add(L);
-}
-
-/*
- * Arguments: evq_udata, object (any), [metatable (table)],
- *	events (string: "r", "w", "rw"),
- *	callback (function), [timeout (milliseconds), one_shot (boolean)]
- * Returns: [ev_ludata]
- */
-static int
-levq_add_trigger (lua_State *L)
-{
-    int tblidx;
-
-    lua_settop(L, 7);
-    if (lua_istable(L, 3))
-	tblidx = 3;
-    else {
-	lua_pop(L, 1);  /* pop nil */
-	lua_getmetatable(L, 2);
-	tblidx = 7;
-    }
-    lua_pushinteger(L, EVENT_TIMER | EVENT_OBJECT);  /* event_flags */
-
-    lua_getfield(L, tblidx, SYS_TRIGGER_TAG);
-    lua_remove(L, tblidx);
-    luaL_checktype(L, 8, LUA_TFUNCTION);
-
     return levq_add(L);
 }
 
@@ -456,40 +403,8 @@ levq_del (lua_State *L)
 
     ev_flags = ev->flags;
 
-    if (!event_deleted(ev)) {
-	if (ev_flags & EVENT_OBJECT) {
-	    sys_get_trigger_t get_trigger;
-	    struct sys_thread *vmtd;
-	    struct event **ev_head;
-
-	    lua_pushlightuserdata(L, ev);
-	    /* get_trigger_func */
-	    lua_pushvalue(L, -1);
-	    lua_rawget(L, ARG_LAST+1);
-	    get_trigger = (sys_get_trigger_t) lua_tocfunction(L, -1);
-	    lua_pop(L, 1);
-	    /* clear the function */
-	    lua_pushnil(L);
-	    lua_rawset(L, ARG_LAST+1);
-
-	    lua_rawgeti(L, ARG_LAST+2, ev->ev_id);
-	    ev_head = (void *) get_trigger(L, &vmtd);
-	    lua_pop(L, 1);
-
-	    if (vmtd != evq->vmtd) sys_vm2_enter(vmtd);
-	    if (ev == *ev_head)
-		*ev_head = ev->next_object;
-	    else {
-		struct event *obj = *ev_head;
-		while (obj->next_object != ev)
-		    obj = obj->next_object;
-		obj->next_object = ev->next_object;
-	    }
-	    if (vmtd != evq->vmtd) sys_vm2_leave(vmtd);
-	}
-
+    if (!event_deleted(ev))
 	res = evq_del(ev, reuse_fd);
-    }
 
     if (!(ev_flags & (EVENT_ACTIVE | EVENT_DELETE))) {
 	levq_del_event(L, ARG_LAST+1, evq, ev);
@@ -731,69 +646,6 @@ levq_now (lua_State *L)
     return 1;
 }
 
-int
-sys_trigger_notify (sys_trigger_t *trigger, int flags)
-{
-    struct sys_thread *vmtd = sys_get_vmthread(sys_get_thread());
-    struct event *ev = (struct event *) *trigger;
-    struct event_queue *evq = event_get_evq(ev);
-    struct event *ev_ready;
-    const int deleted = (flags & SYS_EVDEL) ? EVENT_DELETE : 0;
-
-    if (deleted) *trigger = NULL;
-
-    if (vmtd != evq->vmtd) sys_vm2_enter(evq->vmtd);
-    ev_ready = evq->ev_ready;
-
-    do {
-	const unsigned int ev_flags = ev->flags;
-	int res = 0;
-
-	if ((flags & SYS_EVREAD) && (ev_flags & EVENT_READ))
-	    res = EVENT_READ_RES;
-	if ((flags & SYS_EVWRITE) && (ev_flags & EVENT_WRITE))
-	    res |= EVENT_WRITE_RES;
-	if (flags & SYS_EVEOF)
-	    res |= EVENT_EOF_RES;
-
-	if (res || deleted) {
-	    struct event_queue *cur_evq = event_get_evq(ev);
-
-	    ev->flags |= (res ? res : deleted);
-	    if (ev_flags & EVENT_ACTIVE)
-		continue;
-
-	    ev->flags |= EVENT_ACTIVE;
-	    if (deleted || (ev_flags & EVENT_ONESHOT))
-		evq_del(ev, 0);
-	    else if (ev->tq) {
-		evq_set_timeout(ev, ev->tq->msec);  /* timeout_reset */
-	    }
-
-	    /* Is the event from the same event_queue? */
-	    if (evq != cur_evq) {
-		evq->ev_ready = ev_ready;
-		if (vmtd != evq->vmtd) sys_vm2_leave(evq->vmtd);
-
-		evq_interrupt(evq);
-
-		evq = cur_evq;
-		if (vmtd != evq->vmtd) sys_vm2_enter(evq->vmtd);
-		ev_ready = evq->ev_ready;
-	    }
-
-	    ev->next_ready = ev_ready;
-	    ev_ready = ev;
-	}
-	ev = ev->next_object;
-    } while (ev);
-
-    evq->ev_ready = ev_ready;
-    if (vmtd != evq->vmtd) sys_vm2_leave(evq->vmtd);
-
-    return evq_interrupt(evq);
-}
-
 /*
  * Arguments: evq_udata, ev_ludata, [events (string: "r", "w", "rw")]
  * Returns: [evq_udata]
@@ -804,25 +656,20 @@ levq_notify (lua_State *L)
     struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
     struct event *ev = levq_toevent(L, 2);
     const char *evstr = lua_tostring(L, 3);
+    unsigned int res;
 
-    if (!ev || event_deleted(ev) || !(ev->flags & EVENT_TIMER))
+    (void) evq;
+
+    if (!ev || event_deleted(ev))
 	return 0;
 
-    ev->flags |= EVENT_ACTIVE
-     | (!evstr ? EVENT_READ_RES : (evstr[0] == 'r')
+    if (!(ev->flags & EVENT_TIMER))
+	luaL_argerror(L, 2, "timer expected");
+
+    res = (!evstr ? EVENT_READ_RES : (evstr[0] == 'r')
      ? EVENT_READ_RES | (evstr[1] ? EVENT_WRITE_RES : 0) : EVENT_WRITE_RES);
 
-    if (ev->tq) {
-	if (ev->flags & EVENT_ONESHOT)
-	    evq_del(ev, 0);
-	else
-	    evq_set_timeout(ev, ev->tq->msec);  /* timeout_reset */
-    }
-
-    ev->next_ready = evq->ev_ready;
-    evq->ev_ready = ev;
-
-    if (!evq_interrupt(evq)) {
+    if (!evq_notify(ev, res)) {
 	lua_settop(L, 1);
 	return 1;
     }
@@ -865,7 +712,6 @@ static luaL_Reg evq_meth[] = {
     {"add_pid",		levq_add_pid},
     {"add_winmsg",	levq_add_winmsg},
     {"add_dirwatch",	levq_add_dirwatch},
-    {"add_trigger",	levq_add_trigger},
     {"add_signal",	levq_add_signal},
     {"ignore_signal",	levq_ignore_signal},
     {"add_socket",	levq_add_socket},

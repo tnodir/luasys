@@ -86,7 +86,7 @@ clean:
 luasys.o: luasys.c sys_comm.c sys_date.c sys_env.c sys_evq.c sys_file.c \
     sys_fs.c sys_log.c sys_proc.c sys_rand.c sys_unix.c common.h \
     thread/sys_thread.c thread/thread_dpool.c \
-    thread/thread_msg.c thread/thread_sync.c \
+    thread/thread_pipe.c thread/thread_sync.c \
     mem/sys_mem.c mem/membuf.c \
     event/evq.c event/epoll.c event/kqueue.c event/poll.c \
     event/select.c event/signal.c event/timeout.c \

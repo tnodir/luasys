@@ -49,7 +49,6 @@ struct event {
 #define EVENT_SIGNAL		0x00000080
 #define EVENT_WINMSG		0x00000100
 #define EVENT_DIRWATCH		0x00000200  /* directory watcher */
-#define EVENT_OBJECT		0x00000400  /* triggerable object */
 #define EVENT_AIO		0x00000800
 #define EVENT_CALLBACK		0x00001000  /* callback exist */
 #define EVENT_CALLBACK_THREAD	0x00002000  /* callback is coroutine */
@@ -86,8 +85,6 @@ struct event_queue {
     struct event * volatile ev_ready;  /* head of ready events */
     struct event *ev_free;  /* head of free events */
 
-    struct sys_thread *vmtd;  /* for inter-vm events (eg. threads i/o) */
-
     EVQ_EXTRA
 };
 
@@ -99,6 +96,7 @@ int evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *pat
 int evq_del (struct event *ev, int reuse_fd);
 
 int evq_modify (struct event *ev, unsigned int flags);
+int evq_notify (struct event *ev, unsigned int flags);
 
 int evq_wait (struct event_queue *evq, msec_t timeout);
 

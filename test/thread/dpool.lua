@@ -7,9 +7,6 @@ local thread = sys.thread
 thread.init()
 
 
--- Event Queue
-local evq = assert(sys.event_queue())
-
 -- Data Pool
 local dpool
 do
@@ -28,8 +25,9 @@ do
 end
 
 -- Consumer Thread
+local consumer
 do
-    local function consumer()
+    local function consume()
 	while true do
 	    local i, s = dpool:get(200)
 	    if not i then break end
@@ -38,21 +36,22 @@ do
 	end
     end
 
-    local tid = assert(thread.run(consumer))
-    assert(evq:add_trigger(tid, thread))
+    consumer = assert(thread.run(consume))
 end
 
 -- Producer Thread
+local producer
 do
-    local function producer()
+    local function produce()
 	for i = 1, 10 do
 	    dpool:put(i, (i % 2 == 0) and "even" or "odd")
 	    thread.sleep(100)
 	end
     end
 
-    local tid = assert(thread.run(producer))
-    assert(evq:add_trigger(tid, thread))
+    producer = assert(thread.run(produce))
 end
 
-evq:loop()  -- Wait threads termination
+-- Wait threads termination
+consumer:wait()
+producer:wait()

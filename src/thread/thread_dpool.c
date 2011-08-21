@@ -14,10 +14,10 @@ struct data_pool {
 
 #define DPOOL_PUTONFULL		1
 #define DPOOL_GETONEMPTY	2
+#define DPOOL_OPEN		8
     unsigned int flags;
 
     thread_event_t tev;  /* synchronization */
-    sys_trigger_t trigger;  /* notify event_queue */
 };
 
 
@@ -25,13 +25,14 @@ struct data_pool {
  * Returns: [dpool_udata]
  */
 static int
-thread_data_pool (lua_State *L)
+dpool_new (lua_State *L)
 {
     struct data_pool *dp = lua_newuserdata(L, sizeof(struct data_pool));
     memset(dp, 0, sizeof(struct data_pool));
     dp->max = (unsigned int) -1;
 
     if (!thread_event_new(&dp->tev)) {
+	dp->flags |= DPOOL_OPEN;
 	luaL_getmetatable(L, DPOOL_TYPENAME);
 	lua_setmetatable(L, -2);
 
@@ -46,11 +47,14 @@ thread_data_pool (lua_State *L)
  * Arguments: dpool_udata
  */
 static int
-dpool_done (lua_State *L)
+dpool_close (lua_State *L)
 {
     struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
 
-    thread_event_del(&dp->tev);
+    if (dp->flags & DPOOL_OPEN) {
+	dp->flags ^= DPOOL_OPEN;
+	thread_event_del(&dp->tev);
+    }
     return 0;
 }
 
@@ -105,11 +109,9 @@ dpool_put (lua_State *L)
 	} while (nput--);
 	dp->top = top;
 
-	/* notify event_queue */
-	if (!dp->n++ && dp->trigger)
-	    sys_trigger_notify(&dp->trigger, SYS_EVREAD);
-
-	thread_event_signal(&dp->tev);
+	if (!dp->n++) {
+	    thread_event_signal(&dp->tev);
+	}
     }
     return 0;
 }
@@ -158,9 +160,6 @@ dpool_get (lua_State *L)
 	    if (dp->idx == dp->top)
 		dp->idx = dp->top = 0;
 	    if (dp->n-- == dp->max) {
-		/* notify event_queue */
-		if (dp->trigger)
-		    sys_trigger_notify(&dp->trigger, SYS_EVWRITE);
 		thread_event_signal(&dp->tev);
 	    }
 	    return nput;
@@ -276,20 +275,9 @@ static int
 dpool_tostring (lua_State *L)
 {
     struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
+
     lua_pushfstring(L, DPOOL_TYPENAME " (%p)", &dp->tev);
     return 1;
-}
-
-/*
- * Arguments: ..., dpool_udata
- */
-static sys_trigger_t *
-dpool_get_trigger (lua_State *L, struct sys_thread **tdp)
-{
-    struct data_pool *dp = checkudata(L, -1, DPOOL_TYPENAME);
-
-    *tdp = NULL;
-    return &dp->trigger;
 }
 
 
@@ -301,6 +289,6 @@ static luaL_Reg dpool_meth[] = {
     {"callbacks",	dpool_callbacks},
     {"__len",		dpool_count},
     {"__tostring",	dpool_tostring},
-    {"__gc",		dpool_done},
+    {"__gc",		dpool_close},
     {NULL, NULL}
 };

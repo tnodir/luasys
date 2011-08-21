@@ -43,13 +43,19 @@ static int
 rand_close (lua_State *L)
 {
 #ifndef _WIN32
-    fd_t fd = (fd_t) lua_unboxinteger(L, 1, RAND_TYPENAME);
+    fd_t *fdp = (fd_t *) checkudata(L, 1, RAND_TYPENAME);
 
-    close(fd);
+    if (*fdp != (fd_t) -1) {
+	close(*fdp);
+	*fdp = (fd_t) -1;
+    }
 #else
-    HCRYPTPROV prov = (HCRYPTPROV) lua_unboxpointer(L, 1, RAND_TYPENAME);
+    HCRYPTPROV *p = (HCRYPTPROV *) checkudata(L, 1, RAND_TYPENAME);
 
-    CryptReleaseContext(prov, 0);
+    if (*p != (HCRYPTPROV) -1) {
+	CryptReleaseContext(*p, 0);
+	*p = (HCRYPTPROV) -1;
+    }
 #endif
     return 0;
 }

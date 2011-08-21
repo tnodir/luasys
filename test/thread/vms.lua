@@ -8,38 +8,40 @@ local thread = sys.thread
 thread.init()
 
 
+-- Pipes
+local work_pipe, main_pipe = thread.pipe(), thread.pipe()
+
 -- Consumer VM-Thread
-local consumer
 do
-    local function consume(master)
+    local function consume(work_pipe, main_pipe)
 	local sys = require"sys"
 	local thread = sys.thread
 
 	while true do
-	    local producer, i, s = thread.msg_recv(200)
-	    if not producer then break end
+	    local i, s = work_pipe:get(200)
+	    if not i then break end
 	    print(i, s)
 	    thread.sleep(200)
 	end
-	thread.msg_send(master, "end")
+	main_pipe:put("The end.")
     end
 
-    consumer = assert(thread.runvm(string.dump(consume)))
+    assert(thread.runvm(string.dump(consume), work_pipe, main_pipe))
 end
 
 -- Producer VM-Thread
 do
-    local function produce(master, consumer)
+    local function produce(work_pipe)
 	local sys = require"sys"
 	local thread = sys.thread
 
 	for i = 1, 10 do
-	    thread.msg_send(consumer, i, (i % 2 == 0) and "even" or "odd")
+	    work_pipe:put(i, (i % 2 == 0) and "even" or "odd")
 	    thread.sleep(100)
 	end
     end
 
-    assert(thread.runvm(string.dump(produce), consumer))
+    assert(thread.runvm(string.dump(produce), work_pipe))
 end
 
-thread.msg_recv()  -- Wait vm-threads termination
+main_pipe:wait()  -- Wait VM-Threads termination

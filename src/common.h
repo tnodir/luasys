@@ -189,26 +189,6 @@ struct sys_thread *sys_del_thread (struct sys_thread *td);
 
 
 /*
- * Object Events
- */
-
-#define SYS_TRIGGER_TAG	"evq__"
-
-typedef void *		sys_trigger_t;
-
-typedef sys_trigger_t *(*sys_get_trigger_t) (lua_State *L, struct sys_thread **tdp);
-
-enum {
-    SYS_EVREAD	= 1,
-    SYS_EVWRITE	= 2,
-    SYS_EVEOF	= 4,
-    SYS_EVDEL	= 8
-};
-
-int sys_trigger_notify (sys_trigger_t *trigger, int flags);
-
-
-/*
  * Time
  */
 
