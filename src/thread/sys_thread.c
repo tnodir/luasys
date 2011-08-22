@@ -6,7 +6,8 @@
 
 #define thread_getid		GetCurrentThreadId
 
-#define THREAD_FUNC_API		DWORD WINAPI
+#define THREAD_FUNC_RES		DWORD
+#define THREAD_FUNC_API		THREAD_FUNC_RES WINAPI
 
 typedef unsigned int (WINAPI *thread_func_t) (void *);
 
@@ -17,7 +18,8 @@ typedef DWORD 			thread_key_t;
 
 #define thread_getid		pthread_self
 
-#define THREAD_FUNC_API		void *
+#define THREAD_FUNC_RES		void *
+#define THREAD_FUNC_API		THREAD_FUNC_RES
 
 typedef void *(*thread_func_t) (void *);
 
@@ -49,8 +51,7 @@ struct sys_thread {
     lua_State *L;
     struct sys_vmthread *vmtd;
     thread_id_t tid;
-    int interrupted:	1;
-    int result:		8;
+    int interrupted;
 };
 
 /* Main VM-Thread's data */
@@ -474,19 +475,20 @@ static THREAD_FUNC_API
 thread_start (struct sys_thread *td)
 {
     lua_State *L = td->L;
+    lua_Integer res;
 
     sys_set_thread(td);
     sys_vm2_enter(td);
 
     lua_call(L, lua_gettop(L) - 1, 1);
 
-    td->result = lua_tointeger(L, -1);
+    res = lua_tointeger(L, -1);
 
     /* remove reference to self */
     td = sys_del_thread(td);
 
     sys_vm2_leave(td);
-    return 0;
+    return (THREAD_FUNC_RES) res;
 }
 
 /*
@@ -588,6 +590,7 @@ static int
 thread_wait (lua_State *L)
 {
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
+    THREAD_FUNC_RES thread_res;
     int res;
 
     if (thread_ismain(td))
@@ -595,7 +598,7 @@ thread_wait (lua_State *L)
 
     sys_vm_leave();
 #ifndef _WIN32
-    res = pthread_join(td->tid, NULL);
+    res = pthread_join(td->tid, &thread_res);
     if (res) errno = res;
 #else
     res = WaitForSingleObject(td->th, INFINITE) != WAIT_OBJECT_0;
@@ -603,7 +606,10 @@ thread_wait (lua_State *L)
     sys_vm_enter();
 
     if (!res) {
-	lua_pushinteger(L, td->result);
+#ifdef _WIN32
+	GetExitCodeThread(td->th, &thread_res);
+#endif
+	lua_pushinteger(L, (lua_Integer) thread_res);
 	return 1;
     }
     return sys_seterror(L, 0);
