@@ -23,7 +23,6 @@ do
 	    print(i, s)
 	    thread.sleep(200)
 	end
-	main_pipe:put("The end.")
     end
 
     assert(thread.runvm(string.dump(consume), work_pipe, main_pipe))
