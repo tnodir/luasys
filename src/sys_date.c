@@ -4,7 +4,11 @@
 
 #ifndef _WIN32
 #if defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0
-#define USE_CLOCK_GETTIME
+#ifdef CLOCK_MONOTONIC_COARSE
+#define SYS_MONOTONIC_CLOCKID CLOCK_MONOTONIC_COARSE
+#else
+#define SYS_MONOTONIC_CLOCKID CLOCK_MONOTONIC
+#endif
 #endif
 #else
 struct period {
@@ -17,9 +21,9 @@ struct period {
 msec_t
 get_milliseconds (void)
 {
-#ifdef USE_CLOCK_GETTIME
+#ifdef SYS_MONOTONIC_CLOCKID
     struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
+    clock_gettime(SYS_MONOTONIC_CLOCKID, &ts);
     return (ts.tv_sec * 1000 + ts.tv_nsec / 1000000L);
 #else
     struct timeval tv;
@@ -159,7 +163,7 @@ static int
 sys_period (lua_State *L)
 {
 #ifndef _WIN32
-#ifdef USE_CLOCK_GETTIME
+#ifdef SYS_MONOTONIC_CLOCKID
     lua_newuserdata(L, sizeof(struct timespec));
 #else
     lua_newuserdata(L, sizeof(struct timeval));
@@ -184,8 +188,8 @@ period_start (lua_State *L)
     void *p = checkudata(L, 1, PERIOD_TYPENAME);
 
 #ifndef _WIN32
-#ifdef USE_CLOCK_GETTIME
-    clock_gettime(CLOCK_MONOTONIC, p);
+#ifdef SYS_MONOTONIC_CLOCKID
+    clock_gettime(SYS_MONOTONIC_CLOCKID, p);
 #else
     gettimeofday(p, NULL);
 #endif
@@ -205,10 +209,10 @@ period_get (lua_State *L)
     lua_Number usec;
 
 #ifndef _WIN32
-#ifdef USE_CLOCK_GETTIME
+#ifdef SYS_MONOTONIC_CLOCKID
     struct timespec te, *ts = checkudata(L, 1, PERIOD_TYPENAME);
 
-    clock_gettime(CLOCK_MONOTONIC, &te);
+    clock_gettime(SYS_MONOTONIC_CLOCKID, &te);
 
     te.tv_sec -= ts->tv_sec;
     te.tv_nsec -= ts->tv_nsec;
