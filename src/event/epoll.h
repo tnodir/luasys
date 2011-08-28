@@ -5,6 +5,13 @@
 #include <sys/eventfd.h>
 #include <sys/inotify.h>
 
+#ifdef EFD_NONBLOCK
+#define USE_EVENTFD
+#define NSIG_FD		1
+#else
+#define NSIG_FD		2
+#endif
+
 #define EVQ_SOURCE	"epoll.c"
 
 #define NEVENT		64
@@ -16,7 +23,7 @@
     struct timeout_queue *tq;						\
     pthread_mutex_t cs;							\
     int volatile sig_ready;  /* triggered signals */			\
-    int sig_fd;  /* eventfd to interrupt the loop */			\
+    fd_t sig_fd[NSIG_FD];  /* eventfd or pipe to interrupt the loop */	\
     int epoll_fd;  /* epoll descriptor */
 
 #endif

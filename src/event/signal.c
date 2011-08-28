@@ -66,8 +66,8 @@ evq_signal (struct event_queue *evq, int signo)
 int
 evq_interrupt (struct event_queue *evq)
 {
-#ifdef USE_EPOLL
-    const fd_t fd = evq->sig_fd;
+#ifdef USE_EVENTFD
+    const fd_t fd = evq->sig_fd[0];
     const int64_t data = 1;
 #else
     const fd_t fd = evq->sig_fd[1];
@@ -253,18 +253,17 @@ signal_process_interrupt (struct event_queue *evq, struct event *ev_ready, msec_
     pthread_mutex_lock(&evq->cs);
     /* reset interruption event */
     {
-#ifdef USE_EPOLL
-	const fd_t fd = evq->sig_fd;
+	const fd_t fd = evq->sig_fd[0];
+#ifdef USE_EVENTFD
 	char buf[8];
 #else
-	const fd_t fd = evq->sig_fd[0];
 	char buf[BUFSIZ];
 #endif
 	int nr;
 
 	do nr = read(fd, buf, sizeof(buf));
 	while ((nr == -1 && errno == EINTR)
-#ifndef USE_EPOLL
+#ifndef USE_EVENTFD
 	 || nr == sizeof(buf)
 #endif
 	);

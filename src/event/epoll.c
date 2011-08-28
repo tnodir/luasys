@@ -13,14 +13,20 @@ evq_init (struct event_queue *evq)
     pthread_mutex_init(&evq->cs, NULL);
 
     {
+	fd_t *sig_fd = evq->sig_fd;
 	struct epoll_event epev;
 
 	memset(&epev, 0, sizeof(struct epoll_event));
 	epev.events = EPOLLIN;
 
-	evq->sig_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
-	if (evq->sig_fd == -1
-	 || epoll_ctl(evq->epoll_fd, EPOLL_CTL_ADD, evq->sig_fd, &epev)) {
+#ifdef USE_EVENTFD
+	sig_fd[0] = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+	if (sig_fd[0] == -1
+#else
+	sig_fd[0] = sig_fd[1] = (fd_t) -1;
+	if (pipe(sig_fd) || fcntl(sig_fd[0], F_SETFL, O_NONBLOCK)
+#endif
+	 || epoll_ctl(evq->epoll_fd, EPOLL_CTL_ADD, sig_fd[0], &epev)) {
 	    evq_done(evq);
 	    return -1;
 	}
@@ -35,7 +41,13 @@ evq_done (struct event_queue *evq)
 {
     pthread_mutex_destroy(&evq->cs);
 
-    close(evq->sig_fd);
+#ifdef USE_EVENTFD
+    close(evq->sig_fd[0]);
+#else
+    close(evq->sig_fd[0]);
+    close(evq->sig_fd[1]);
+#endif
+
     close(evq->epoll_fd);
 }
 
