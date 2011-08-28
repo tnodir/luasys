@@ -2,11 +2,10 @@
 #define EPOLL_H
 
 #include <sys/epoll.h>
-#include <sys/eventfd.h>
 #include <sys/inotify.h>
 
-#ifdef EFD_NONBLOCK
-#define USE_EVENTFD
+#ifdef USE_EVENTFD
+#include <sys/eventfd.h>
 #define NSIG_FD		1
 #else
 #define NSIG_FD		2
