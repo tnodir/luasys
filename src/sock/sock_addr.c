@@ -251,7 +251,7 @@ sock_getifaddrs (lua_State *L)
 #else
 	sap = (struct sock_addr *) &rp->iiAddress;
 #endif
-	if (sap->u.addr.sa_family == AF_UNSPEC)
+	if (!sap || sap->u.addr.sa_family == AF_UNSPEC)
 	    continue;
 
 	lua_newtable(L);

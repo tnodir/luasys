@@ -90,7 +90,7 @@ end
 
 print"-- Directory List"
 do
-    for file, type in sys.dir('/') do
+    for file, type in sys.dir('.') do
 	print(file, type and "DIR" or "FILE")
     end
     print("OK")

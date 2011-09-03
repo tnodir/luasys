@@ -599,7 +599,6 @@ thread_wait (lua_State *L)
     sys_vm_leave();
 #ifndef _WIN32
     res = pthread_join(td->tid, &thread_res);
-    if (res) errno = res;
 #else
     res = WaitForSingleObject(td->th, INFINITE) != WAIT_OBJECT_0;
 #endif
@@ -612,7 +611,11 @@ thread_wait (lua_State *L)
 	lua_pushinteger(L, (lua_Integer) thread_res);
 	return 1;
     }
+#ifndef _WIN32
+    return sys_seterror(L, res);
+#else
     return sys_seterror(L, 0);
+#endif
 }
 
 static int
