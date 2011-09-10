@@ -55,7 +55,7 @@ struct sys_thread {
     int daemonized:	1;
     int interrupted:	1;
     int killed:		1;
-    int kill_status;
+    THREAD_FUNC_RES kill_status;
 };
 
 /* Main VM-Thread's data */
@@ -152,7 +152,7 @@ sys_vm_enter (void)
 
     if (td) {
 	if (td->killed) {
-	    const int status = td->kill_status;
+	    THREAD_FUNC_RES status = td->kill_status;
 
 	    if (thread_ismain(td))
 		lua_close(td->L);
@@ -161,9 +161,9 @@ sys_vm_enter (void)
 		sys_vm2_leave(td);
 	    }
 #ifndef _WIN32
-	    pthread_exit((THREAD_FUNC_RES) status);
+	    pthread_exit(status);
 #else
-	    _endthreadex((THREAD_FUNC_RES) status);
+	    _endthreadex(status);
 #endif
 	}
 	else if (td->interrupted) {
@@ -638,10 +638,10 @@ static int
 thread_kill (lua_State *L)
 {
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
-    const int status = !lua_isboolean(L, 2) ? lua_tointeger(L, 2)
+    const lua_Integer status = !lua_isboolean(L, 2) ? lua_tointeger(L, 2)
      : (lua_toboolean(L, 2) ? EXIT_SUCCESS : EXIT_FAILURE);
 
-    td->kill_status = status;
+    td->kill_status = (THREAD_FUNC_RES) status;
     td->killed = -1;
 
     if (td == sys_get_thread()) {
@@ -700,28 +700,13 @@ static int
 thread_daemonize (lua_State *L)
 {
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
-    int res;
 
-    if (!td->cross_vm)
-	luaL_argerror(L, 0, "VM-thread expected");
+    if (!td->cross_vm) luaL_argerror(L, 0, "VM-thread expected");
+
+    td->daemonized = -1;
 
     lua_settop(L, 1);
-    if (td->daemonized) return 1;  /* already a daemon */
-
-#ifndef _WIN32
-    res = pthread_detach(td->tid);
-#else
-    res = !CloseHandle(td->th);
-#endif
-    if (!res) {
-	td->daemonized = -1;
-	return 1;
-    }
-#ifndef _WIN32
-    return sys_seterror(L, res);
-#else
-    return sys_seterror(L, 0);
-#endif
+    return 1;
 }
 
 /*
