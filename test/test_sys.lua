@@ -71,11 +71,13 @@ do
     local ifaddrs = assert(sock.getifaddrs())
     for i, iface in ipairs(ifaddrs) do
 	local af = iface.family
-	sys.stdout:write(i, "\taddress family: ", af or "unknown", "\n")
+	sys.stdout:write(i, "\taddress family: ", af, "\n")
 	if af then
-	    local host = sock.getnameinfo(iface.addr)
-	    sys.stdout:write("\tinet addr: ", sock.inet_ntop(iface.addr),
-		" <", host, ">", " Mask: ", sock.inet_ntop(iface.netmask), "\n")
+	    if iface.addr then
+		sys.stdout:write("\tinet addr: ", sock.inet_ntop(iface.addr),
+		    " <", sock.getnameinfo(iface.addr), ">",
+		    " Mask: ", sock.inet_ntop(iface.netmask), "\n")
+	    end
 	    local flags = iface.flags
 	    sys.stdout:write("\t",
 		flags.up and "UP " or "",
