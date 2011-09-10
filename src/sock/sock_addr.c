@@ -256,16 +256,128 @@ sock_getifaddrs (lua_State *L)
 
 	lua_newtable(L);
 	{
-	    sock_pushaddr(L, sap);
-	    lua_setfield(L, -2, "addr");
+	    const int af = sap->u.addr.sa_family;
 
-	    if (sap->u.addr.sa_family == AF_INET)
-		lua_pushliteral(L, "inet");
-	    else if (sap->u.addr.sa_family == AF_INET6)
-		lua_pushliteral(L, "inet6");
-	    else
-		lua_pushnil(L);
-	    lua_setfield(L, -2, "family");
+	    if (af == AF_INET
+#ifdef AF_INET6
+	     || af == AF_INET6
+#endif
+	    ) {
+		sock_pushaddr(L, sap);
+		lua_setfield(L, -2, "addr");
+	    }
+
+	    {
+		const char *s = NULL;
+
+		switch (af) {
+		case AF_INET: s = "INET"; break;
+#ifdef AF_INET6
+		case AF_INET6: s = "INET6"; break;
+#endif
+#ifdef AF_LOCAL
+		case AF_LOCAL: s = "LOCAL"; break;
+#endif
+#ifdef AF_AX25
+		case AF_AX25: s = "AX25"; break;
+#endif
+#ifdef AF_IPX
+		case AF_IPX: s = "IPX"; break;
+#endif
+#ifdef AF_APPLETALK
+		case AF_APPLETALK: s = "APPLETALK"; break;
+#endif
+#ifdef AF_NETROM
+		case AF_NETROM: s = "NETROM"; break;
+#endif
+#ifdef AF_BRIDGE
+		case AF_BRIDGE: s = "BRIDGE"; break;
+#endif
+#ifdef AF_ATMPVC
+		case AF_ATMPVC: s = "ATMPVC"; break;
+#endif
+#ifdef AF_X25
+		case AF_X25: s = "X25"; break;
+#endif
+#ifdef AF_ROSE
+		case AF_ROSE: s = "ROSE"; break;
+#endif
+#ifdef AF_DECnet
+		case AF_DECnet: s = "DECnet"; break;
+#endif
+#ifdef AF_NETBEUI
+		case AF_NETBEUI: s = "NETBEUI"; break;
+#endif
+#ifdef AF_SECURITY
+		case AF_SECURITY: s = "SECURITY"; break;
+#endif
+#ifdef AF_KEY
+		case AF_KEY: s = "KEY"; break;
+#endif
+#ifdef AF_NETLINK
+		case AF_NETLINK: s = "NETLINK"; break;
+#endif
+#ifdef AF_PACKET
+		case AF_PACKET: s = "PACKET"; break;
+#endif
+#ifdef AF_ASH
+		case AF_ASH: s = "ASH"; break;
+#endif
+#ifdef AF_ECONET
+		case AF_ECONET: s = "ECONET"; break;
+#endif
+#ifdef AF_ATMSVC
+		case AF_ATMSVC: s = "ATMSVC"; break;
+#endif
+#ifdef AF_RDS
+		case AF_RDS: s = "RDS"; break;
+#endif
+#ifdef AF_SNA
+		case AF_SNA: s = "SNA"; break;
+#endif
+#ifdef AF_IRDA
+		case AF_IRDA: s = "IRDA"; break;
+#endif
+#ifdef AF_PPPOX
+		case AF_PPPOX: s = "PPPOX"; break;
+#endif
+#ifdef AF_WANPIPE
+		case AF_WANPIPE: s = "WANPIPE"; break;
+#endif
+#ifdef AF_LLC
+		case AF_LLC: s = "LLC"; break;
+#endif
+#ifdef AF_CAN
+		case AF_CAN: s = "CAN"; break;
+#endif
+#ifdef AF_TIPC
+		case AF_TIPC: s = "TIPC"; break;
+#endif
+#ifdef AF_BLUETOOTH
+		case AF_BLUETOOTH: s = "BLUETOOTH"; break;
+#endif
+#ifdef AF_IUCV
+		case AF_IUCV: s = "IUCV"; break;
+#endif
+#ifdef AF_RXRPC
+		case AF_RXRPC: s = "RXRPC"; break;
+#endif
+#ifdef AF_ISDN
+		case AF_ISDN: s = "ISDN"; break;
+#endif
+#ifdef AF_PHONET
+		case AF_PHONET: s = "PHONET"; break;
+#endif
+#ifdef AF_IEEE802154
+		case AF_IEEE802154: s = "IEEE802154"; break;
+#endif
+		default: s = "UNKNOWN";
+		}
+		if (s) {
+		    lua_pushstring(L, s);
+		    lua_setfield(L, -2, "family");
+		}
+	    }
 
 #ifndef _WIN32
 	    sap = (struct sock_addr *) rp->ifa_netmask;
