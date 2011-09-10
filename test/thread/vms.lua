@@ -8,12 +8,13 @@ local thread = sys.thread
 thread.init()
 
 
--- Pipes
-local work_pipe, main_pipe = thread.pipe(), thread.pipe()
+-- Pipe
+local work_pipe = thread.pipe()
 
 -- Consumer VM-Thread
+local consumer
 do
-    local function consume(work_pipe, main_pipe)
+    local function consume(work_pipe)
 	local sys = require"sys"
 	local thread = sys.thread
 
@@ -25,10 +26,11 @@ do
 	end
     end
 
-    assert(thread.runvm(string.dump(consume), work_pipe, main_pipe))
+    consumer = assert(thread.runvm(string.dump(consume), work_pipe))
 end
 
 -- Producer VM-Thread
+local producer
 do
     local function produce(work_pipe)
 	local sys = require"sys"
@@ -40,7 +42,9 @@ do
 	end
     end
 
-    assert(thread.runvm(string.dump(produce), work_pipe))
+    producer = assert(thread.runvm(string.dump(produce), work_pipe))
 end
 
-main_pipe:wait()  -- Wait VM-Threads termination
+-- Wait VM-Threads termination
+consumer:wait()
+producer:wait()
