@@ -85,7 +85,7 @@ end
 local function accept(evq, evid, fd)
     local peer
     if DEBUG then
-	peer = sock.addr_in()
+	peer = sock.addr()
     end
     local newfd = socket_get()
 
@@ -93,8 +93,8 @@ local function accept(evq, evid, fd)
 	chan_insert(evq, newfd, process)
 
 	if DEBUG then
-	    local port, addr = sock.addr_in(peer)
-	    stderr:write("Peer: ", sock.inet_ntoa(addr), ":", port, "\n")
+	    local port, addr = peer:inet()
+	    stderr:write("Peer: ", sock.inet_ntop(addr), ":", port, "\n")
 	end
     else
 	stderr:write("accept: ", errorMessage, "\n")

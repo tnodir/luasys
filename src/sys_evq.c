@@ -518,7 +518,7 @@ levq_loop (lua_State *L)
 
     evq->stop = 0;
     while (!evq->stop && !evq_is_empty(evq)) {
-	struct event *ev, *ev_next;
+	struct event *ev;
 
 	if (!evq->ev_ready) {
 	    const int res = evq_wait(evq, timeout);
@@ -542,10 +542,10 @@ levq_loop (lua_State *L)
 	    evq->stop = 1;
 	}
 
-	for (ev = evq->ev_ready; ev; ev = ev_next) {
+	while ((ev = evq->ev_ready)) {
 	    const unsigned int ev_flags = ev->flags;
 
-	    evq->ev_ready = ev_next = ev->next_ready;
+	    evq->ev_ready = ev->next_ready;
 
 	    if (!(ev_flags & EVENT_DELETE)) {
 		if (ev_flags & EVENT_CALLBACK) {

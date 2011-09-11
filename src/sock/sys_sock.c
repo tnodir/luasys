@@ -371,6 +371,7 @@ sock_accept (lua_State *L)
     if (from) {
 	sap = &from->u.addr;
 	slp = &from->addrlen;
+	*slp = SOCK_ADDR_LEN;
     }
 #ifndef _WIN32
     do sd = accept(sd, sap, slp);

@@ -34,6 +34,8 @@ struct sock_addr {
     socklen_t addrlen;
 };
 
+#define SOCK_ADDR_LEN	offsetof(struct sock_addr, addrlen)
+
 #define sock_addr_get_inp(sap, af) \
     ((af) == AF_INET) ? (void *) &(sap)->u.in.sin_addr : (void *) &(sap)->u.in6.sin6_addr
 
@@ -605,7 +607,7 @@ sock_addr_getsockname (lua_State *L)
     struct sock_addr *sap = checkudata(L, 1, SA_TYPENAME);
     sd_t sd = (sd_t) lua_unboxinteger(L, 2, SD_TYPENAME);
 
-    sap->addrlen = sizeof(struct sock_addr);
+    sap->addrlen = SOCK_ADDR_LEN;
     if (!getsockname(sd, &sap->u.addr, &sap->addrlen)) {
 	lua_settop(L, 1);
 	return 1;
@@ -623,7 +625,7 @@ sock_addr_getpeername (lua_State *L)
     struct sock_addr *sap = checkudata(L, 1, SA_TYPENAME);
     sd_t sd = (sd_t) lua_unboxinteger(L, 2, SD_TYPENAME);
 
-    sap->addrlen = sizeof(struct sock_addr);
+    sap->addrlen = SOCK_ADDR_LEN;
     if (!getpeername(sd, &sap->u.addr, &sap->addrlen)) {
 	lua_settop(L, 1);
 	return 1;

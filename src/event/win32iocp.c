@@ -52,13 +52,13 @@ win32iocp_set (struct event *ev, unsigned int ev_flags)
     if (ev_flags & EVENT_READ) {
 	DWORD flags = 0;
 
-	if (WSARecv((sd_t) ev->fd, &buf, 1, NULL, &flags, &evq->rov, NULL) != SOCKET_ERROR
-	 || WSAGetLastError() != WSA_IO_PENDING)
+	if (WSARecv((sd_t) ev->fd, &buf, 1, NULL, &flags, &evq->rov, NULL)
+	 && WSAGetLastError() != WSA_IO_PENDING)
 	    return -1;
     }
     if (ev_flags & EVENT_WRITE) {
-	if (WSASend((sd_t) ev->fd, &buf, 1, NULL, 0, &evq->wov, NULL) != SOCKET_ERROR
-	 || WSAGetLastError() != WSA_IO_PENDING)
+	if (WSASend((sd_t) ev->fd, &buf, 1, NULL, 0, &evq->wov, NULL)
+	 && WSAGetLastError() != WSA_IO_PENDING)
 	    return -1;
     }
     ev->flags |= EVENT_PENDING;  /* IOCP request is installed */
