@@ -38,7 +38,7 @@ RANLIB= ranlib
 RM= rm -f
 STRIP= strip
 
-PLATS= generic linux bsd osx
+PLATS= generic linux bsd osx mingw
 
 OBJS= luasys.o sock/sys_sock.o
 LDOBJS= $(OBJS)
@@ -75,6 +75,14 @@ bsd:
 osx:
 	$(MAKE) all MYCFLAGS="-DUSE_KQUEUE" STRIP="echo strip" \
 	MYLDFLAGS="-bundle -undefined dynamic_lookup /usr/lib/bundle1.o"
+
+mingw:
+	$(MAKE) all A="sys.lib" T="sys.dll" \
+	AR="$(CC) -shared -o" RANLIB="echo ranlib" \
+	COPT="-O2 -DNDEBUG" RM="del" \
+	MYCFLAGS="-DLUA_BUILD_AS_DLL" \
+	MYLDFLAGS="-s -shared -L/MinGW32/lib" \
+	LIBS="$(LUA)/src/lua*.dll -lmsvcrt -lkernel32 -luser32 -lwinmm -lshell32 -ladvapi32 -lws2_32"
 
 clean:
 	$(RM) $(T) *.o */*.o
