@@ -56,8 +56,8 @@ struct win32iocp {
 	if (((ev)->flags & (EVENT_SOCKET | EVENT_AIO | EVENT_PENDING))	\
 	 == (EVENT_SOCKET | EVENT_AIO))					\
 	    win32iocp_set((ev),						\
-	     ((ev_flags) & EVENT_READ_RES) ? EVENT_READ : 0		\
-	     | ((ev_flags) & EVENT_WRITE_RES) ? EVENT_WRITE : 0);	\
+	     (((ev_flags) & EVENT_READ_RES) ? EVENT_READ : 0)		\
+	     | (((ev_flags) & EVENT_WRITE_RES) ? EVENT_WRITE : 0));	\
 	else if ((ev_flags) & EVENT_DIRWATCH)				\
 	    FindNextChangeNotification((ev)->fd);			\
     } while (0)

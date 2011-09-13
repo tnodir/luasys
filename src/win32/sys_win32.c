@@ -12,7 +12,7 @@ win32_mailslot (lua_State *L)
     const char *path = luaL_checkstring(L, 2);
     size_t max_size = (size_t) lua_tointeger(L, 3);
     const msec_t timeout = lua_isnoneornil(L, 4)
-     ? MAILSLOT_WAIT_FOREVER : (msec_t) lua_tointeger(L, 4);
+     ? (msec_t) MAILSLOT_WAIT_FOREVER : (msec_t) lua_tointeger(L, 4);
 
     fd = CreateMailslotA(path, max_size, timeout, NULL);
 

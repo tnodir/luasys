@@ -47,7 +47,7 @@ int
 win32iocp_set (struct event *ev, unsigned int ev_flags)
 {
     struct event_queue *evq = ev->wth->evq;
-    WSABUF buf = {0};
+    WSABUF buf = {0, 0};
 
     if (ev_flags & EVENT_READ) {
 	DWORD flags = 0;

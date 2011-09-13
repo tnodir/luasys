@@ -117,7 +117,7 @@ pipe_close (lua_State *L)
 	nref = pp->nref--;
 	/* notify about all closed end-points */
 	if (nref == 1) {
-	    thread_event_signal_nolock(&pp->bufev);
+	    (void) thread_event_signal_nolock(&pp->bufev);
 	}
 	thread_critsect_leave(csp);
 
@@ -271,7 +271,7 @@ pipe_put (lua_State *L)
 	pp->buffer = buf;
 
 	if (buf.nmsg == 1) {
-	    thread_event_signal_nolock(&pp->bufev);
+	    (void) thread_event_signal_nolock(&pp->bufev);
 	}
     }
     thread_critsect_leave(csp);

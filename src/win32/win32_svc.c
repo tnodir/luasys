@@ -91,26 +91,26 @@ static struct {
 static void WINAPI
 svc_controller (DWORD code)
 {
-    int accept = 0;
+    int is_accept = 0;
 
     switch (code) {
     case SERVICE_CONTROL_SHUTDOWN:
     case SERVICE_CONTROL_STOP:
 	g_Service.status.dwCurrentState = SERVICE_STOP_PENDING;
-	accept = 1;
+	is_accept = 1;
 	break;
     case SERVICE_CONTROL_PAUSE:
     case SERVICE_CONTROL_CONTINUE:
 	if (g_Service.accept_pause_cont) {
 	    g_Service.status.dwCurrentState = (code == SERVICE_CONTROL_PAUSE)
 	     ? SERVICE_PAUSE_PENDING : SERVICE_CONTINUE_PENDING;
-	    accept = 1;
+	    is_accept = 1;
 	}
 	break;
     }
 
     SetServiceStatus(g_Service.hstatus, &g_Service.status);
-    if (accept)
+    if (is_accept)
 	SetEvent(g_Service.event);
 }
 
@@ -140,10 +140,11 @@ svc_main (DWORD argc, char *argv[])
 static DWORD WINAPI
 svc_start (void *name)
 {
-    SERVICE_TABLE_ENTRY table[] = {
-	{name, svc_main},
-	{NULL, NULL}
-    };
+    SERVICE_TABLE_ENTRY table[] = {{NULL, NULL}, {NULL, NULL}};
+
+    table[0].lpServiceName = name;
+    table[0].lpServiceProc = svc_main;
+
     return !StartServiceCtrlDispatcher(table);
 }
 
@@ -154,7 +155,7 @@ svc_start (void *name)
 static int
 svc_handle (lua_State *L)
 {
-    char *svc_name = (char *) lua_tostring(L, 1);
+    char *svc_name = (char *) luaL_checkstring(L, 1);
     const int accept_pause_cont = lua_toboolean(L, 2);
     HANDLE hThr;
     DWORD id;
@@ -255,7 +256,7 @@ static int
 svc_wait (lua_State *L)
 {
     HANDLE he = (HANDLE) lua_unboxpointer(L, 1, WSVC_TYPENAME);
-    int res = luaL_optinteger(L, 2, INFINITE);
+    DWORD res = luaL_optinteger(L, 2, INFINITE);
 
     sys_vm_leave();
     res = WaitForSingleObject(he, res);

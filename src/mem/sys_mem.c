@@ -385,7 +385,7 @@ mem_map (lua_State *L)
 
 	if (fd == (fd_t) -1) goto err;
 	size_lo = GetFileSize(fd, &size_hi);
-	if (size_lo == -1L && SYS_ERRNO != NO_ERROR)
+	if (size_lo == (DWORD) -1L && SYS_ERRNO != NO_ERROR)
 	    goto err;
 	size = INT64_MAKE(size_lo, size_hi) - off;
 	len = ((uint64_t) size < (uint64_t) ~((DWORD) 0))

@@ -31,11 +31,19 @@ sys_stat (lua_State *L)
 {
     const char *path = luaL_checkstring(L, 1);
     const int more_info = lua_toboolean(L, 2);
+#ifndef _WIN32
     struct stat st;
+#else
+    struct _stat st;
+#endif
     int res;
 
     sys_vm_leave();
+#ifndef _WIN32
     res = stat(path, &st);
+#else
+    res = _stat(path, &st);
+#endif
     sys_vm_enter();
 
     if (!res) {
@@ -98,10 +106,10 @@ sys_stat (lua_State *L)
 	    }
 	    lua_pushboolean(L, attr > 0 && (attr & FILE_ATTRIBUTE_REPARSE_POINT));
 #endif
-	    lua_pushnumber(L, st.st_size);  /* size in bytes */
-	    lua_pushnumber(L, st.st_atime);  /* access time */
-	    lua_pushnumber(L, st.st_mtime);  /* modification time */
-	    lua_pushnumber(L, st.st_ctime);  /* creation time */
+	    lua_pushnumber(L, (lua_Number) st.st_size);  /* size in bytes */
+	    lua_pushnumber(L, (lua_Number) st.st_atime);  /* access time */
+	    lua_pushnumber(L, (lua_Number) st.st_mtime);  /* modification time */
+	    lua_pushnumber(L, (lua_Number) st.st_ctime);  /* creation time */
 	    return 10;
 	}
 	return 5;

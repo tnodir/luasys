@@ -15,6 +15,10 @@
 
 #ifdef AI_CANONNAME
 #define USE_GAI
+
+#ifndef AI_ADDRCONFIG
+#define AI_ADDRCONFIG	0
+#endif
 #endif
 
 
@@ -178,15 +182,18 @@ sock_getnameinfo (lua_State *L)
     struct sock_addr sa;
     void *inp = sock_addr_get_inp(&sa, af);
     const int in_len = sock_addr_get_inlen(af);
-    int gai_errno;
-
 #ifdef USE_GAI
     char host[NI_MAXHOST];
+#else
+    struct hostent *hp;
+#endif
+    int gai_errno;
 
     memset(&sa, 0, sizeof(struct sock_addr));
-    sa.u.addr.sa_family = af;
+    sa.u.addr.sa_family = (short) af;
     memcpy(inp, addr, in_len);
 
+#ifdef USE_GAI
     sys_vm_leave();
     gai_errno = getnameinfo(&sa.u.addr, sizeof(struct sock_addr),
      host, sizeof(host), NULL, 0, NI_NAMEREQD);
@@ -196,8 +203,6 @@ sock_getnameinfo (lua_State *L)
 
     lua_pushstring(L, host);
 #else
-    struct hostent *hp;
-
     sys_vm_leave();
     hp = gethostbyaddr(inp, in_len, af);
     sys_vm_enter();
@@ -489,7 +494,7 @@ sock_inet_ntop (lua_State *L)
 
 	memset(&sa, 0, sizeof(struct sock_addr));
 	memcpy(inp, src, in_len);
-	sa.u.addr.sa_family = af;
+	sa.u.addr.sa_family = (short) af;
 
 	if (WSAAddressToString(&sa.u.addr, sl, NULL, buf, &buflen)
 	 || buflen >= sizeof(buf))
@@ -541,12 +546,12 @@ sock_addr_inet (lua_State *L)
     }
     else {
 	const int port = lua_tointeger(L, 2);
-	int in_len, af;
+	int in_len = SOCK_ADDR_LEN, af = AF_INET;
 	const char *addr = lua_isnoneornil(L, 3) ? NULL
 	 : sock_checkladdr(L, 3, &in_len, &af);
 
 	memset(sap, 0, sizeof(struct sock_addr));
-	sap->u.addr.sa_family = af;
+	sap->u.addr.sa_family = (short) af;
 	if (af == AF_INET) {
 	    sap->u.in.sin_port = htons((unsigned short) port);
 	    if (addr)
@@ -593,6 +598,8 @@ sock_addr_file (lua_State *L)
 	    return 1;
 	}
     };
+#else
+    (void) sap;
 #endif
     return 0;
 }

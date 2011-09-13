@@ -139,7 +139,7 @@ sys_time (lua_State *L)
 	    return sys_seterror(L, 0);
     } else
 	t = time(NULL);  /* current time */
-    lua_pushnumber(L, t);
+    lua_pushnumber(L, (lua_Number) t);
     return 1;
 }
 

@@ -13,10 +13,10 @@
 #endif
 
 struct sys_pid {
-    int id;
 #ifdef _WIN32
     HANDLE h;
 #endif
+    int id;
 };
 
 
@@ -28,9 +28,9 @@ static int
 sys_run (lua_State *L)
 {
     const char *cmd = luaL_checkstring(L, 1);
+#ifndef _WIN32
     int res;
 
-#ifndef _WIN32
     sys_vm_leave();
     res = system(cmd);
     sys_vm_enter();
@@ -39,6 +39,7 @@ sys_run (lua_State *L)
 #else
     char path[MAX_PATHNAME];
     const char *arg = NULL;
+    HINSTANCE res;
 
     arg = strchr(cmd, ' ');
     if (arg) {
@@ -52,10 +53,10 @@ sys_run (lua_State *L)
     }
 
     sys_vm_leave();
-    res = (int) ShellExecuteA(NULL, NULL, cmd, arg, NULL, 0);
+    res = ShellExecuteA(NULL, NULL, cmd, arg, NULL, 0);
     sys_vm_enter();
 
-    if (res > 32) {
+    if (res > (HINSTANCE) 32) {
 #endif
 	lua_pushboolean(L, 1);
 	return 1;
@@ -142,7 +143,7 @@ sys_spawn (lua_State *L)
 	int len = lua_rawlen(L, 1);
 
 	/* filename */
-	if (len >= sizeof(line) - 2)
+	if (len >= (int) sizeof(line) - 2)
 	    return 0;
 	memcpy(cp, cmd, len);
 	cp += len;

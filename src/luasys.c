@@ -150,6 +150,8 @@ sys_limit_nfiles (lua_State *L)
     }
     return 1;
 #else
+    (void) L;
+
     return 0;
 #endif
 }
@@ -270,18 +272,13 @@ createmeta (lua_State *L)
     luaL_getmetatable(L, FD_TYPENAME);
     {
 	const char *std[] = {"stdin", "stdout", "stderr"};
-#ifdef _WIN32
-	const fd_t std_fd[] = {
-	    GetStdHandle(STD_INPUT_HANDLE),
-	    GetStdHandle(STD_OUTPUT_HANDLE),
-	    GetStdHandle(STD_ERROR_HANDLE)
-	};
-#endif
+
 	for (i = 3; i--; ) {
 #ifndef _WIN32
 	    const fd_t fd = i;
 #else
-	    const fd_t fd = std_fd[i];
+	    const fd_t fd = GetStdHandle(i == 0 ? STD_INPUT_HANDLE
+	     : (i == 1 ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE));
 #endif
 	    lua_pushstring(L, std[i]);
 	    lua_boxinteger(L, fd);

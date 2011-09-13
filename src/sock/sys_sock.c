@@ -75,17 +75,17 @@ sock_pair (int type, sd_t sv[2])
     sa.sin_port = 0;
     sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-    if ((sd = WSASocket(AF_INET, type, 0, NULL, 0, IS_OVERLAPPED)) != -1) {
+    if ((sd = WSASocket(AF_INET, type, 0, NULL, 0, IS_OVERLAPPED)) != INVALID_SOCKET) {
 	if (!bind(sd, (struct sockaddr *) &sa, len)
 	 && !listen(sd, 1)
 	 && !getsockname(sd, (struct sockaddr *) &sa, &len)
-	 && (sv[0] = WSASocket(AF_INET, type, 0, NULL, 0, IS_OVERLAPPED)) != -1) {
+	 && (sv[0] = WSASocket(AF_INET, type, 0, NULL, 0, IS_OVERLAPPED)) != INVALID_SOCKET) {
 	    struct sockaddr_in sa2;
 	    int len2;
 
 	    sv[1] = (sd_t) -1;
 	    if (!connect(sv[0], (struct sockaddr *) &sa, len)
-	     && (sv[1] = accept(sd, (struct sockaddr *) &sa, &len)) != -1
+	     && (sv[1] = accept(sd, (struct sockaddr *) &sa, &len)) != INVALID_SOCKET
 	     && !getpeername(sv[0], (struct sockaddr *) &sa, &len)
 	     && !getsockname(sv[1], (struct sockaddr *) &sa2, &len2)
 	     && len == len2
@@ -117,7 +117,6 @@ sock_socket (lua_State *L)
     const char *typep = lua_tostring(L, 2);
     const char *domainp = lua_tostring(L, 3);
     int type = SOCK_STREAM, domain = AF_INET;
-    sd_t sd, sv[2];
     sd_t *pair_sdp = (lua_gettop(L) > 1 && lua_isuserdata(L, -1))
      ? checkudata(L, -1, SD_TYPENAME) : NULL;
 
@@ -131,22 +130,30 @@ sock_socket (lua_State *L)
 	    domain = AF_INET6;
     }
 
+    lua_settop(L, 1);
+    if (pair_sdp) {
+	sd_t sv[2];
 #ifndef _WIN32
-    sd = (pair_sdp) ? socketpair(AF_UNIX, type, 0, sv)
-     : socket(domain, type, 0);
+	if (!socketpair(AF_UNIX, type, 0, sv)) {
 #else
-    sd = (pair_sdp) ? sock_pair(type, sv)
-     : WSASocket(domain, type, 0, NULL, 0, IS_OVERLAPPED);
+	if (!sock_pair(type, sv)) {
 #endif
-
-    if (sd != -1) {
-	if (pair_sdp) {
 	    *sdp = sv[0];
 	    *pair_sdp = sv[1];
-	} else
+	    return 1;
+	}
+    }
+    else {
+	sd_t sd;
+#ifndef _WIN32
+	sd = socket(domain, type, 0);
+#else
+	sd = WSASocket(domain, type, 0, NULL, 0, IS_OVERLAPPED);
+#endif
+	if (sd != (sd_t) -1) {
 	    *sdp = sd;
-	lua_settop(L, 1);
-	return 1;
+	    return 1;
+	}
     }
     return sys_seterror(L, 0);
 }
@@ -256,7 +263,7 @@ sock_sockopt (lua_State *L)
     }
     else if (!getsockopt(sd, level, optflag, (char *) &optval, &optlen)) {
 	lua_pushinteger(L, optval[0]);
-	if (optlen <= sizeof(int))
+	if (optlen <= (socklen_t) sizeof(int))
 	    return 1;
 	lua_pushinteger(L, optval[1]);
 	return 2;
@@ -310,6 +317,7 @@ sock_membership (lua_State *L)
 	mr_len = sizeof(struct ipv6_mreq);
 #else
 	luaL_argerror(L, 2, "invalid family");
+	return 0;
 #endif
     }
 
@@ -548,7 +556,7 @@ TransmitFileMap (SOCKET sd, HANDLE fd, DWORD n)
 	char *base = NULL;
 
 	size_lo = GetFileSize(fd, &size_hi);
-	if (size_lo != -1L || SYS_ERRNO == NO_ERROR) {
+	if (size_lo != (DWORD) -1L || SYS_ERRNO == NO_ERROR) {
 	    LONG off_hi = 0L, off_lo;
 	    int64_t size;
 	    DWORD len;
@@ -566,9 +574,12 @@ TransmitFileMap (SOCKET sd, HANDLE fd, DWORD n)
 	CloseHandle(hmap);
 
 	if (base) {
-	    WSABUF buf = {n, base + size_lo};
+	    WSABUF wsa_buf;
 
-	    if (!WSASend(sd, &buf, 1, &res, 0, NULL, NULL)) {
+	    wsa_buf.len = n;
+	    wsa_buf.buf = base + size_lo;
+
+	    if (!WSASend(sd, &wsa_buf, 1, &res, 0, NULL, NULL)) {
 		LONG off_hi = 0L;
 		SetFilePointer(fd, res, &off_hi, SEEK_CUR);
 	    }
@@ -657,9 +668,13 @@ sock_write (lua_State *L)
 	while (nw == -1 && SYS_ERRNO == EINTR);
 #else
 	{
-	    WSABUF buf = {sb.size, sb.ptr.w};
+	    WSABUF wsa_buf;
 	    DWORD l;
-	    nw = !WSASend(sd, &buf, 1, &l, 0, NULL, NULL) ? l : -1;
+
+	    wsa_buf.len = sb.size;
+	    wsa_buf.buf = sb.ptr.w;
+
+	    nw = !WSASend(sd, &wsa_buf, 1, &l, 0, NULL, NULL) ? (int) l : -1;
 	}
 #endif
 	sys_vm_enter();
@@ -701,9 +716,13 @@ sock_read (lua_State *L)
 	while (nr == -1 && SYS_ERRNO == EINTR);
 #else
 	{
-	    WSABUF buf = {rlen, sb.ptr.w};
+	    WSABUF wsa_buf;
 	    DWORD l, flags = 0;
-	    nr = !WSARecv(sd, &buf, 1, &l, &flags, NULL, NULL) ? l : -1;
+
+	    wsa_buf.len = rlen;
+	    wsa_buf.buf = sb.ptr.w;
+
+	    nr = !WSARecv(sd, &wsa_buf, 1, &l, &flags, NULL, NULL) ? (int) l : -1;
 	}
 #endif
 	sys_vm_enter();

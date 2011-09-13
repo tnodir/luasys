@@ -392,7 +392,8 @@ sys_fileno (lua_State *L)
 #ifndef _WIN32
     *fdp = fileno(*fp);
 #else
-    *fdp = (fd_t) _get_osfhandle(_fileno(*fp));
+    const long int res = _get_osfhandle(_fileno(*fp));
+    *fdp = (fd_t) res;
 #endif
     *fp = NULL;
     lua_settop(L, 1);
@@ -579,7 +580,7 @@ sys_write (lua_State *L)
 #else
 	{
 	    DWORD l;
-	    nw = WriteFile(fd, sb.ptr.r, sb.size, &l, NULL) ? l : -1;
+	    nw = WriteFile(fd, sb.ptr.r, sb.size, &l, NULL) ? (int) l : -1;
 	}
 #endif
 	sys_vm_enter();
@@ -622,7 +623,7 @@ sys_read (lua_State *L)
 #else
 	{
 	    DWORD l;
-	    nr = ReadFile(fd, sb.ptr.w, rlen, &l, NULL) ? l : -1;
+	    nr = ReadFile(fd, sb.ptr.w, rlen, &l, NULL) ? (int) l : -1;
 	}
 #endif
 	sys_vm_enter();
@@ -740,9 +741,13 @@ sys_utime (lua_State *L)
 	GetSystemTimeAsFileTime(&ft);
     else {
 	FILETIME lft;
-	int64_t t64 = modtime;
+#ifdef _MSC_VER
+	const int64_t fix = 11644473600;
+#else
+	const int64_t fix = 11644473600LL;
+#endif
+	int64_t t64 = (modtime + fix) * 10000000;
 
-	t64 = (t64 + 11644473600) * 10000000;
 	lft.dwLowDateTime = INT64_LOW(t64);
 	lft.dwHighDateTime = INT64_HIGH(t64);
 

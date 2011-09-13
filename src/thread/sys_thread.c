@@ -415,6 +415,9 @@ thread_runvm (lua_State *L)
     const char *path = luaL_checkstring(L, 1);
     struct sys_thread *xtd, *td = sys_get_thread();
     lua_State *NL;
+#ifdef _WIN32
+    unsigned long hThr;
+#endif
     int res = 0;
 
     if (!td) luaL_argerror(L, 0, "Threading not initialized");
@@ -477,9 +480,10 @@ thread_runvm (lua_State *L)
     res = pthread_create(&td->tid, NULL, (thread_func_t) thread_startvm, td);
     if (!res) {
 #else
-    td->th = (HANDLE) _beginthreadex(NULL, 0,
+    hThr = _beginthreadex(NULL, 0,
      (thread_func_t) thread_startvm, td, 0, &td->tid);
-    if (td->th) {
+    if (hThr) {
+	td->th = (HANDLE) hThr;
 #endif
 	*xtd = *td;
 	xtd->cross_vm = -1;
@@ -525,6 +529,7 @@ thread_run (lua_State *L)
     pthread_attr_t attr;
     int res = 0;
 #else
+    unsigned long hThr;
     const int res = 0;
 #endif
 
@@ -554,9 +559,10 @@ thread_run (lua_State *L)
     pthread_attr_destroy(&attr);
     if (!res) {
 #else
-    td->th = (HANDLE) _beginthreadex(NULL, THREAD_STACK_SIZE,
+    hThr = _beginthreadex(NULL, THREAD_STACK_SIZE,
      (thread_func_t) thread_start, td, 0, &td->tid);
-    if (td->th) {
+    if (hThr) {
+	td->th = (HANDLE) hThr;
 #endif
 	thread_settable(L, NL, td->tid);  /* save thread to avoid GC */
 	lua_xmove(L, NL, lua_gettop(L) - 1);  /* move function and args to new thread */

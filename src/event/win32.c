@@ -255,7 +255,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	if (!wth->tq)
 	    return EVQ_TIMEOUT;
     }
-    if (wait_res == (WAIT_OBJECT_0 + n + 1)) {
+    if (wait_res == (DWORD) (WAIT_OBJECT_0 + n + 1)) {
 	struct event *ev = evq->win_msg;
 	if (ev && !(ev->flags & EVENT_ACTIVE)) {
 	    ev->flags |= EVENT_ACTIVE;
@@ -284,7 +284,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	evq->sig_ready = 0;
 	LeaveCriticalSection(head_cs);
 
-	if (wait_res == (WAIT_OBJECT_0 + n))
+	if (wait_res == (DWORD) (WAIT_OBJECT_0 + n))
 	    wth = threads;
 	else
 	    wth->next_ready = threads;

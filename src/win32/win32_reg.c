@@ -79,7 +79,7 @@ reg_open (lua_State *L)
 
 /*
  * Arguments: reg_udata, root (reg_udata | string), subkey (string),
- *	[class (string), option (string: "non_volatile", "volatile"),
+ *	[option (string: "non_volatile", "volatile"),
  *	mode (string: "r", "w", "rw")]
  * Returns: [reg_udata, opened_existing (boolean)]
  */
@@ -88,14 +88,13 @@ reg_create (lua_State *L)
 {
     HKEY *hkp = checkudata(L, 1, WREG_TYPENAME);
     HKEY hk = reg_root2key(L, 2);
-    char *subkey = (char *) luaL_checkstring(L, 3);
-    char *class = (char *) lua_tostring(L, 4);
-    const char *s = lua_tostring(L, 5);
+    const char *subkey = luaL_checkstring(L, 3);
+    const char *s = lua_tostring(L, 4);
     DWORD opt = (s && *s == 'v') ? REG_OPTION_VOLATILE : 0;
-    REGSAM desired = reg_mode2sam(L, 6);
+    REGSAM desired = reg_mode2sam(L, 5);
     int res;
 
-    res = RegCreateKeyExA(hk, subkey, 0, class, opt, desired, NULL, hkp, &opt);
+    res = RegCreateKeyExA(hk, subkey, 0, NULL, opt, desired, NULL, hkp, &opt);
     if (!res) {
 	lua_settop(L, 1);
 	lua_pushboolean(L, opt == REG_OPENED_EXISTING_KEY);
@@ -213,7 +212,8 @@ static int
 reg_values (lua_State *L)
 {
     if (lua_gettop(L) == 1) {  /* `for' start? */
-	/* return generator (this function), state (reg_udata), */
+	lua_pushcfunction(L, reg_values);  /* return generator (this function), */
+	lua_pushvalue(L, 1);  /* state (reg_udata), */
 	lua_pushinteger(L, 0);  /* and initial value */
 	return 3;
     } else {  /* `for' step */

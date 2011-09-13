@@ -259,7 +259,7 @@ comm_timeout (lua_State *L)
     COMMTIMEOUTS timeouts;
 
     memset(&timeouts, 0, sizeof(COMMTIMEOUTS));
-    timeouts.ReadIntervalTimeout = rtime ? rtime : MAXDWORD;
+    timeouts.ReadIntervalTimeout = rtime ? (DWORD) rtime : MAXDWORD;
     timeouts.ReadTotalTimeoutMultiplier =
      timeouts.ReadTotalTimeoutConstant = rtime;
 
@@ -335,7 +335,7 @@ comm_wait (lua_State *L)
 {
     const fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
     const int nargs = lua_gettop(L);
-    unsigned long status;
+    unsigned long status = 0;
     int flags = 0;
     int i, res;
 

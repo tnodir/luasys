@@ -45,7 +45,6 @@ extern int is_WinNT;
 
 #include <sys/time.h>
 #include <unistd.h>
-#include <stdint.h>
 #include <signal.h>
 #include <fcntl.h>
 
@@ -104,6 +103,8 @@ extern int pthread_mutexattr_setkind_np (pthread_mutexattr_t *attr, int kind);
 #if defined(_MSC_VER) || defined(__BORLANDC__)
 typedef __int64			int64_t;
 typedef unsigned __int64	uint64_t;
+#else
+#include <stdint.h>
 #endif
 
 #define INT64_MAKE(lo,hi)	(((int64_t) (hi) << 32) | (unsigned int) (lo))
