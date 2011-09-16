@@ -22,8 +22,10 @@ signal_handler (int signo)
 	res = 1;
     else {
 	struct event *ev = g_Signal.events[signo];
-	res = (!ev || event_deleted(ev)
-	 || evq_signal(ev->wth->evq, signo)) ? 0 : 1;
+	for (; ev; ev = ev->next_object) {
+	    if (!event_deleted(ev))
+		res |= evq_signal(ev->wth->evq, signo) ? 0 : 1;
+	}
     }
     LeaveCriticalSection(&g_Signal.cs);
     return res;
