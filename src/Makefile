@@ -82,7 +82,8 @@ mingw:
 	COPT="-O2 -DNDEBUG" RM="del" \
 	MYCFLAGS="-DLUA_BUILD_AS_DLL" \
 	MYLDFLAGS="-s -shared -L/MinGW32/lib" \
-	LIBS="$(LUA)/src/lua*.dll -lmsvcrt -lkernel32 -luser32 -lwinmm -lshell32 -ladvapi32 -lws2_32"
+	LIBS="$(LUA)/src/lua*.dll -lmsvcrt -lkernel32 -luser32 -lwinmm -lshell32 -ladvapi32 -lws2_32" \
+	OBJS="luasys.o sock/sys_sock.o isa/isapi/isapi_dll.o"
 
 clean:
 	$(RM) $(T) *.o */*.o
@@ -100,4 +101,5 @@ luasys.o: luasys.c sys_comm.c sys_date.c sys_env.c sys_evq.c sys_file.c \
     event/select.c event/signal.c event/timeout.c \
     event/evq.h event/epoll.h event/kqueue.h event/poll.h \
     event/select.h event/timeout.h
-sock/sys_sock.o: sock/sys_sock.c common.h
+sock/sys_sock.o: sock/sys_sock.c sock/sock_addr.c common.h
+isa/isapi/isapi_dll.o: isa/isapi/isapi_dll.c isa/isapi/isapi_ecb.c common.h

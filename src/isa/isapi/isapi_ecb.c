@@ -15,7 +15,7 @@ static int
 ecb_getvar (lua_State *L)
 {
     LPEXTENSION_CONTROL_BLOCK ecb = lua_unboxpointer(L, 1, ECB_TYPENAME);
-    char *name = (char *) luaL_checkstring(L, 2);
+    const char *name = luaL_checkstring(L, 2);
     const char *val = NULL;
 
     if (!strcmp(name, "REQUEST_METHOD"))
@@ -40,7 +40,7 @@ ecb_getvar (lua_State *L)
 	char buf[SYS_BUFSIZE];
 	DWORD len = sizeof(buf);
 
-	if (ecb->GetServerVariable(ecb->ConnID, name, buf, &len)) {
+	if (ecb->GetServerVariable(ecb->ConnID, (char *) name, buf, &len)) {
 	    lua_pushlstring(L, buf, len - 1);
 	    return 1;
 	}
@@ -83,7 +83,7 @@ ecb_read (lua_State *L)
 	sys_vm_leave();
 	{
 	    DWORD l;
-	    nr = ecb->ReadClient(ecb->ConnID, sb.ptr.w, &l) ? l : -1;
+	    nr = ecb->ReadClient(ecb->ConnID, sb.ptr.w, &l) ? (int) l : -1;
 	}
 	sys_vm_enter();
 	if (nr == -1) break;
@@ -139,7 +139,7 @@ ecb_write (lua_State *L)
 	sys_vm_leave();
 	{
 	    DWORD l = sb.size;
-	    nw = ecb->WriteClient(ecb->ConnID, sb.ptr.w, &l, 0) ? l : -1;
+	    nw = ecb->WriteClient(ecb->ConnID, sb.ptr.w, &l, 0) ? (int) l : -1;
 	}
 	sys_vm_enter();
 	if (nw == -1) {

@@ -179,7 +179,7 @@ DllMain (HANDLE hmodule, DWORD reason, LPVOID reserved)
 BOOL WINAPI
 GetExtensionVersion (HSE_VERSION_INFO *ver)
 {
-    ver->dwExtensionVersion = HSE_VERSION;
+    ver->dwExtensionVersion = MAKELONG(HSE_VERSION_MINOR, HSE_VERSION_MAJOR);
     memcpy(ver->lpszExtensionDesc, LISAPI_DESCR, sizeof(LISAPI_DESCR));
 
     return !lisapi_init();

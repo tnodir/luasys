@@ -178,10 +178,8 @@ svc_handle (lua_State *L)
     if (hThr != NULL) {
 	CloseHandle(hThr);
 
-	sys_vm_leave();
 	WaitForSingleObject(g_Service.event, INFINITE);
 	ResetEvent(g_Service.event);
-	sys_vm_enter();
 
 	if (g_Service.hstatus)
 	    return 1;
@@ -223,10 +221,8 @@ svc_status (lua_State *L)
 	}
 	g_Service.status.dwCurrentState = st;
 
-	sys_vm_leave();
 	SetServiceStatus(g_Service.hstatus, &g_Service.status);
-	Sleep(0);
-	sys_vm_enter();
+	Sleep(0);  /* yield to service controller thread */
 
 	lua_settop(L, 1);
     }
