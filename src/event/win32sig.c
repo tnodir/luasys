@@ -15,7 +15,7 @@ static int volatile g_SignalInit = 0;
 static int
 signal_handler (int signo)
 {
-    int res;
+    int res = 0;
 
     EnterCriticalSection(&g_Signal.cs);
     if (g_Signal.ignore & (1 << signo))

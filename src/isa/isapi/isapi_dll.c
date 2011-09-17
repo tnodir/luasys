@@ -56,7 +56,7 @@ lisapi_init (void)
 
     if (g_ISAPI.vmtd) return 0;
 
-    L = lua_open();
+    L = luaL_newstate();
     if (!L) return -1;
 
 #ifndef NDEBUG
