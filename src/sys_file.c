@@ -632,7 +632,7 @@ sys_read (lua_State *L)
     } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
      && sys_buffer_write_next(L, &sb, buf, 0));
     if (nr <= 0 && len == n) {
-	if (!nr || SYS_EAGAIN(SYS_ERRNO)) goto err;
+	if (!nr || !SYS_EAGAIN(SYS_ERRNO)) goto err;
 	lua_pushboolean(L, 0);
     } else {
 	if (!sys_buffer_write_done(L, &sb, buf, nr))
