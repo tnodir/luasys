@@ -183,7 +183,7 @@ pipe_msg_build (lua_State *L, struct message *msg, int idx)
 	item->type = type;
 	item->len = len;
 	cp += len;
-	cp += (len & (MSG_ITEM_ALIGN-1)) ? MSG_ITEM_ALIGN - (len & (MSG_ITEM_ALIGN-1)) : 0;
+	cp += (len + (MSG_ITEM_ALIGN-1)) & ~(MSG_ITEM_ALIGN-1);
     }
     msg->nitems = top;
     msg->size = offsetof(struct message, items) + cp - msg->items;
@@ -222,7 +222,7 @@ pipe_msg_parse (lua_State *L, struct message *msg)
 	    lua_pushlightuserdata(L, item->v.ptr);
 	}
 	cp += offsetof(struct message_item, v) + len;
-	cp += (len & (MSG_ITEM_ALIGN-1)) ? MSG_ITEM_ALIGN - (len & (MSG_ITEM_ALIGN-1)) : 0;
+	cp += (len + (MSG_ITEM_ALIGN-1)) & ~(MSG_ITEM_ALIGN-1);
     }
     return i - 1;
 }
