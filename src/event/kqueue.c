@@ -203,12 +203,11 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     }
 
     sys_vm_leave();
-
     nready = kevent(evq->kqueue_fd, kev, evq->nchanges, kev, NEVENT, tsp);
+    sys_vm_enter();
+
     evq->nchanges = 0;
     evq->now = get_milliseconds();
-
-    sys_vm_enter();
 
     if (nready == -1)
 	return (errno == EINTR) ? 0 : EVQ_FAILED;

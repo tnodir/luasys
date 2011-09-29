@@ -241,14 +241,12 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	ev_ready = win32iocp_process(evq, ev_ready, 0L);
 
     sys_vm_leave();
-
     wait_res = MsgWaitForMultipleObjects(n + 1, wth->handles, FALSE,
      ev_ready ? 0L : timeout_get(wth->tq, timeout, evq->now),
      evq->win_msg ? QS_ALLEVENTS : 0);
+    sys_vm_enter();
 
     evq->now = get_milliseconds();
-
-    sys_vm_enter();
 
     if (wait_res == WAIT_TIMEOUT) {
 	if (ev_ready) goto end;

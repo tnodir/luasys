@@ -10,9 +10,8 @@ win32_mailslot (lua_State *L)
 {
     fd_t fd, *fdp = checkudata(L, 1, FD_TYPENAME);
     const char *path = luaL_checkstring(L, 2);
-    size_t max_size = (size_t) lua_tointeger(L, 3);
-    const msec_t timeout = lua_isnoneornil(L, 4)
-     ? (msec_t) MAILSLOT_WAIT_FOREVER : (msec_t) lua_tointeger(L, 4);
+    const DWORD max_size = lua_tointeger(L, 3);
+    const DWORD timeout = luaL_optinteger(L, 4, MAILSLOT_WAIT_FOREVER);
 
     fd = CreateMailslotA(path, max_size, timeout, NULL);
 
@@ -25,21 +24,40 @@ win32_mailslot (lua_State *L)
 }
 
 /*
- * Arguments: fd_udata
- * Returns: [next_message_size (number), message_count (number)]
+ * Arguments: fd_udata, [timeout (milliseconds)]
+ * Returns: [fd_udata]
  */
 static int
-win32_mailslot_info (lua_State *L)
+win32_set_mailslot_info (lua_State *L)
 {
     fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
-    DWORD next_size, count;
+    const DWORD timeout = luaL_optinteger(L, 2, MAILSLOT_WAIT_FOREVER);
 
-    if (GetMailslotInfo(fd, NULL, &next_size, &count, NULL)) {
+    if (SetMailslotInfo(fd, timeout)) {
+	lua_settop(L, 1);
+	return 1;
+    }
+    return sys_seterror(L, 0);
+}
+
+/*
+ * Arguments: fd_udata
+ * Returns: [next_message_size (number), message_count (number),
+ *	timeout (milliseconds)]
+ */
+static int
+win32_get_mailslot_info (lua_State *L)
+{
+    fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
+    DWORD next_size, count, timeout;
+
+    if (GetMailslotInfo(fd, NULL, &next_size, &count, &timeout)) {
 	if (next_size == MAILSLOT_NO_MESSAGE)
 	    next_size = count = 0;
 	lua_pushinteger(L, next_size);
 	lua_pushinteger(L, count);
-	return 2;
+	lua_pushinteger(L, timeout);
+	return 3;
     }
     return sys_seterror(L, 0);
 }
@@ -83,8 +101,9 @@ win32_beep (lua_State *L)
 
 
 #define WIN32_METHODS \
-    {"mailslot",	win32_mailslot}, \
-    {"mailslot_info",	win32_mailslot_info}
+    {"mailslot",		win32_mailslot}, \
+    {"set_mailslot_info",	win32_set_mailslot_info}, \
+    {"get_mailslot_info",	win32_get_mailslot_info}
 
 static luaL_Reg win32_lib[] = {
     {"file_apis",	win32_file_apis},

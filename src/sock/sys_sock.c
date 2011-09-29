@@ -10,7 +10,6 @@
 
 #define SHUT_WR		SD_SEND
 
-typedef long		ssize_t;
 typedef int		socklen_t;
 
 #undef EINTR

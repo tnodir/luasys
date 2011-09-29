@@ -91,8 +91,7 @@ ecb_read (lua_State *L)
     } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
      && sys_buffer_write_next(L, &sb, buf, 0));
     if (nr <= 0 && len == n) {
-	if (!nr || !SYS_EAGAIN(SYS_ERRNO)) goto err;
-	lua_pushboolean(L, 0);
+	goto err;
     } else {
 	if (!sys_buffer_write_done(L, &sb, buf, nr))
 	    lua_pushinteger(L, len - n);
@@ -143,7 +142,7 @@ ecb_write (lua_State *L)
 	}
 	sys_vm_enter();
 	if (nw == -1) {
-	    if (n > 0 || SYS_EAGAIN(SYS_ERRNO)) break;
+	    if (n > 0) break;
 	    return sys_seterror(L, 0);
 	}
 	n += nw;

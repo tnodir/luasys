@@ -694,23 +694,22 @@ sys_flush (lua_State *L)
 static int
 sys_nonblocking (lua_State *L)
 {
+#ifndef _WIN32
     fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
     const int nonblocking = lua_toboolean(L, 2);
-
-#ifndef _WIN32
     const int flags = fcntl(fd, F_GETFL);
 
     if (!fcntl(fd, F_SETFL, nonblocking ? flags | O_NONBLOCK
      : flags ^ O_NONBLOCK)) {
-#else
-    const size_t mode = nonblocking ? 0 : MAILSLOT_WAIT_FOREVER;
-
-    if (SetMailslotInfo(fd, mode)) {
-#endif
 	lua_settop(L, 1);
 	return 1;
     }
     return sys_seterror(L, 0);
+#else
+    (void) L;
+
+    return sys_seterror(L, ERROR_NOT_SUPPORTED);
+#endif
 }
 
 /*

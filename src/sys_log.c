@@ -143,9 +143,15 @@ log_report (lua_State *L)
 	return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
     sys_vm_leave();
-    ReportEventW(logp->h, (short) logp->type,
-     0, 3299, NULL, sizeof(buf) / sizeof(buf[0]), 0,
-     (const WCHAR **) buf, NULL);
+    if (is_WinNT) {
+	ReportEventW(logp->h, (short) logp->type,
+	 0, 3299, NULL, sizeof(buf) / sizeof(buf[0]), 0,
+	 (const WCHAR **) buf, NULL);
+    } else {
+	ReportEventA(logp->h, (short) logp->type,
+	 0, 3299, NULL, sizeof(buf) / sizeof(buf[0]), 0,
+	 (const CHAR **) buf, NULL);
+    }
     sys_vm_enter();
 
     free(buf[0]);

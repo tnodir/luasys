@@ -100,6 +100,7 @@ luasys.o: luasys.c sys_comm.c sys_date.c sys_env.c sys_evq.c sys_file.c \
     event/evq.c event/epoll.c event/kqueue.c event/poll.c \
     event/select.c event/signal.c event/timeout.c \
     event/evq.h event/epoll.h event/kqueue.h event/poll.h \
-    event/select.h event/timeout.h
+    event/select.h event/timeout.h \
+    win32/sys_win32.c win32/win32_reg.c win32/win32_svc.c win32/win32_utf8.c
 sock/sys_sock.o: sock/sys_sock.c sock/sock_addr.c common.h
 isa/isapi/isapi_dll.o: isa/isapi/isapi_dll.c isa/isapi/isapi_ecb.c common.h

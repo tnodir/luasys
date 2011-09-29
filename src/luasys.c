@@ -7,9 +7,6 @@
 
 #ifdef _WIN32
 
-#define mode_t	int
-#define ssize_t	DWORD
-
 int is_WinNT;
 
 #else

@@ -20,6 +20,10 @@
 #include <winsock2.h>
 #include <mmsystem.h>	/* timeGetTime */
 
+#if defined(_MSC_VER) || defined(__BORLANDC__)
+typedef DWORD		ssize_t;
+#endif
+
 #ifndef ULONG_PTR
 #define ULONG_PTR	DWORD
 #endif

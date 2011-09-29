@@ -176,11 +176,10 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     timeout = timeout_get(evq->tq, timeout, evq->now);
 
     sys_vm_leave();
-
     nready = poll(fdset, npolls, (int) timeout);
-    evq->now = get_milliseconds();
-
     sys_vm_enter();
+
+    evq->now = get_milliseconds();
 
     if (nready == -1)
 	return (errno == EINTR) ? 0 : EVQ_FAILED;
