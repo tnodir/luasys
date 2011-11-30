@@ -3,6 +3,7 @@
 #define PERIOD_TYPENAME	"sys.period"
 
 #ifndef _WIN32
+
 #if defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0
 #ifdef CLOCK_MONOTONIC_COARSE
 #define SYS_MONOTONIC_CLOCKID CLOCK_MONOTONIC_COARSE
@@ -10,10 +11,13 @@
 #define SYS_MONOTONIC_CLOCKID CLOCK_MONOTONIC
 #endif
 #endif
+
 #else
+
 struct period {
     LARGE_INTEGER start, freq;
 };
+
 #endif
 
 
@@ -85,8 +89,17 @@ sys_date (lua_State *L)
      : time(NULL);  /* current time */
     const int is_UTC = lua_isboolean(L, -1) && lua_toboolean(L, -1);
     const struct tm *tsp;
+#if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) \
+	|| (defined(_XOPEN_SOURCE) && _XOPEN_SOURCE) \
+	|| (defined(_BSD_SOURCE) && _BSD_SOURCE) \
+	|| (defined(_SVID_SOURCE) && _SVID_SOURCE) \
+	|| (defined(_POSIX_SOURCE) && _POSIX_SOURCE)
+    struct tm ts;
 
+    tsp = is_UTC ? gmtime_r(&t, &ts) : localtime_r(&t, &ts);
+#else
     tsp = is_UTC ? gmtime(&t) : localtime(&t);
+#endif
     if (tsp == NULL)  /* invalid date */
 	return 0;
 
