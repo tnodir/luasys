@@ -354,7 +354,8 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 		if (ev_flags & EVENT_ONESHOT) {
 		    win32thr_del(wth, ev);
 		    --i, --n, --hp;
-		} else if (ev->tq)
+		}
+		else if (ev->tq && !(ev_flags & EVENT_TIMEOUT_MANUAL))
 		    timeout_reset(ev, timeout);
 	    }
 

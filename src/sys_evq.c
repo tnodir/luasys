@@ -464,7 +464,7 @@ levq_timeout (lua_State *L)
 {
     struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
     struct event *ev = levq_toevent(L, 2);
-    msec_t timeout = lua_isnoneornil(L, 3)
+    const msec_t timeout = lua_isnoneornil(L, 3)
      ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 3);
 
     if (!ev || event_deleted(ev) || (ev->flags & EVENT_WINMSG))
@@ -481,6 +481,28 @@ levq_timeout (lua_State *L)
 	return 1;
     }
     return sys_seterror(L, 0);
+}
+
+/*
+ * Arguments: evq_udata, ev_ludata, [manually/auto-reset (boolean)]
+ * Returns: [evq_udata]
+ */
+static int
+levq_timeout_manual (lua_State *L)
+{
+    struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
+    struct event *ev = levq_toevent(L, 2);
+    const int manual = lua_toboolean(L, 3);
+
+    (void) evq;
+
+    if (manual)
+	ev->flags |= EVENT_TIMEOUT_MANUAL;
+    else
+	ev->flags &= ~EVENT_TIMEOUT_MANUAL;
+
+    lua_settop(L, 1);
+    return 1;
 }
 
 /*
@@ -718,6 +740,7 @@ static luaL_Reg evq_meth[] = {
     {"mod_socket",	levq_mod_socket},
     {"del",		levq_del},
     {"timeout",		levq_timeout},
+    {"timeout_manual",	levq_timeout_manual},
     {"callback",	levq_callback},
     {"on_interrupt",	levq_on_interrupt},
     {"loop",		levq_loop},

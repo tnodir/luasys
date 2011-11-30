@@ -49,6 +49,7 @@ struct event {
 #define EVENT_SIGNAL		0x00000080
 #define EVENT_WINMSG		0x00000100
 #define EVENT_DIRWATCH		0x00000200  /* directory watcher */
+#define EVENT_TIMEOUT_MANUAL	0x00000400  /* don't auto-reset timeout on event */
 #define EVENT_AIO		0x00000800
 #define EVENT_CALLBACK		0x00001000  /* callback exist */
 #define EVENT_CALLBACK_THREAD	0x00002000  /* callback is coroutine */

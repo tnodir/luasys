@@ -30,7 +30,7 @@ win32iocp_process (struct event_queue *evq, struct event *ev_ready, msec_t now)
 	ev->flags |= EVENT_ACTIVE;
 	if (ev->flags & EVENT_ONESHOT)
 	    evq_del(ev, 1);
-	else if (ev->tq) {
+	else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL)) {
 	    if (now == 0L) {
 		now = evq->now = get_milliseconds();
 	    }

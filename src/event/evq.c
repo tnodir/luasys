@@ -62,7 +62,7 @@ evq_notify (struct event *ev, unsigned int flags)
 
     if (ev->flags & EVENT_ONESHOT)
 	evq_del(ev, 0);
-    else if (ev->tq) {
+    else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL)) {
 	evq_set_timeout(ev, ev->tq->msec);  /* timeout_reset */
     }
 

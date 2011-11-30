@@ -213,7 +213,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	    ev->flags |= EVENT_ACTIVE | res;
 	    if (ev_flags & EVENT_ONESHOT)
 		evq_del(ev, 1);
-	    else if (ev->tq)
+	    else if (ev->tq && !(ev_flags & EVENT_TIMEOUT_MANUAL))
 		timeout_reset(ev, timeout);
 
 	    ev->next_ready = ev_ready;
