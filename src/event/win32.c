@@ -28,8 +28,11 @@ evq_init (struct event_queue *evq)
 
     InitCriticalSection(&wth->cs);
 
-    if (is_WinNT)
+    if (is_WinNT) {
+	win32iocp_init();
+
 	evq->iocp.h = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
+    }
 
     evq->now = get_milliseconds();
     return 0;

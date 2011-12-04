@@ -27,6 +27,7 @@ struct event_queue;
 #define EVQ_CALLBACK	2  /* table: callback functions */
 #define EVQ_ON_INTR	3  /* function */
 #define EVQ_BUF_IDX	6  /* initial buffer index */
+#define EVQ_BUF_MAX	24  /* maximum buffer index */
 
 /* Directory watcher filter flags */
 #define EVQ_DIRWATCH_MODIFY	0x01

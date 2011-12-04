@@ -32,6 +32,24 @@ levq_new (lua_State *L)
     return sys_seterror(L, 0);
 }
 
+/* Find the log base 2 of an N-bit integer in O(lg(N)) operations with multiply and lookup */
+static int
+getmaxbit (unsigned int v)
+{
+    static const int bit_position[32] = {
+	0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30,
+	8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31
+    };
+
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+
+    return bit_position[(unsigned int) (v * 0x07C4ACDDU) >> 27];
+}
+
 /*
  * Arguments: evq_udata
  */
@@ -39,16 +57,34 @@ static int
 levq_done (lua_State *L)
 {
     struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
+    struct event *buffers[32];  /* cache */
 
+    memset(buffers, 0, sizeof(buffers));
+
+#undef ARG_LAST
+#define ARG_LAST	1
+
+    lua_settop(L, ARG_LAST);
     lua_getfenv(L, 1);
-    lua_rawgeti(L, -1, EVQ_OBJ_UDATA);
+    lua_rawgeti(L, ARG_LAST+1, EVQ_OBJ_UDATA);
 
     /* delete object events */
     lua_pushnil(L);
     while (lua_next(L, -2)) {
-	struct event *ev = lua_touserdata(L, -2);
+	const int ev_id = lua_tointeger(L, -2);
+	const int buf_idx = getmaxbit((ev_id | ((1 << EVQ_BUF_IDX) - 1)) + 1);
+	const int nmax = (1 << buf_idx);
+	struct event *ev = buffers[buf_idx];
 
-	if (ev && !event_deleted(ev))
+	if (!ev) {
+	    lua_rawgeti(L, ARG_LAST+1, buf_idx);
+	    ev = lua_touserdata(L, -1);
+	    lua_pop(L, 1);  /* pop events buffer */
+	    buffers[buf_idx] = ev;
+	}
+	ev += ev_id - ((nmax - 1) & ~((1 << EVQ_BUF_IDX) - 1));
+
+	if (!event_deleted(ev))
 	    evq_del(ev, 0);
 	lua_pop(L, 1);  /* pop value */
     }
@@ -74,10 +110,10 @@ levq_new_event (lua_State *L, int idx, struct event_queue *evq)
     }
     else {
 	const int n = evq->buf_nevents;
-	const int i = evq->buf_index;
-	const int nmax = (1 << i);
+	const int buf_idx = evq->buf_index;
+	const int nmax = (1 << buf_idx);
 
-	lua_rawgeti(L, idx, i);
+	lua_rawgeti(L, idx, buf_idx);
 	ev = lua_touserdata(L, -1);
 	lua_pop(L, 1);
 	if (ev) {
@@ -88,8 +124,10 @@ levq_new_event (lua_State *L, int idx, struct event_queue *evq)
 	    }
 	}
 	else {
+	    if (evq->buf_index > EVQ_BUF_MAX)
+		luaL_argerror(L, 1, "too many events");
 	    ev = lua_newuserdata(L, nmax * sizeof(struct event));
-	    lua_rawseti(L, idx, i);
+	    lua_rawseti(L, idx, buf_idx);
 	    evq->buf_nevents = 1;
 	}
 	ev_id = n + ((nmax - 1) & ~((1 << EVQ_BUF_IDX) - 1));
