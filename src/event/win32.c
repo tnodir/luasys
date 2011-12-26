@@ -243,10 +243,11 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     if (!iocp_is_empty(evq))
 	ev_ready = win32iocp_process(evq, ev_ready, 0L);
 
+    timeout = ev_ready ? 0L : timeout_get(wth->tq, timeout, evq->now);
+
     sys_vm_leave();
     wait_res = MsgWaitForMultipleObjects(n + 1, wth->handles, FALSE,
-     ev_ready ? 0L : timeout_get(wth->tq, timeout, evq->now),
-     evq->win_msg ? QS_ALLEVENTS : 0);
+     timeout, evq->win_msg ? QS_ALLEVENTS : 0);
     sys_vm_enter();
 
     evq->now = get_milliseconds();

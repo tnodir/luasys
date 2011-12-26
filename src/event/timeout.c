@@ -9,7 +9,7 @@ timeout_reset (struct event *ev, msec_t now)
     if (msec == TIMEOUT_INFINITE)
 	return;
 
-    ev->timeout_at = msec + now;
+    ev->timeout_at = now + msec;
     if (!ev->next)
 	return;
 
@@ -107,7 +107,7 @@ timeout_add (struct event *ev, msec_t msec, msec_t now)
     tq->ev_tail = ev;
     ev->next = NULL;
     ev->tq = tq;
-    ev->timeout_at = msec + now;
+    ev->timeout_at = now + msec;
     return 0;
 }
 
@@ -129,7 +129,8 @@ timeout_get (const struct timeout_queue *tq, msec_t min, msec_t now)
 	    if (is_infinite) {
 		is_infinite = 0;
 		min = t;
-	    } else if ((long) t < (long) min)
+	    }
+	    else if ((long) t < (long) min)
 		min = t;
 	}
 	tq = tq->tq_next;
@@ -146,7 +147,7 @@ timeout_get (const struct timeout_queue *tq, msec_t min, msec_t now)
 static struct event *
 timeout_process (struct timeout_queue *tq, struct event *ev_ready, msec_t now)
 {
-    long timeout_at = (long) now + MIN_TIMEOUT;
+    const long timeout_at = (long) now + MIN_TIMEOUT;
 
     while (tq) {
 	struct event *ev_head = tq->ev_head;
@@ -154,10 +155,10 @@ timeout_process (struct timeout_queue *tq, struct event *ev_ready, msec_t now)
 	if (ev_head) {
 	    struct event *ev = ev_head;
 
-	    while ((long) ev->timeout_at <= timeout_at
+	    while ((long) ev->timeout_at < timeout_at
 	     && !(ev->flags & EVENT_ACTIVE)) {
 		ev->flags |= EVENT_ACTIVE | EVENT_TIMEOUT_RES;
-		ev->timeout_at = tq->msec + now;
+		ev->timeout_at = now + tq->msec;
 
 		ev->next_ready = ev_ready;
 		ev_ready = ev;

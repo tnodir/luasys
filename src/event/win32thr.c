@@ -116,7 +116,7 @@ win32thr_wait (struct event_queue *evq)
 	LeaveCriticalSection(head_cs);
 
 	res = WaitForMultipleObjects(n + 1, wth.handles, FALSE,
-	 timeout_get(wth.tq, INFINITE, now));
+	 timeout_get(wth.tq, TIMEOUT_INFINITE, now));
 	wth.idx = res;
 	res = (res == WAIT_TIMEOUT) || (res < (WAIT_OBJECT_0 + n));
 
