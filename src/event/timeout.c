@@ -147,25 +147,25 @@ timeout_get (const struct timeout_queue *tq, msec_t min, msec_t now)
 static struct event *
 timeout_process (struct timeout_queue *tq, struct event *ev_ready, msec_t now)
 {
-    const long timeout_at = (long) now + MIN_TIMEOUT;
+    const long timeout = (long) now + MIN_TIMEOUT;
 
     while (tq) {
 	struct event *ev_head = tq->ev_head;
 
-	if (ev_head) {
+	if (ev_head && (long) ev_head->timeout_at < timeout) {
 	    struct event *ev = ev_head;
+	    const msec_t timeout_at = now + tq->msec;
 
-	    while ((long) ev->timeout_at < timeout_at
-	     && !(ev->flags & EVENT_ACTIVE)) {
+	    do {
 		ev->flags |= EVENT_ACTIVE | EVENT_TIMEOUT_RES;
-		ev->timeout_at = now + tq->msec;
+		ev->timeout_at = timeout_at;
 
 		ev->next_ready = ev_ready;
 		ev_ready = ev;
 		ev = ev->next;
-		if (!ev) break;
-	    }
-	    if (ev && ev != ev_head) {
+	    } while (ev && (long) ev->timeout_at < timeout);
+
+	    if (ev) {
 		/* recycle timeout queue */
 		tq->ev_head = ev;  /* head */
 		ev->prev = NULL;
