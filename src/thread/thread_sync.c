@@ -143,7 +143,7 @@ thread_event_wait (thread_event_t *tev, msec_t timeout)
 #ifndef _WIN32
 #define thread_event_signal_nolock(tev)		(pthread_cond_signal(&(tev)->cond))
 #else
-#define thread_event_signal_nolock(tev)		(!PulseEvent((tev)->h))
+#define thread_event_signal_nolock(tev)		(!SetEvent((tev)->h))
 #endif
 
 static int
@@ -160,7 +160,7 @@ thread_event_signal (thread_event_t *tev)
     if (res) errno = res;
     return res;
 #else
-    return !PulseEvent(tev->h);
+    return !SetEvent(tev->h);
 #endif
 }
 

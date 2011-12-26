@@ -191,26 +191,6 @@ dpool_get (lua_State *L)
 }
 
 /*
- * Arguments: dpool_udata, [timeout (milliseconds)]
- * Returns: [signalled/timedout (boolean)]
- */
-static int
-dpool_wait (lua_State *L)
-{
-    struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
-    const msec_t timeout = lua_isnoneornil(L, 2)
-     ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
-    int res;
-
-    res = thread_event_wait(&dp->tev, timeout);
-    if (res >= 0) {
-	lua_pushboolean(L, !res);
-	return 1;
-    }
-    return sys_seterror(L, 0);
-}
-
-/*
  * Arguments: dpool_udata, [maximum (number)]
  * Returns: dpool_udata | maximum (number)
  */
@@ -284,7 +264,6 @@ dpool_tostring (lua_State *L)
 static luaL_Reg dpool_meth[] = {
     {"put",		dpool_put},
     {"get",		dpool_get},
-    {"wait",		dpool_wait},
     {"max",		dpool_max},
     {"callbacks",	dpool_callbacks},
     {"__len",		dpool_count},

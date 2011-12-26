@@ -115,10 +115,6 @@ pipe_close (lua_State *L)
 
 	thread_critsect_enter(csp);
 	nref = pp->nref--;
-	/* notify about all closed end-points */
-	if (nref == 1) {
-	    (void) thread_event_signal_nolock(&pp->bufev);
-	}
 	thread_critsect_leave(csp);
 
 	if (!nref) {
@@ -326,26 +322,6 @@ pipe_get (lua_State *L)
 }
 
 /*
- * Arguments: pipe_udata, [timeout (milliseconds)]
- * Returns: [signalled/timedout (boolean)]
- */
-static int
-pipe_wait (lua_State *L)
-{
-    struct pipe *pp = lua_unboxpointer(L, 1, PIPE_TYPENAME);
-    const msec_t timeout = lua_isnoneornil(L, 2)
-     ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
-    int res;
-
-    res = thread_event_wait(&pp->bufev, timeout);
-    if (res >= 0) {
-	lua_pushboolean(L, !res);
-	return 1;
-    }
-    return sys_seterror(L, 0);
-}
-
-/*
  * Arguments: pipe_udata
  * Returns: [number]
  */
@@ -382,7 +358,6 @@ static luaL_Reg pipe_meth[] = {
     {THREAD_XDUP_TAG,	pipe_xdup},
     {"put",		pipe_put},
     {"get",		pipe_get},
-    {"wait",		pipe_wait},
     {"__len",		pipe_count},
     {"__tostring",	pipe_tostring},
     {"__gc",		pipe_close},
