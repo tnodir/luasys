@@ -44,6 +44,7 @@ typedef struct {
 #ifndef _WIN32
     pthread_cond_t cond;
     thread_critsect_t cs;
+    int signalled;
 #else
     HANDLE h;
 #endif
@@ -101,7 +102,8 @@ thread_event_wait (thread_event_t *tev, msec_t timeout)
     sys_vm_leave();
     if (timeout == TIMEOUT_INFINITE) {
 	pthread_mutex_lock(csp);
-	res = pthread_cond_wait(&tev->cond, &tev->cs);
+	res = tev->signalled ? 0
+	 : pthread_cond_wait(&tev->cond, &tev->cs);
     } else {
 	struct timespec ts;
 	struct timeval tv;
@@ -118,8 +120,10 @@ thread_event_wait (thread_event_t *tev, msec_t timeout)
 	ts.tv_nsec = tv.tv_usec * 1000;
 
 	pthread_mutex_lock(csp);
-	res = pthread_cond_timedwait(&tev->cond, &tev->cs, &ts);
+	res = tev->signalled ? 0
+	 : pthread_cond_timedwait(&tev->cond, &tev->cs, &ts);
     }
+    tev->signalled = 0;
     pthread_mutex_unlock(csp);
     sys_vm_enter();
 
@@ -141,7 +145,7 @@ thread_event_wait (thread_event_t *tev, msec_t timeout)
 }
 
 #ifndef _WIN32
-#define thread_event_signal_nolock(tev)		(pthread_cond_signal(&(tev)->cond))
+#define thread_event_signal_nolock(tev)		((tev)->signalled = 1, pthread_cond_signal(&(tev)->cond))
 #else
 #define thread_event_signal_nolock(tev)		(!SetEvent((tev)->h))
 #endif
@@ -154,6 +158,7 @@ thread_event_signal (thread_event_t *tev)
     int res;
 
     pthread_mutex_lock(csp);
+    tev->signalled = 1;
     res = pthread_cond_signal(&tev->cond);
     pthread_mutex_unlock(csp);
 
