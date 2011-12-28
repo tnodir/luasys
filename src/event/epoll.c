@@ -144,7 +144,13 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     struct event *ev_ready;
     int nready;
 
-    timeout = timeout_get(evq->tq, timeout, evq->now);
+    if (timeout != 0L) {
+	timeout = timeout_get(evq->tq, timeout, evq->now);
+	if (timeout == 0L) {
+	    ev_ready = timeout_process(evq->tq, NULL, evq->now);
+	    goto end;
+	}
+    }
 
     sys_vm_leave();
     nready = epoll_wait(evq->epoll_fd, ep_events, NEVENT, (int) timeout);

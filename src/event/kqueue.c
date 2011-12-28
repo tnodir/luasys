@@ -193,7 +193,13 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     struct timespec ts, *tsp;
     int nready;
 
-    timeout = timeout_get(evq->tq, timeout, evq->now);
+    if (timeout != 0L) {
+	timeout = timeout_get(evq->tq, timeout, evq->now);
+	if (timeout == 0L) {
+	    ev_ready = timeout_process(evq->tq, NULL, evq->now);
+	    goto end;
+	}
+    }
     if (timeout == TIMEOUT_INFINITE)
 	tsp = NULL;
     else {

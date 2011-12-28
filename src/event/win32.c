@@ -240,14 +240,20 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     if (threads && win32thr_poll(evq) && evq_is_empty(evq))
 	return 0;
 
-    if (!iocp_is_empty(evq))
-	ev_ready = win32iocp_process(evq, ev_ready, 0L);
+    if (timeout != 0L) {
+	timeout = timeout_get(wth->tq, timeout, evq->now);
+	if (timeout == 0L) {
+	    ev_ready = timeout_process(wth->tq, NULL, evq->now);
+	    goto end;
+	}
+    }
 
-    timeout = ev_ready ? 0L : timeout_get(wth->tq, timeout, evq->now);
+    if (!iocp_is_empty(evq))
+	ev_ready = win32iocp_process(evq, NULL, 0L);
 
     sys_vm_leave();
     wait_res = MsgWaitForMultipleObjects(n + 1, wth->handles, FALSE,
-     timeout, evq->win_msg ? QS_ALLEVENTS : 0);
+     (ev_ready ? 0L : timeout), (evq->win_msg ? QS_ALLEVENTS : 0));
     sys_vm_enter();
 
     evq->now = get_milliseconds();

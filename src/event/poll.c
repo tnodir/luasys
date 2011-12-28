@@ -173,7 +173,13 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     const int npolls = evq->npolls;
     int i, nready;
 
-    timeout = timeout_get(evq->tq, timeout, evq->now);
+    if (timeout != 0L) {
+	timeout = timeout_get(evq->tq, timeout, evq->now);
+	if (timeout == 0L) {
+	    ev_ready = timeout_process(evq->tq, NULL, evq->now);
+	    goto end;
+	}
+    }
 
     sys_vm_leave();
     nready = poll(fdset, npolls, (int) timeout);

@@ -151,10 +151,24 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     struct timeval tv, *tvp;
     struct event **events = evq->events;
     const int npolls = evq->npolls;
-    int i, nready;
+    int i, nready, max_fd;
 
-    int max_fd = evq->max_fd;
+    if (timeout != 0L) {
+	timeout = timeout_get(evq->tq, timeout, evq->now);
+	if (timeout == 0L) {
+	    ev_ready = timeout_process(evq->tq, NULL, evq->now);
+	    goto end;
+	}
+    }
+    if (timeout == TIMEOUT_INFINITE)
+	tvp = NULL;
+    else {
+	tv.tv_sec = timeout / 1000;
+	tv.tv_usec = (timeout % 1000) * 1000;
+	tvp = &tv;
+    }
 
+    max_fd = evq->max_fd;
     if (max_fd == -1) {
 	for (i = 1; i < npolls; ++i) {
 	    struct event *ev = events[i];
@@ -162,15 +176,6 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 		max_fd = ev->fd;
 	}
 	evq->max_fd = max_fd;
-    }
-
-    timeout = timeout_get(evq->tq, timeout, evq->now);
-    if (timeout == TIMEOUT_INFINITE)
-	tvp = NULL;
-    else {
-	tv.tv_sec = timeout / 1000;
-	tv.tv_usec = (timeout % 1000) * 1000;
-	tvp = &tv;
     }
 
     sys_vm_leave();
