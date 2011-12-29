@@ -9,10 +9,11 @@ local sock = require"sys.sock"
 
 local USE_PIPES = false
 
+local num_pipes, num_active, num_writes
+local count, writes, fired
+
 local pipes = {}
 local events, events_idx = {}, {}
-local count, writes, fired
-local num_pipes, num_active, num_writes
 
 local period = sys.period()
 
@@ -101,6 +102,8 @@ local function main(npipes, nactives, nwrites)
     for i = 1, 25 do
 	print(run_once(evq))
     end
+
+    sys.exit(0)
 end
 
 main(...)
