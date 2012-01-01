@@ -15,7 +15,6 @@ levq_new (lua_State *L)
     struct event_queue *evq = lua_newuserdata(L, sizeof(struct event_queue));
 
     memset(evq, 0, sizeof(struct event_queue));
-    evq->buf_index = EVQ_BUF_IDX;
 
     if (!evq_init(evq)) {
 	luaL_getmetatable(L, EVQ_TYPENAME);
@@ -57,7 +56,7 @@ static int
 levq_done (lua_State *L)
 {
     struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
-    struct event *buffers[32];  /* cache */
+    struct event *buffers[EVQ_BUF_MAX - EVQ_BUF_IDX + 1];  /* cache */
 
     memset(buffers, 0, sizeof(buffers));
 
@@ -107,10 +106,9 @@ levq_new_event (lua_State *L, int idx, struct event_queue *evq)
     if (ev) {
 	evq->ev_free = ev->next_ready;
 	ev_id = ev->ev_id;
-    }
-    else {
+    } else {
 	const int n = evq->buf_nevents;
-	const int buf_idx = evq->buf_index;
+	const int buf_idx = evq->buf_index + EVQ_BUF_IDX;
 	const int nmax = (1 << buf_idx);
 
 	lua_rawgeti(L, idx, buf_idx);
@@ -122,9 +120,8 @@ levq_new_event (lua_State *L, int idx, struct event_queue *evq)
 		evq->buf_nevents = 0;
 		evq->buf_index++;
 	    }
-	}
-	else {
-	    if (evq->buf_index > EVQ_BUF_MAX)
+	} else {
+	    if (buf_idx > EVQ_BUF_MAX)
 		luaL_argerror(L, 1, "too many events");
 	    ev = lua_newuserdata(L, nmax * sizeof(struct event));
 	    lua_rawseti(L, idx, buf_idx);

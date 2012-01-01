@@ -7,8 +7,6 @@ local sys = require"sys"
 local sock = require"sys.sock"
 
 
-local USE_PIPES = false
-
 local num_pipes, num_active, num_writes
 local count, writes, fired
 
@@ -41,7 +39,7 @@ local function run_once(evq)
 	if evid then
 	    evq:del(evid, true)
 	end
-	evid = evq:add(fdi, "r", read_cb)
+	evid = evq:add_socket(fdi, "r", read_cb)
 	if not evid then
 	    error(errorMessage)
 	end
@@ -83,15 +81,8 @@ local function main(npipes, nactives, nwrites)
     assert(sys.limit_nfiles(num_pipes * 2 + 50))
 
     for i = 1, num_pipes do
-	local fdi, fdo, res
-	if USE_PIPES then
-	    fdi, fdo = sys.handle(), sys.handle()
-	    res = fdi:pipe(fdo)
-	else
-	    fdi, fdo = sock.handle(), sock.handle()
-	    res = fdi:socket(fdo)
-	end
-	if not res then
+	local fdi, fdo = sock.handle(), sock.handle()
+	if not fdi:socket(fdo) then
 	    error(errorMessage)
 	end
 	pipes[i] = {fdi, fdo}

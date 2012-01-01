@@ -149,7 +149,8 @@ sys_limit_nfiles (lua_State *L)
 #else
     (void) L;
 
-    return 0;
+    lua_pushinteger(L, -1);
+    return 1;
 #endif
 }
 

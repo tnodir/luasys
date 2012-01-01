@@ -32,6 +32,14 @@ struct win32iocp {
     HANDLE h;  /* IOCP handle */
 };
 
+struct win32overlapped {
+    union {
+	struct win32overlapped *next_free;
+	OVERLAPPED ov;
+    } u;
+    unsigned int flags;
+};
+
 #define EVENT_EXTRA							\
     struct win32thr *wth;						\
     unsigned int index;
@@ -44,7 +52,10 @@ struct win32iocp {
     struct win32thr head;						\
     int volatile nwakeup;  /* number of the re-polling threads */	\
     int volatile sig_ready;  /* triggered signals */			\
-    OVERLAPPED rov, wov;  /* sockets IOCP */
+    int ov_buf_nevents;  /* number of used overlaps of cur. buffer */	\
+    int ov_buf_index;  /* index of current buffer */			\
+    struct win32overlapped *ov_free;  /* head of free overlaps */	\
+    struct win32overlapped *ov_buffers[EVQ_BUF_MAX - EVQ_BUF_IDX + 1];
 
 #define event_get_evq(ev)	(ev)->wth->evq
 #define event_get_tq_head(ev)	(ev)->wth->tq
@@ -52,7 +63,8 @@ struct win32iocp {
 #define iocp_is_empty(evq)	(!(evq)->iocp.n)
 #define evq_is_empty(evq)	(!((evq)->nevents || (evq)->head.next))
 
-#define evq_post_call(ev, ev_flags) do {				\
+#define evq_post_call(ev, ev_flags)					\
+    do {								\
 	if (((ev)->flags & (EVENT_SOCKET | EVENT_AIO | EVENT_PENDING))	\
 	 == (EVENT_SOCKET | EVENT_AIO))					\
 	    win32iocp_set((ev),						\

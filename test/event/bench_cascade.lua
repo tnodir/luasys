@@ -49,7 +49,7 @@ local function run_once(evq)
 
     for i = 1, num_pipes do
 	local fdi = pipes[i][1]
-	evid = evq:add(fdi, "r", read_cb, timeout)
+	evid = evq:add_socket(fdi, "r", read_cb, timeout)
 	if not evid then
 	    error(errorMessage)
 	end
@@ -61,7 +61,16 @@ local function run_once(evq)
     -- kick everything off with a single write
     pipes[1][2]:write("e")
 
-    evq:loop(0)
+    local xcount = 0
+    while true do
+	evq:loop(0)
+	if fired < num_pipes then
+	    xcount = xcount + 1
+	else break end
+    end
+    if xcount ~= 0 then
+	sys.stderr:write("Xcount: ", xcount, "\n")
+    end
 
     local res = period:get()
 

@@ -24,14 +24,12 @@ evq_init (struct event_queue *evq)
     }
     wth->handles[0] = wth->signal;
     wth->evq = evq;
-    evq->rov.hEvent = evq->wov.hEvent = wth->signal;
 
     InitCriticalSection(&wth->cs);
 
     if (is_WinNT) {
-	win32iocp_init();
-
 	evq->iocp.h = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
+	win32iocp_init();
     }
 
     evq->now = get_milliseconds();
@@ -43,8 +41,10 @@ evq_done (struct event_queue *evq)
 {
     win32thr_poll(evq);
 
-    if (evq->iocp.h)
+    if (is_WinNT) {
 	CloseHandle(evq->iocp.h);
+	win32iocp_done(evq);
+    }
 
     CloseHandle(evq->ack_event);
     CloseHandle(evq->head.signal);
@@ -170,7 +170,7 @@ evq_del (struct event *ev, int reuse_fd)
 	evq->nevents--;
 
 	if (ev_flags & EVENT_AIO) {
-	    if (reuse_fd && (ev_flags & EVENT_PENDING))
+	    if (ev_flags & EVENT_PENDING)
 		CancelIo(ev->fd);
 	    evq->iocp.n--;
 	    return 0;
