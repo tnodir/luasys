@@ -17,7 +17,7 @@ struct pipe {
 #ifdef _WIN32
     thread_critsect_t bufcs;  /* guard access to buffer */
 #endif
-    thread_event_t bufev;
+    thread_cond_t bufcond;
     struct pipe_buf volatile buffer;
     int nref;
 };
@@ -40,7 +40,7 @@ struct message {
 };
 
 #ifndef _WIN32
-#define pipe_buf_csp(pp)	(&pp->bufev.cs)
+#define pipe_buf_csp(pp)	(&pp->bufcond.cs)
 #else
 #define pipe_buf_csp(pp)	(&pp->bufcs)
 #endif
@@ -62,11 +62,11 @@ pipe_new (lua_State *L)
     pp = calloc(sizeof(struct pipe), 1);
     if (!pp) goto err;
 
-    if (thread_event_new(&pp->bufev))
+    if (thread_cond_new(&pp->bufcond))
 	goto err_clean;
 #ifdef _WIN32
     if (thread_critsect_new(&pp->bufcs)) {
-	thread_event_del(&pp->bufev);
+	thread_cond_del(&pp->bufcond);
 	goto err_clean;
     }
 #endif
@@ -118,7 +118,7 @@ pipe_close (lua_State *L)
 	thread_critsect_leave(csp);
 
 	if (!nref) {
-	    thread_event_del(&pp->bufev);
+	    thread_cond_del(&pp->bufcond);
 #ifdef _WIN32
 	    thread_critsect_del(&pp->bufcs);
 #endif
@@ -267,7 +267,7 @@ pipe_put (lua_State *L)
 	pp->buffer = buf;
 
 	if (buf.nmsg == 1) {
-	    (void) thread_event_signal_nolock(&pp->bufev);
+	    (void) thread_cond_signal_nolock(&pp->bufcond);
 	}
     }
     thread_critsect_leave(csp);
@@ -310,7 +310,7 @@ pipe_get (lua_State *L)
 	if (res) return pipe_msg_parse(L, &msg);
 
 	/* wait signal */
-	res = thread_event_wait(&pp->bufev, timeout);
+	res = thread_cond_wait(&pp->bufcond, timeout);
 	if (res) {
 	    if (res == 1) {
 		lua_pushboolean(L, 0);
@@ -349,7 +349,7 @@ pipe_tostring (lua_State *L)
 {
     struct pipe *pp = lua_unboxpointer(L, 1, PIPE_TYPENAME);
 
-    lua_pushfstring(L, PIPE_TYPENAME " (%p)", &pp->bufev);
+    lua_pushfstring(L, PIPE_TYPENAME " (%p)", pp);
     return 1;
 }
 

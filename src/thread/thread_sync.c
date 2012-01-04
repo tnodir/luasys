@@ -48,62 +48,62 @@ typedef struct {
 #else
     HANDLE h;
 #endif
-} thread_event_t;
+} thread_cond_t;
 
 
 static int
-thread_event_new (thread_event_t *tev)
+thread_cond_new (thread_cond_t *tcond)
 {
 #ifndef _WIN32
     int res;
 
-    res = pthread_cond_init(&tev->cond, NULL);
+    res = pthread_cond_init(&tcond->cond, NULL);
     if (!res) {
-	res = pthread_mutex_init(&tev->cs, NULL);
+	res = pthread_mutex_init(&tcond->cs, NULL);
 	if (res)
-	    pthread_cond_destroy(&tev->cond);
+	    pthread_cond_destroy(&tcond->cond);
     }
     if (res) errno = res;
     return res;
 #else
-    tev->h = CreateEvent(NULL, FALSE, FALSE, NULL);  /* auto-reset */
-    return (tev->h != NULL) ? 0 : -1;
+    tcond->h = CreateEvent(NULL, FALSE, FALSE, NULL);  /* auto-reset */
+    return (tcond->h != NULL) ? 0 : -1;
 #endif
 }
 
 static int
-thread_event_del (thread_event_t *tev)
+thread_cond_del (thread_cond_t *tcond)
 {
     int res;
 
 #ifndef _WIN32
-    res = pthread_cond_destroy(&tev->cond);
+    res = pthread_cond_destroy(&tcond->cond);
     if (!res)
-	res = pthread_mutex_destroy(&tev->cs);
+	res = pthread_mutex_destroy(&tcond->cs);
     if (res) errno = res;
 #else
     res = 0;
-    if (tev->h) {
-	res = !CloseHandle(tev->h);
-	tev->h = NULL;
+    if (tcond->h) {
+	res = !CloseHandle(tcond->h);
+	tcond->h = NULL;
     }
 #endif
     return res;
 }
 
 static int
-thread_event_wait (thread_event_t *tev, msec_t timeout)
+thread_cond_wait (thread_cond_t *tcond, msec_t timeout)
 {
     int res;
 
 #ifndef _WIN32
-    pthread_mutex_t *csp = &tev->cs;
+    pthread_mutex_t *csp = &tcond->cs;
 
     sys_vm_leave();
     if (timeout == TIMEOUT_INFINITE) {
 	pthread_mutex_lock(csp);
-	res = tev->signalled ? 0
-	 : pthread_cond_wait(&tev->cond, &tev->cs);
+	res = tcond->signalled ? 0
+	 : pthread_cond_wait(&tcond->cond, &tcond->cs);
     } else {
 	struct timespec ts;
 	struct timeval tv;
@@ -120,10 +120,10 @@ thread_event_wait (thread_event_t *tev, msec_t timeout)
 	ts.tv_nsec = tv.tv_usec * 1000;
 
 	pthread_mutex_lock(csp);
-	res = tev->signalled ? 0
-	 : pthread_cond_timedwait(&tev->cond, &tev->cs, &ts);
+	res = tcond->signalled ? 0
+	 : pthread_cond_timedwait(&tcond->cond, &tcond->cs, &ts);
     }
-    tev->signalled = 0;
+    tcond->signalled = 0;
     pthread_mutex_unlock(csp);
     sys_vm_enter();
 
@@ -136,7 +136,7 @@ thread_event_wait (thread_event_t *tev, msec_t timeout)
     return 0;
 #else
     sys_vm_leave();
-    res = WaitForSingleObject(tev->h, timeout);
+    res = WaitForSingleObject(tcond->h, timeout);
     sys_vm_enter();
 
     return (res == WAIT_OBJECT_0) ? 0
@@ -145,27 +145,27 @@ thread_event_wait (thread_event_t *tev, msec_t timeout)
 }
 
 #ifndef _WIN32
-#define thread_event_signal_nolock(tev)		((tev)->signalled = 1, pthread_cond_signal(&(tev)->cond))
+#define thread_cond_signal_nolock(tcond)	((tcond)->signalled = 1, pthread_cond_signal(&(tcond)->cond))
 #else
-#define thread_event_signal_nolock(tev)		(!SetEvent((tev)->h))
+#define thread_cond_signal_nolock(tcond)	(!SetEvent((tcond)->h))
 #endif
 
 static int
-thread_event_signal (thread_event_t *tev)
+thread_cond_signal (thread_cond_t *tcond)
 {
 #ifndef _WIN32
-    pthread_mutex_t *csp = &tev->cs;
+    pthread_mutex_t *csp = &tcond->cs;
     int res;
 
     pthread_mutex_lock(csp);
-    tev->signalled = 1;
-    res = pthread_cond_signal(&tev->cond);
+    tcond->signalled = 1;
+    res = pthread_cond_signal(&tcond->cond);
     pthread_mutex_unlock(csp);
 
     if (res) errno = res;
     return res;
 #else
-    return !SetEvent(tev->h);
+    return !SetEvent(tcond->h);
 #endif
 }
 
