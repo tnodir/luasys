@@ -61,26 +61,32 @@ rand_close (lua_State *L)
 }
 
 /*
- * Arguments: rand_udata, [upper_bound (number)]
+ * Arguments: rand_udata, [upper_bound (number)
+ *	| buffer (ludata), buffer_length (number)]
  * Returns: number
  */
 static int
 rand_next (lua_State *L)
 {
-    unsigned int num, ub = lua_tointeger(L, 2);
+    const int is_udata = lua_isuserdata(L, 2);
+    const unsigned int ub = is_udata ? 0 : lua_tointeger(L, 2);
+    unsigned int num;
+    unsigned char *buf = is_udata ? lua_touserdata(L, 2) : &num;
+    const int len = is_udata ? luaL_checkinteger(L, 3) : (int) sizeof(num);
 #ifndef _WIN32
     fd_t fd = (fd_t) lua_unboxinteger(L, 1, RAND_TYPENAME);
     int nr;
 
-    do nr = read(fd, (char *) &num, sizeof(num));
+    do nr = read(fd, (char *) buf, len);
     while (nr == -1 && SYS_ERRNO == EINTR);
-    if (nr == sizeof(num)) {
+    if (nr == len) {
 #else
     HCRYPTPROV prov = (HCRYPTPROV) lua_unboxpointer(L, 1, RAND_TYPENAME);
 
-    if (CryptGenRandom(prov, sizeof(num), (unsigned char *) &num)) {
+    if (CryptGenRandom(prov, len, buf)) {
 #endif
-	lua_pushnumber(L, ub ? num % ub : num);
+	lua_pushinteger(L, is_udata ? 1
+	 : (ub ? num % ub : num));
 	return 1;
     }
     return sys_seterror(L, 0);
