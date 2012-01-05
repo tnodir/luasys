@@ -73,8 +73,7 @@ static thread_key_t g_TLSIndex = INVALID_TLS_INDEX;
 
 #define THREAD_KEY_ADDRESS	(&g_TLSIndex)
 
-
-static void luaopen_sys_thread (lua_State *L);
+static void thread_createmeta (lua_State *L);
 
 
 void
@@ -347,6 +346,7 @@ thread_init (lua_State *L)
 }
 
 
+#if LUA_VERSION_NUM < 502
 static void
 thread_setfield (lua_State *L, const char *name, lua_CFunction f)
 {
@@ -365,7 +365,7 @@ thread_openlib (lua_State *L, const char *name, lua_CFunction func)
 static void
 thread_openlibs (lua_State *L)
 {
-    thread_openlib(L, "", luaopen_base);
+    thread_openlib(L, "_G", luaopen_base);
     thread_openlib(L, LUA_LOADLIBNAME, luaopen_package);
 
     lua_getglobal(L, "package");
@@ -377,9 +377,45 @@ thread_openlibs (lua_State *L)
     thread_setfield(L, LUA_MATHLIBNAME, luaopen_math);
     thread_setfield(L, LUA_DBLIBNAME, luaopen_debug);
     lua_pop(L, 2);
-
-    luaopen_sys_thread(L);  /* create table of threads */
 }
+#else
+static const luaL_Reg loadedlibs[] = {
+    {"_G", luaopen_base},
+    {LUA_LOADLIBNAME, luaopen_package},
+    {NULL, NULL}
+};
+
+
+static const luaL_Reg preloadedlibs[] = {
+    {LUA_COLIBNAME, luaopen_coroutine},
+    {LUA_TABLIBNAME, luaopen_table},
+    {LUA_IOLIBNAME, luaopen_io},
+    {LUA_OSLIBNAME, luaopen_os},
+    {LUA_STRLIBNAME, luaopen_string},
+    {LUA_BITLIBNAME, luaopen_bit32},
+    {LUA_MATHLIBNAME, luaopen_math},
+    {LUA_DBLIBNAME, luaopen_debug},
+    {NULL, NULL}
+};
+
+static void
+thread_openlibs (lua_State *L)
+{
+    const luaL_Reg *lib;
+    /* call open functions from 'loadedlibs' and set results to global table */
+    for (lib = loadedlibs; lib->func; lib++) {
+	luaL_requiref(L, lib->name, lib->func, 1);
+	lua_pop(L, 1);  /* remove lib */
+    }
+    /* add open functions from 'preloadedlibs' into 'package.preload' table */
+    luaL_getsubtable(L, LUA_REGISTRYINDEX, "_PRELOAD");
+    for (lib = preloadedlibs; lib->func; lib++) {
+	lua_pushcfunction(L, lib->func);
+	lua_setfield(L, -2, lib->name);
+    }
+    lua_pop(L, 1);  /* remove _PRELOAD table */
+}
+#endif
 
 /*
  * Arguments: function,
@@ -431,6 +467,7 @@ thread_runvm (lua_State *L)
     if (!NL) goto err;
 
     thread_openlibs(NL);
+    thread_createmeta(NL);
 
     if (path[0] == LUA_SIGNATURE[0]
      ? luaL_loadbuffer(NL, path, lua_rawlen(L, 1), "thread")
@@ -791,39 +828,48 @@ static luaL_Reg thread_lib[] = {
 
 
 static void
-luaopen_sys_thread (lua_State *L)
+thread_createmeta (lua_State *L)
 {
-    /* already initialized? */
-    luaL_getmetatable(L, DPOOL_TYPENAME);
+    /* already created? */
+    luaL_getmetatable(L, THREAD_TYPENAME);
     {
-	int is_reg = !lua_isnil(L, -1);
+	const int created = !lua_isnil(L, -1);
 	lua_pop(L, 1);
-	if (is_reg) return;
+	if (created) return;
     }
 
     luaL_newmetatable(L, THREAD_TYPENAME);
     lua_pushvalue(L, -1);  /* push metatable */
     lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
-    luaL_register(L, NULL, thread_meth);
+    luaL_setfuncs(L, thread_meth, 0);
     lua_pop(L, 1);
 
     luaL_newmetatable(L, DPOOL_TYPENAME);
     lua_pushvalue(L, -1);  /* push metatable */
     lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
-    luaL_register(L, NULL, dpool_meth);
+    luaL_setfuncs(L, dpool_meth, 0);
     lua_pop(L, 1);
 
     luaL_newmetatable(L, PIPE_TYPENAME);
     lua_pushvalue(L, -1);  /* push metatable */
     lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
-    luaL_register(L, NULL, pipe_meth);
+    luaL_setfuncs(L, pipe_meth, 0);
     lua_pop(L, 1);
 
-    /* create table of threads */
+    /* create threads table */
     lua_pushlightuserdata(L, THREAD_KEY_ADDRESS);
     lua_newtable(L);
     lua_rawset(L, LUA_REGISTRYINDEX);
+}
 
-    luaL_register(L, "sys.thread", thread_lib);
-    lua_pop(L, 1);
+/*
+ * Arguments: ..., sys_lib (table)
+ */
+static void
+luaopen_sys_thread (lua_State *L)
+{
+    luaL_newlib(L, thread_lib);
+    lua_setfield(L, -2, "thread");
+
+    thread_createmeta(L);
 }

@@ -114,16 +114,22 @@ static luaL_Reg win32_lib[] = {
 };
 
 
+/*
+ * Arguments: ..., sys_lib (table)
+ */
 static void
 luaopen_sys_win32 (lua_State *L)
 {
+    luaL_newlib(L, win32_lib);
+    lua_pushvalue(L, -1);  /* push win32_lib */
+    lua_setfield(L, -3, "win32");
+
+    luaopen_sys_win32_service(L);
+    lua_pop(L, 1);  /* pop win32_lib */
+
     luaL_newmetatable(L, WREG_TYPENAME);
     lua_pushvalue(L, -1);  /* push metatable */
     lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
-    luaL_register(L, NULL, reg_meth);
-
-    luaL_register(L, "sys.win32", win32_lib);
-    lua_pop(L, 2);
-
-    luaopen_sys_win32_service(L);
+    luaL_setfuncs(L, reg_meth, 0);
+    lua_pop(L, 1);
 }

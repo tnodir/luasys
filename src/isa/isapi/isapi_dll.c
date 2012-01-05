@@ -32,6 +32,7 @@ static struct {
 
 static int
 traceback (lua_State *L) {
+#if LUA_VERSION_NUM < 502
     lua_getfield(L, LUA_GLOBALSINDEX, "debug");
     if (!lua_istable(L, -1)) {
 	lua_pop(L, 1);
@@ -46,6 +47,16 @@ traceback (lua_State *L) {
     lua_pushinteger(L, 2);  /* skip this function and traceback */
     lua_call(L, 2, 1);  /* call debug.traceback */
     return 1;
+#else
+    const char *msg = lua_tostring(L, 1);
+    if (msg)
+	luaL_traceback(L, L, msg, 1);
+    else if (!lua_isnoneornil(L, 1)) {  /* is there an error object? */
+	if (!luaL_callmeta(L, 1, "__tostring"))  /* try its 'tostring' metamethod */
+	    lua_pushliteral(L, "(no error message)");
+    }
+    return 1;
+#endif
 }
 
 static int
@@ -88,7 +99,7 @@ lisapi_init (void)
 	luaL_newmetatable(L, ECB_TYPENAME);
 	lua_pushvalue(L, -1);  /* push metatable */
 	lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
-	luaL_register(L, NULL, ecb_meth);
+	luaL_setfuncs(L, ecb_meth, 0);
 	lua_pop(L, 1);
 
 	g_ISAPI.nthreads = 0;

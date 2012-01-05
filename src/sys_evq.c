@@ -632,7 +632,7 @@ levq_loop (lua_State *L)
 
 			lua_xmove(L, co, 7);
 			lua_pop(L, 1);  /* pop coroutine */
-			switch (lua_resume(co, 7)) {
+			switch (lua_resume(co, L, 7)) {
 			case 0:
 			    lua_settop(co, 0);
 			    if (!event_deleted(ev))

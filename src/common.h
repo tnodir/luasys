@@ -79,7 +79,17 @@ extern int pthread_mutexattr_setkind_np (pthread_mutexattr_t *attr, int kind);
 
 #if LUA_VERSION_NUM < 502
 #define lua_rawlen		lua_objlen
-#define luaL_typeerror		luaL_typerror
+#define lua_resume(L,from,n)	lua_resume((L), (n))
+#define luaL_setfuncs(L,l,n)	luaL_register((L), NULL, (l))
+
+#define luaL_newlibtable(L,l)	\
+	lua_createtable(L, 0, sizeof(l) / sizeof((l)[0]) - 1)
+#define luaL_newlib(L,l)	(luaL_newlibtable((L), (l)), luaL_setfuncs((L), (l), 0))
+
+#else
+#define luaL_register(L,n,l)	luaL_newlib((L), (l))
+#define lua_setfenv		lua_setuservalue
+#define lua_getfenv		lua_getuservalue
 #endif
 
 

@@ -2,12 +2,12 @@
 
 local sys = require("sys")
 
-local win32 = sys.win32
+local win32 = assert(sys.win32, "Windows 9x/NT required")
 
 
 local TIMEOUT = 3000  -- milliseconds
 
-local FILENAME = [[C:\tmp\lua_msvc.51\bin\beep_svc.lua]]  -- EDIT PATH !!!
+local FILENAME = [[C:\tmp\lua_msvc.52\bin\beep_svc.lua]]  -- EDIT PATH !!!
 
 local USE_FOREVER_LOOP = true
 
@@ -91,4 +91,3 @@ else
 end
 
 svc:status"stopped"
-

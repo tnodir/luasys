@@ -829,20 +829,22 @@ sock_init (lua_State *L)
 LUALIB_API int
 luaopen_sys_sock (lua_State *L)
 {
+    luaL_register(L, LUA_SOCKLIBNAME, sock_lib);
+#ifdef _WIN32
+    if (sock_init(L)) return 0;
+#endif
+
     luaL_newmetatable(L, SD_TYPENAME);
     lua_pushvalue(L, -1);  /* push metatable */
     lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
-    luaL_register(L, NULL, sock_meth);
+    luaL_setfuncs(L, sock_meth, 0);
+    lua_pop(L, 1);
 
     luaL_newmetatable(L, SA_TYPENAME);
     lua_pushvalue(L, -1);  /* push metatable */
     lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
-    luaL_register(L, NULL, addr_meth);
+    luaL_setfuncs(L, addr_meth, 0);
+    lua_pop(L, 1);
 
-    luaL_register(L, LUA_SOCKLIBNAME, sock_lib);
-
-#ifdef _WIN32
-    if (sock_init(L)) return 0;
-#endif
     return 1;
 }

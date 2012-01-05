@@ -295,14 +295,18 @@ static luaL_Reg svc_lib[] = {
 };
 
 
+/*
+ * Arguments: ..., win32_lib (table)
+ */
 static void
 luaopen_sys_win32_service (lua_State *L)
 {
+    luaL_newlib(L, svc_lib);
+    lua_setfield(L, -2, "service");
+
     luaL_newmetatable(L, WSVC_TYPENAME);
     lua_pushvalue(L, -1);  /* push metatable */
     lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
-    luaL_register(L, NULL, svc_meth);
-
-    luaL_register(L, "sys.win32.service", svc_lib);
-    lua_pop(L, 2);
+    luaL_setfuncs(L, svc_meth, 0);
+    lua_pop(L, 1);
 }

@@ -655,13 +655,13 @@ mem_newindex (lua_State *L)
 	    case SYSMEM_TFLOAT: *((float *) ptr) = (float) num; break;
 	    case SYSMEM_TDOUBLE: *((double *) ptr) = (double) num; break;
 	    case SYSMEM_TNUMBER: *((lua_Number *) ptr) = num; break;
-	    case SYSMEM_TBITSTRING: luaL_typeerror(L, 3, "boolean"); break;
+	    case SYSMEM_TBITSTRING: luaL_argerror(L, 3, "boolean expected"); break;
 	    }
 	}
 	break;
     case LUA_TBOOLEAN:
 	if (type != SYSMEM_TBITSTRING)
-	    luaL_typeerror(L, 1, "bitstring");
+	    luaL_argerror(L, 1, "bitstring expected");
 	else {
 	    const int bit = 1 << (off & 7);
 
@@ -679,7 +679,7 @@ mem_newindex (lua_State *L)
 	}
 	break;
     default:
-	luaL_typeerror(L, 3, "membuf value");
+	luaL_argerror(L, 3, "membuf value expected");
     }
     return 0;
 }
@@ -745,12 +745,17 @@ static luaL_Reg mem_lib[] = {
 };
 
 
+/*
+ * Arguments: ..., sys_lib (table)
+ */
 static void
 luaopen_sys_mem (lua_State *L)
 {
+    luaL_newlib(L, mem_lib);
+    lua_setfield(L, -2, "mem");
+
     luaL_newmetatable(L, MEM_TYPENAME);
-    luaL_register(L, NULL, mem_meth);
-    luaL_register(L, "sys.mem", mem_lib);
-    lua_pop(L, 2);
+    luaL_setfuncs(L, mem_meth, 0);
+    lua_pop(L, 1);
 }
 

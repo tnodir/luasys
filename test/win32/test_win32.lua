@@ -1,16 +1,14 @@
 
 local sys = require("sys")
 
-local win32 = sys.win32
-
-assert(win32, "Windows 9x/NT required")
+local win32 = assert(sys.win32, "Windows 9x/NT required")
 
 
 print"-- Mailslot"
 do
     local fd = sys.handle()
     assert(fd:mailslot([[\\.\mailslot\luasys]]))
-    print(fd:mailslot_info())
+    print(fd:get_mailslot_info())
     fd:close()
     print"OK"
 end

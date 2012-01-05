@@ -262,7 +262,7 @@ createmeta (lua_State *L)
 	    lua_pushvalue(L, -1);  /* push metatable */
 	    lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
 	}
-	luaL_register(L, NULL, meta[i].meth);
+	luaL_setfuncs(L, meta[i].meth, 0);
 	lua_pop(L, 1);
     }
 
@@ -297,11 +297,6 @@ luaopen_sys (lua_State *L)
     luaL_register(L, LUA_SYSLIBNAME, sys_lib);
     createmeta(L);
 
-    signal_init();
-
-    luaopen_sys_mem(L);
-    luaopen_sys_thread(L);
-
 #ifdef _WIN32
 #ifdef _WIN32_WCE
     is_WinNT = 1;
@@ -315,11 +310,15 @@ luaopen_sys (lua_State *L)
 	 && osvi.dwPlatformId == VER_PLATFORM_WIN32_NT);
     }
 #endif
-
     luaopen_sys_win32(L);
 #else
     /* Ignore sigpipe or it will crash us */
     signal_set(SIGPIPE, SIG_IGN);
 #endif
+    signal_init();
+
+    luaopen_sys_mem(L);
+    luaopen_sys_thread(L);
+
     return 1;
 }
