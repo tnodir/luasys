@@ -11,19 +11,21 @@ do
 	print(msg, coroutine.yield())
     end
 
-    local function start(co)
+    local function start(co, num)
 	local evid = assert(evq:add_timer(co, 10))
 	sleep"init"
 	assert(evq:timeout(evid, 20))
 	sleep"work"
 	assert(evq:timeout(evid, 30))
 	sleep"done"
-	assert(evq:del(evid))
+	if num % 2 == 0 then
+	    assert(evq:del(evid))
+	end
     end
 
     for i = 1, 3 do
 	local co = assert(coroutine.create(start))
-	assert(coroutine.resume(co, co))
+	assert(coroutine.resume(co, co, i))
     end
 
     evq:loop()
@@ -48,7 +50,7 @@ do
     assert(evq:add_signal("INT", on_signal, 3000, true))
     assert(evq:ignore_signal("INT", true))
 
-    evq:loop(10000)
+    evq:loop(30000)
     print"OK"
 end
 

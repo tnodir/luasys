@@ -37,12 +37,12 @@ struct win32overlapped {
 	struct win32overlapped *next_free;
 	OVERLAPPED ov;
     } u;
-    unsigned int flags;
 };
 
 #define EVENT_EXTRA							\
     struct win32thr *wth;						\
-    unsigned int index;
+    unsigned int index;							\
+    struct win32overlapped *rov, *wov;  /* IOCP overlaps */
 
 #define EVQ_EXTRA							\
     HANDLE ack_event;							\
@@ -63,14 +63,13 @@ struct win32overlapped {
 #define iocp_is_empty(evq)	(!(evq)->iocp.n)
 #define evq_is_empty(evq)	(!((evq)->nevents || (evq)->head.next))
 
-#define evq_post_call(ev, ev_flags)					\
+#define EVQ_POST_INIT
+
+#define evq_post_init(ev)						\
     do {								\
-	if (((ev)->flags & (EVENT_SOCKET | EVENT_AIO | EVENT_PENDING))	\
-	 == (EVENT_SOCKET | EVENT_AIO))					\
-	    win32iocp_set((ev),						\
-	     (((ev_flags) & EVENT_READ_RES) ? EVENT_READ : 0)		\
-	     | (((ev_flags) & EVENT_WRITE_RES) ? EVENT_WRITE : 0));	\
-	else if ((ev_flags) & EVENT_DIRWATCH)				\
+	if (((ev)->flags & (EVENT_AIO | EVENT_PENDING)) == EVENT_AIO)	\
+	    win32iocp_set((ev), (ev)->flags);				\
+	else if ((ev)->flags & EVENT_DIRWATCH)				\
 	    FindNextChangeNotification((ev)->fd);			\
     } while (0)
 

@@ -132,6 +132,7 @@ win32thr_wait (struct event_queue *evq)
 	    EnterCriticalSection(head_cs);
 	    wth.next_ready = evq->wth_ready;
 	    evq->wth_ready = &wth;
+	    evq->sig_ready |= (1 << SYS_SIGINTR);
 	    SetEvent(head_signal);
 	    LeaveCriticalSection(head_cs);
 	}

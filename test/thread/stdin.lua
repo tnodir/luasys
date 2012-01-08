@@ -18,6 +18,8 @@ local stdin = sys.stdin
 -- Event Queue
 local evq = assert(sys.event_queue())
 
+local controller
+
 -- Worker Thread
 local worker
 do
@@ -25,8 +27,8 @@ do
 	while true do
 	    local line = stdin:read()
 	    if #line <= 2 then
-		print("Worker:", "Interrupt event queue")
-		evq:interrupt()
+		print("Worker:", "Notify controller")
+		evq:notify(controller)
 	    else
 		sys.stdout:write("Worker:\tInput: ", line)
 	    end
@@ -34,8 +36,11 @@ do
     end
 
     local function start()
-	local ok, err = pcall(read_stdin)
-	assert(not ok and thread.self():interrupted(err))
+	local _, err = pcall(read_stdin)
+	if not thread.self():interrupted(err) then
+	    print(err)
+	    error("Thread Interrupt Error expected")
+	end
 	print("Worker:", "Terminated")
 	return -1
     end
@@ -43,33 +48,18 @@ do
     worker = assert(thread.run(start))
 end
 
--- Timer
-local timer
+-- Controller
 do
     local function on_event(evq, evid)
-	if worker then
-	    print("Main:", "Timer")
-	else
-	    print("Main:", "Worker closed -> Delete timer")
-	    evq:del(evid)
-	end
+	print("Controller:", "Close stdin")
+	stdin:close(true)
+	worker:interrupt()
+	assert(worker:wait() == -1)
+	worker = nil
+	evq:del(evid)
     end
 
-    timer = evq:add_timer(on_event, 3000)
-end
-
--- Interrupt handler
-do
-	local function on_intr()
-	    print("Main:", "Event queue interrupted -> Close stdin")
-	    stdin:close(true)
-	    worker:interrupt()
-	    assert(worker:wait() == -1)
-	    worker = nil
-	    evq:notify(timer)
-	end
-
-	evq:on_interrupt(on_intr)
+    controller = assert(evq:add_timer(on_event, 30000))
 end
 
 evq:loop()

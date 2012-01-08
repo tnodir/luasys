@@ -69,12 +69,14 @@ evq_add (struct event_queue *evq, struct event *ev)
     }
 
     if ((ev_flags & (EVENT_SOCKET | EVENT_SOCKET_ACC_CONN)) == EVENT_SOCKET) {
-	if (CreateIoCompletionPort((HANDLE) ev->fd, evq->iocp.h, (ULONG_PTR) ev, 0)
-	 && !win32iocp_set(ev, ev_flags)) {
-	    ev->flags |= EVENT_AIO;
-	    evq->iocp.n++;
-	    evq->nevents++;
-	    return 0;
+	if (CreateIoCompletionPort((HANDLE) ev->fd, evq->iocp.h, (ULONG_PTR) ev, 0)) {
+	    if (!win32iocp_set(ev, ev_flags)) {
+		ev->flags |= EVENT_AIO;
+		evq->iocp.n++;
+		evq->nevents++;
+		return 0;
+	    }
+	    win32iocp_cancel(ev, (EVENT_READ | EVENT_WRITE));
 	}
     }
 
@@ -171,7 +173,7 @@ evq_del (struct event *ev, int reuse_fd)
 
 	if (ev_flags & EVENT_AIO) {
 	    if (ev_flags & EVENT_PENDING)
-		CancelIo(ev->fd);
+		win32iocp_cancel(ev, (EVENT_READ | EVENT_WRITE));
 	    evq->iocp.n--;
 	    return 0;
 	}
@@ -199,7 +201,7 @@ evq_modify (struct event *ev, unsigned int flags)
 
     if (ev_flags & EVENT_AIO) {
 	if (ev_flags & EVENT_PENDING)
-	    CancelIo(ev->fd);
+	    win32iocp_cancel(ev, (ev_flags & ~flags));
 	return win32iocp_set(ev, flags);
     }
     else {
@@ -223,7 +225,14 @@ evq_modify (struct event *ev, unsigned int flags)
 int
 evq_interrupt (struct event_queue *evq)
 {
-    return !SetEvent(evq->head.signal);
+    struct win32thr *wth = &evq->head;
+    int res;
+
+    EnterCriticalSection(&wth->cs);
+    evq->sig_ready |= (1 << SYS_SIGINTR);
+    res = !SetEvent(wth->signal);
+    LeaveCriticalSection(&wth->cs);
+    return res;
 }
 
 int
@@ -233,6 +242,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     struct win32thr *wth = &evq->head;
     struct win32thr *threads = wth->next;
     CRITICAL_SECTION *head_cs = &wth->cs;
+    HANDLE head_signal = wth->signal;
     int n = wth->n;
     int sig_ready = 0;
     DWORD wait_res;
@@ -248,8 +258,18 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	}
     }
 
-    if (!iocp_is_empty(evq))
-	ev_ready = win32iocp_process(evq, NULL, 0L);
+    if (is_WinNT) {
+	if (!iocp_is_empty(evq))
+	    ev_ready = win32iocp_process(evq, NULL, 0L);
+
+	/* in IOCP WSARecv/WSASend the head_signal is resetted */
+	if (!ev_ready) {
+	    EnterCriticalSection(head_cs);
+	    if (evq->sig_ready)
+		timeout = 0L;
+	    LeaveCriticalSection(head_cs);
+	}
+    }
 
     sys_vm_leave();
     wait_res = MsgWaitForMultipleObjects(n + 1, wth->handles, FALSE,
@@ -283,12 +303,12 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 
     if (threads) {
 	EnterCriticalSection(head_cs);
-	ResetEvent(wth->signal);
+	ResetEvent(head_signal);
 
 	threads = evq->wth_ready;
 	evq->wth_ready = NULL;
 
-	sig_ready = evq->sig_ready;
+	sig_ready = (evq->sig_ready & SIGMASK);
 	evq->sig_ready = 0;
 	LeaveCriticalSection(head_cs);
 
@@ -301,9 +321,9 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 
 	if (evq->sig_ready) {
 	    EnterCriticalSection(head_cs);
-	    ResetEvent(wth->signal);
+	    ResetEvent(head_signal);
 
-	    sig_ready = evq->sig_ready;
+	    sig_ready = (evq->sig_ready & SIGMASK);
 	    evq->sig_ready = 0;
 	    LeaveCriticalSection(head_cs);
 	}

@@ -40,6 +40,9 @@ typedef DWORD		ssize_t;
 #define SIGTERM		CTRL_SHUTDOWN_EVENT
 #define NSIG 		(SIGTERM + 1)
 
+#define SIGMASK		((1 << NSIG) - 1)
+#define SYS_SIGINTR	NSIG
+
 #define SYS_ERRNO	GetLastError()
 #define SYS_EAGAIN(e)	((e) == WSAEWOULDBLOCK)
 

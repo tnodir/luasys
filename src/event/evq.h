@@ -25,7 +25,6 @@ struct event_queue;
 /* Event Queue environ. table reserved indexes */
 #define EVQ_OBJ_UDATA	1  /* table: event objects */
 #define EVQ_CALLBACK	2  /* table: callback functions */
-#define EVQ_ON_INTR	3  /* function */
 #define EVQ_BUF_IDX	6  /* initial buffer index */
 #define EVQ_BUF_MAX	24  /* maximum buffer index */
 
@@ -75,7 +74,6 @@ struct event {
 
 struct event_queue {
     unsigned int stop:		1;  /* break the loop? */
-    unsigned int intr:		1;  /* is interrupted? */
 
     unsigned int nevents;  /* number of alive events */
 
@@ -86,6 +84,10 @@ struct event_queue {
 
     struct event * volatile ev_ready;  /* head of ready events */
     struct event *ev_free;  /* head of free events */
+
+#ifdef EVQ_POST_INIT
+    struct event *ev_post;  /* have to initialize the event source */
+#endif
 
     EVQ_EXTRA
 };
@@ -113,8 +115,6 @@ int evq_interrupt (struct event_queue *evq);
 void signal_init (void);
 
 #ifndef _WIN32
-
-#define evq_post_call(ev, ev_flags)	((void) 0)
 
 #define event_get_evq(ev)	(ev)->evq
 #define event_get_tq_head(ev)	(ev)->evq->tq
