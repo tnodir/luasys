@@ -231,14 +231,18 @@ sock_getifaddrs (lua_State *L)
 #ifndef _WIN32
     struct ifaddrs *result, *rp;
 
+    sys_vm_leave();
     res = getifaddrs(&result);
+    sys_vm_enter();
 #else
     INTERFACE_INFO result[8192], *rp;
     SOCKET sd = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
     DWORD n;
 
+    sys_vm_leave();
     res = WSAIoctl(sd, SIO_GET_INTERFACE_LIST, NULL, 0,
      result, sizeof(result), &n, NULL, NULL);
+    sys_vm_enter();
 
     closesocket(sd);
 #endif

@@ -131,7 +131,9 @@ sys_statfs (lua_State *L)
 #ifndef _WIN32
     struct statvfs buf;
 
+    sys_vm_leave();
     res = statvfs(path, &buf);
+    sys_vm_enter();
 
     ntotal = buf.f_blocks * buf.f_frsize;
     nfree = buf.f_bfree * buf.f_bsize;
@@ -145,9 +147,11 @@ sys_statfs (lua_State *L)
 	if (!os_path)
 	    return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
+	sys_vm_leave();
 	res = is_WinNT
 	 ? !GetDiskFreeSpaceExW(os_path, &na, &nt, &nf)
 	 : !GetDiskFreeSpaceExA(os_path, &na, &nt, &nf);
+	sys_vm_enter();
 
 	free(os_path);
     }
@@ -359,16 +363,20 @@ sys_mkdir (lua_State *L)
 #ifndef _WIN32
     mode_t perm = (mode_t) lua_tointeger(L, 2);
 
+    sys_vm_leave();
     res = mkdir(path, perm);
+    sys_vm_enter();
 #else
     {
 	void *os_path = utf8_to_filename(path);
 	if (!os_path)
 	    return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
+	sys_vm_leave();
 	res = is_WinNT
 	 ? !CreateDirectoryW(os_path, NULL)
 	 : !CreateDirectoryA(os_path, NULL);
+	sys_vm_enter();
 
 	free(os_path);
     }
@@ -391,16 +399,20 @@ sys_rmdir (lua_State *L)
     int res;
 
 #ifndef _WIN32
+    sys_vm_leave();
     res = rmdir(path);
+    sys_vm_enter();
 #else
     {
 	void *os_path = utf8_to_filename(path);
 	if (!os_path)
 	    return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
+	sys_vm_leave();
 	res = is_WinNT
 	 ? !RemoveDirectoryW(os_path)
 	 : !RemoveDirectoryA(os_path);
+	sys_vm_enter();
 
 	free(os_path);
     }
@@ -424,7 +436,11 @@ sys_dir_open (lua_State *L, const int idx, struct dir *dp)
 #ifndef _WIN32
     if (dp->data)
 	closedir(dp->data);
+
+    sys_vm_leave();
     dp->data = opendir(*dir == '\0' ? "/" : dir);
+    sys_vm_enter();
+
     if (dp->data) return 1;
 #else
     char *filename = (char *) dp->data.cFileName;
@@ -459,9 +475,11 @@ sys_dir_open (lua_State *L, const int idx, struct dir *dp)
 	    if (!os_path)
 		return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
+	    sys_vm_leave();
 	    dp->h = is_WinNT
 	     ? FindFirstFileW(os_path, &dp->data)
 	     : FindFirstFileA(os_path, (WIN32_FIND_DATAA *) &dp->data);
+	    sys_vm_enter();
 
 	    free(os_path);
 	}
@@ -541,7 +559,10 @@ sys_dir_next (lua_State *L)
 	if (!dp->data)
 	    return 0;
 	do {
+	    sys_vm_leave();
 	    entry = readdir(dp->data);
+	    sys_vm_enter();
+
 	    if (!entry) {
 		closedir(dp->data);
 		dp->data = NULL;
@@ -579,7 +600,7 @@ sys_dir_next (lua_State *L)
 	if (dp->h == INVALID_HANDLE_VALUE)
 	    return 0;
 	for (; ; ) {
-	    int is_dots = 1;
+	    int res, is_dots = 1;
 	    {
 		char *path = filename_to_utf8(filename);
 		if (!path)
@@ -595,9 +616,14 @@ sys_dir_next (lua_State *L)
 
 		free(path);
 	    }
-	    if (is_WinNT
-	     ? !FindNextFileW(dp->h, &dp->data)
-	     : !FindNextFileA(dp->h, (WIN32_FIND_DATAA *) &dp->data)) {
+
+	    sys_vm_leave();
+	    res = is_WinNT
+	     ? FindNextFileW(dp->h, &dp->data)
+	     : FindNextFileA(dp->h, (WIN32_FIND_DATAA *) &dp->data);
+	    sys_vm_enter();
+
+	    if (!res) {
 		FindClose(dp->h);
 		dp->h = INVALID_HANDLE_VALUE;
 		return is_dots ? 0 : 2;
