@@ -63,7 +63,7 @@ ecb_data (lua_State *L)
 
 /*
  * Arguments: ecb_udata, [membuf_udata, count (number)]
- * Returns: [string | count (number) | false (EAGAIN)]
+ * Returns: [string | count (number)]
  */
 static int
 ecb_read (lua_State *L)

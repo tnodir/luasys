@@ -262,8 +262,10 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	if (!iocp_is_empty(evq))
 	    ev_ready = win32iocp_process(evq, NULL, 0L);
 
-	/* in IOCP WSARecv/WSASend the head_signal is resetted */
-	if (!ev_ready) {
+	if (ev_ready)
+	    timeout = 0L;
+	else {
+	    /* in IOCP WSARecv/WSASend the head_signal is resetted */
 	    EnterCriticalSection(head_cs);
 	    if (evq->sig_ready)
 		timeout = 0L;
@@ -272,8 +274,8 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     }
 
     sys_vm_leave();
-    wait_res = MsgWaitForMultipleObjects(n + 1, wth->handles, FALSE,
-     (ev_ready ? 0L : timeout), (evq->win_msg ? QS_ALLEVENTS : 0));
+    wait_res = MsgWaitForMultipleObjects(n + 1, wth->handles, FALSE, timeout,
+     (evq->win_msg ? QS_ALLEVENTS : 0));
     sys_vm_enter();
 
     evq->now = get_milliseconds();
