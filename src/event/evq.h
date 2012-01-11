@@ -54,13 +54,15 @@ struct event {
 #define EVENT_CALLBACK		0x00001000  /* callback exist */
 #define EVENT_CALLBACK_THREAD	0x00002000  /* callback is coroutine */
 #define EVENT_SOCKET_ACC_CONN	0x00004000  /* IOCP: don't use listening or connecting socket */
-#define EVENT_PENDING		0x00008000  /* AIO request not completed */
-#define EVENT_MASK		0x0000FFFF
+#define EVENT_RPENDING		0x00010000  /* IOCP: read request not completed */
+#define EVENT_WPENDING		0x00020000  /* IOCP: write request not completed */
+#define EVENT_PENDING		(EVENT_RPENDING | EVENT_WPENDING)
+#define EVENT_MASK		0x000FFFFF
 /* triggered events (result of waiting) */
-#define EVENT_ACTIVE		0x00010000
-#define EVENT_READ_RES		0x00100000
-#define EVENT_WRITE_RES		0x00200000
-#define EVENT_TIMEOUT_RES	0x00400000
+#define EVENT_ACTIVE		0x00100000
+#define EVENT_READ_RES		0x00200000
+#define EVENT_WRITE_RES		0x00400000
+#define EVENT_TIMEOUT_RES	0x00800000
 #define EVENT_EOF_RES		0x01000000
 #define EVENT_EOF_MASK_RES	0xFF000000
 #define EVENT_EOF_SHIFT_RES	24  /* last byte is error status */

@@ -136,15 +136,16 @@ win32iocp_process (struct event_queue *evq, struct event *ev_ready, msec_t now)
 	else if (ov == ev->rov) {
 	    ev->rov = NULL;
 	    ev->flags |= EVENT_READ_RES;
+	    ev->flags &= ~EVENT_RPENDING;  /* have to install IOCP read request */
 	} else {
 	    ev->wov = NULL;
 	    ev->flags |= EVENT_WRITE_RES;
+	    ev->flags &= ~EVENT_WPENDING;  /* have to install IOCP write request */
 	}
 
 	if (ev->flags & EVENT_ACTIVE)
 	    continue;
 	ev->flags |= EVENT_ACTIVE;
-	ev->flags &= ~EVENT_PENDING;  /* have to install IOCP request */
 	if (ev->flags & EVENT_ONESHOT)
 	    evq_del(ev, 1);
 	else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL)) {
@@ -161,35 +162,34 @@ win32iocp_process (struct event_queue *evq, struct event *ev_ready, msec_t now)
 }
 
 static void
-win32iocp_cancel (struct event *ev, unsigned int ev_flags)
+win32iocp_cancel (struct event *ev, unsigned int rw_flags)
 {
-    ev->flags &= ~EVENT_PENDING;
-
-    if (!cancelioex)
+    if (!cancelioex) {
 	CancelIo(ev->fd);
-    else
-	ev_flags = (EVENT_READ | EVENT_WRITE);
-
-    if ((ev_flags & EVENT_READ) && ev->rov) {
+	rw_flags = (EVENT_READ | EVENT_WRITE);
+    }
+    if ((rw_flags & EVENT_READ) && ev->rov) {
 	if (cancelioex) cancelioex(ev->fd, (OVERLAPPED *) ev->rov);
 	ev->rov->u.ov.hEvent = NULL;
 	ev->rov = NULL;
+	ev->flags &= ~EVENT_RPENDING;
     }
-    if ((ev_flags & EVENT_WRITE) && ev->wov) {
+    if ((rw_flags & EVENT_WRITE) && ev->wov) {
 	if (cancelioex) cancelioex(ev->fd, (OVERLAPPED *) ev->wov);
 	ev->wov->u.ov.hEvent = NULL;
 	ev->wov = NULL;
+	ev->flags &= ~EVENT_WPENDING;
     }
 }
 
 int
-win32iocp_set (struct event *ev, unsigned int ev_flags)
+win32iocp_set (struct event *ev, unsigned int rw_flags)
 {
     static WSABUF buf = {0, 0};
 
     struct event_queue *evq = ev->wth->evq;
 
-    if ((ev_flags & EVENT_READ) && !ev->rov) {
+    if ((rw_flags & EVENT_READ) && !ev->rov) {
 	struct win32overlapped *ov = win32iocp_new_overlapped(evq);
 	DWORD flags = 0;
 
@@ -200,9 +200,9 @@ win32iocp_set (struct event *ev, unsigned int ev_flags)
 	    return -1;
 	}
 	ev->rov = ov;
-	ev->flags |= EVENT_PENDING;  /* IOCP request is installed */
+	ev->flags |= EVENT_RPENDING;  /* IOCP read request is installed */
     }
-    if ((ev_flags & EVENT_WRITE) && !ev->wov) {
+    if ((rw_flags & EVENT_WRITE) && !ev->wov) {
 	struct win32overlapped *ov = win32iocp_new_overlapped(evq);
 
 	if (!ov) return -1;
@@ -212,7 +212,7 @@ win32iocp_set (struct event *ev, unsigned int ev_flags)
 	    return -1;
 	}
 	ev->wov = ov;
-	ev->flags |= EVENT_PENDING;  /* IOCP request is installed */
+	ev->flags |= EVENT_WPENDING;  /* IOCP write request is installed */
     }
     return 0;
 }

@@ -18,10 +18,24 @@ local stdin = sys.stdin
 -- Event Queue
 local evq = assert(sys.event_queue())
 
+local worker
+
+-- Controller
 local controller
+do
+    local function on_event(evq, evid)
+	print("Controller:", "Close stdin")
+	stdin:close(true)
+	worker:interrupt()
+	assert(worker:wait() == -1)
+	worker = nil
+	evq:del(evid)
+    end
+
+    controller = assert(evq:add_timer(on_event, 30000))
+end
 
 -- Worker Thread
-local worker
 do
     local function read_stdin()
 	while true do
@@ -46,20 +60,6 @@ do
     end
 
     worker = assert(thread.run(start))
-end
-
--- Controller
-do
-    local function on_event(evq, evid)
-	print("Controller:", "Close stdin")
-	stdin:close(true)
-	worker:interrupt()
-	assert(worker:wait() == -1)
-	worker = nil
-	evq:del(evid)
-    end
-
-    controller = assert(evq:add_timer(on_event, 30000))
 end
 
 evq:loop()

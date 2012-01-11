@@ -265,7 +265,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	if (ev_ready)
 	    timeout = 0L;
 	else {
-	    /* in IOCP WSARecv/WSASend the head_signal is resetted */
+	    /* head_signal is resetted by IOCP WSARecv/WSASend */
 	    EnterCriticalSection(head_cs);
 	    if (evq->sig_ready)
 		timeout = 0L;

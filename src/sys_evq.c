@@ -658,8 +658,8 @@ levq_loop (lua_State *L)
 
 #ifdef EVQ_POST_INIT
 		if (evq->ev_post) {
+		    evq_post_init(evq->ev_post);
 		    evq->ev_post = NULL;
-		    evq_post_init(ev);
 		}
 #endif
 	    }
