@@ -227,6 +227,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	    if (!--nready) break;
 	}
     }
+    if (!ev_ready) return 0;
  end:
     evq->ev_ready = ev_ready;
     return 0;

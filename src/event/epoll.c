@@ -211,6 +211,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	ev->next_ready = ev_ready;
 	ev_ready = ev;
     }
+    if (!ev_ready) return 0;
  end:
     evq->ev_ready = ev_ready;
     return 0;

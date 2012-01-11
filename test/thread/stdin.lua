@@ -28,7 +28,6 @@ do
 	stdin:close(true)
 	worker:interrupt()
 	assert(worker:wait() == -1)
-	worker = nil
 	evq:del(evid)
     end
 
