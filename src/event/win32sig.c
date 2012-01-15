@@ -44,13 +44,14 @@ int
 evq_signal (struct event_queue *evq, int signo)
 {
     struct win32thr *wth = &evq->head;
+    int res = 0;
 
     EnterCriticalSection(&wth->cs);
     if (!evq->sig_ready)
-	SetEvent(wth->signal);
+	res = !SetEvent(wth->signal);
     evq->sig_ready |= 1 << signo;
     LeaveCriticalSection(&wth->cs);
-    return 0;
+    return res;
 }
 
 int
@@ -126,13 +127,13 @@ signal_del (struct event *ev)
 }
 
 static struct event *
-signal_process_active (struct event *ev, struct event *ev_ready, msec_t timeout)
+signal_process_active (struct event *ev, struct event *ev_ready, msec_t now)
 {
     ev->flags |= EVENT_ACTIVE | EVENT_READ_RES;
     if (ev->flags & EVENT_ONESHOT)
 	evq_del(ev, 1);
     else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL))
-	timeout_reset(ev, timeout);
+	timeout_reset(ev, now);
 
     ev->next_ready = ev_ready;
     return ev;

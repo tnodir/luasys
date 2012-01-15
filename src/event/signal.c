@@ -50,20 +50,7 @@ signal_init (void)
     signal_set(SYS_SIGINTR, signal_handler);
 }
 
-int
-evq_signal (struct event_queue *evq, int signo)
-{
-    int res = 0;
-
-    pthread_mutex_lock(&evq->cs);
-    if (!evq->sig_ready)
-	res = evq_interrupt(evq);
-    evq->sig_ready |= 1 << signo;
-    pthread_mutex_unlock(&evq->cs);
-    return res;
-}
-
-int
+static int
 evq_interrupt (struct event_queue *evq)
 {
 #ifdef USE_EVENTFD
@@ -79,6 +66,19 @@ evq_interrupt (struct event_queue *evq)
     while (nw == -1 && errno == EINTR);
 
     return (nw == -1) ? -1 : 0;
+}
+
+int
+evq_signal (struct event_queue *evq, int signo)
+{
+    int res = 0;
+
+    pthread_mutex_lock(&evq->cs);
+    if (!evq->sig_ready)
+	res = evq_interrupt(evq);
+    evq->sig_ready |= 1 << signo;
+    pthread_mutex_unlock(&evq->cs);
+    return res;
 }
 
 int

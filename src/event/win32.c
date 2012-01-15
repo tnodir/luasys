@@ -139,11 +139,10 @@ evq_set_timeout (struct event *ev, msec_t msec)
 	    return 0;
 	}
 	timeout_del(ev);
-	if (msec == TIMEOUT_INFINITE)
-	    return 0;
     }
 
-    return timeout_add(ev, msec, evq->now);
+    return (msec == TIMEOUT_INFINITE) ? 0
+     : timeout_add(ev, msec, evq->now);
 }
 
 int
@@ -220,19 +219,6 @@ evq_modify (struct event *ev, unsigned int flags)
 	    return -1;
     }
     return 0;
-}
-
-int
-evq_interrupt (struct event_queue *evq)
-{
-    struct win32thr *wth = &evq->head;
-    int res;
-
-    EnterCriticalSection(&wth->cs);
-    evq->sig_ready |= (1 << SYS_SIGINTR);
-    res = !SetEvent(wth->signal);
-    LeaveCriticalSection(&wth->cs);
-    return res;
 }
 
 int

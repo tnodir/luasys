@@ -6,31 +6,6 @@
     (lua_type(L, (i)) == LUA_TLIGHTUSERDATA ? lua_touserdata(L, (i)) : NULL)
 
 
-/*
- * Returns: [evq_udata]
- */
-static int
-levq_new (lua_State *L)
-{
-    struct event_queue *evq = lua_newuserdata(L, sizeof(struct event_queue));
-
-    memset(evq, 0, sizeof(struct event_queue));
-
-    if (!evq_init(evq)) {
-	luaL_getmetatable(L, EVQ_TYPENAME);
-	lua_setmetatable(L, -2);
-
-	lua_newtable(L);  /* environ. */
-	lua_newtable(L);  /* {ev_id => obj_udata} */
-	lua_rawseti(L, -2, EVQ_OBJ_UDATA);
-	lua_newtable(L);  /* {ev_id => cb_func} */
-	lua_rawseti(L, -2, EVQ_CALLBACK);
-	lua_setfenv(L, -2);
-	return 1;
-    }
-    return sys_seterror(L, 0);
-}
-
 /* Find the log base 2 of an N-bit integer in O(lg(N)) operations with multiply and lookup */
 static int
 getmaxbit (unsigned int v)
@@ -47,6 +22,36 @@ getmaxbit (unsigned int v)
     v |= v >> 16;
 
     return bit_position[(unsigned int) (v * 0x07C4ACDDU) >> 27];
+}
+
+
+/*
+ * Returns: [evq_udata]
+ */
+static int
+levq_new (lua_State *L)
+{
+    struct event_queue *evq = lua_newuserdata(L, sizeof(struct event_queue));
+
+    memset(evq, 0, sizeof(struct event_queue));
+
+    lua_assert(sizeof(struct event) >= sizeof(struct timeout_queue));
+
+    if (!evq_init(evq)) {
+	evq->tid = sys_gettid();
+
+	luaL_getmetatable(L, EVQ_TYPENAME);
+	lua_setmetatable(L, -2);
+
+	lua_newtable(L);  /* environ. */
+	lua_newtable(L);  /* {ev_id => obj_udata} */
+	lua_rawseti(L, -2, EVQ_OBJ_UDATA);
+	lua_newtable(L);  /* {ev_id => cb_func} */
+	lua_rawseti(L, -2, EVQ_CALLBACK);
+	lua_setfenv(L, -2);
+	return 1;
+    }
+    return sys_seterror(L, 0);
 }
 
 /*
@@ -335,8 +340,27 @@ levq_ignore_signal (lua_State *L)
 {
     struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
     const int signo = sig_flags[luaL_checkoption(L, 2, NULL, sig_names)];
+    const int ignore = lua_toboolean(L, 3);
 
-    if (!evq_ignore_signal(evq, signo, lua_toboolean(L, 3))) {
+    if (!evq_ignore_signal(evq, signo, ignore)) {
+	lua_settop(L, 1);
+	return 1;
+    }
+    return sys_seterror(L, 0);
+}
+
+/*
+ * Arguments: evq_udata, [signal (string)]
+ * Returns: [evq_udata]
+ */
+static int
+levq_signal (lua_State *L)
+{
+    struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
+    const int signo = lua_isnoneornil(L, 2) ? SYS_SIGINTR
+     : sig_flags[luaL_checkoption(L, 2, NULL, sig_names)];
+
+    if (!evq_signal(evq, signo)) {
 	lua_settop(L, 1);
 	return 1;
     }
@@ -381,8 +405,7 @@ levq_mod_socket (lua_State *L)
     const char *evstr = luaL_checkstring(L, 3);
     int change, flags;
 
-    if (!ev || event_deleted(ev) || !(ev->flags & EVENT_SOCKET))
-	return 0;
+    lua_assert(ev && !event_deleted(ev) && (ev->flags & EVENT_SOCKET));
 
     change = 0;
     flags = ev->flags & (EVENT_READ | EVENT_WRITE);
@@ -425,7 +448,7 @@ levq_del (lua_State *L)
     const int reuse_fd = lua_toboolean(L, 3);
     int res = 0;
 
-    if (!ev) return 0;
+    lua_assert(ev);
 
 #undef ARG_LAST
 #define ARG_LAST	1
@@ -465,7 +488,7 @@ levq_callback (lua_State *L)
     struct event *ev = levq_toevent(L, 2);
     const int top = lua_gettop(L);
 
-    if (!ev) return 0;
+    lua_assert(ev && !event_deleted(ev));
 
 #undef ARG_LAST
 #define ARG_LAST	3
@@ -504,8 +527,7 @@ levq_timeout (lua_State *L)
     const msec_t timeout = lua_isnoneornil(L, 3)
      ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 3);
 
-    if (!ev || event_deleted(ev) || (ev->flags & EVENT_WINMSG))
-	return 0;
+    lua_assert(ev && !event_deleted(ev) && !(ev->flags & EVENT_WINMSG));
 
     /* place for timeout_queue */
     if (!evq->ev_free) {
@@ -533,6 +555,8 @@ levq_timeout_manual (lua_State *L)
 
     (void) evq;
 
+    lua_assert(ev && !event_deleted(ev) && !(ev->flags & EVENT_WINMSG));
+
     if (manual)
 	ev->flags |= EVENT_TIMEOUT_MANUAL;
     else
@@ -553,11 +577,13 @@ levq_loop (lua_State *L)
     struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
     const msec_t timeout = (lua_type(L, 2) != LUA_TNUMBER)
      ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
-    const int is_once = lua_toboolean(L, 3);
-    const int is_fetch = lua_toboolean(L, 4);
+    const int once = lua_toboolean(L, 3);
+    const int fetch = lua_toboolean(L, 4);
 
 #undef ARG_LAST
 #define ARG_LAST	1
+
+    lua_assert(evq->tid == sys_gettid());
 
     lua_settop(L, ARG_LAST);
     lua_getfenv(L, 1);
@@ -590,8 +616,8 @@ levq_loop (lua_State *L)
 		return sys_seterror(L, 0);
 	}
 
-	if (!(ev = evq->ev_ready))
-	    continue;
+	ev = evq->ev_ready;
+	if (!ev) continue;
 	do {
 	    const unsigned int ev_flags = ev->flags;
 
@@ -601,7 +627,7 @@ levq_loop (lua_State *L)
 	    if (ev_flags & EVENT_DELETE)
 		levq_del_event(L, ARG_LAST+1, evq, ev);  /* postponed deletion of active event */
 	    else {
-		if ((ev_flags & EVENT_CALLBACK) || is_fetch) {
+		if ((ev_flags & EVENT_CALLBACK) || fetch) {
 		    const int ev_id = ev->ev_id;
 
 		    /* callback function */
@@ -628,7 +654,7 @@ levq_loop (lua_State *L)
 		else evq->ev_post = ev;
 #endif
 
-		if (is_fetch)
+		if (fetch)
 		    return 8;
 		else if (!(ev_flags & EVENT_CALLBACK))
 		    (void) 0;
@@ -663,9 +689,10 @@ levq_loop (lua_State *L)
 		}
 #endif
 	    }
-	} while ((ev = evq->ev_ready));
+	    ev = evq->ev_ready;
+	} while (ev);
 
-	if (is_once) break;
+	if (once) break;
     }
     return 0;
 }
@@ -712,8 +739,7 @@ levq_notify (lua_State *L)
 
     (void) evq;
 
-    if (!ev || event_deleted(ev))
-	return 0;
+    lua_assert(ev && !event_deleted(ev));
 
     if (!(ev->flags & EVENT_TIMER))
 	luaL_argerror(L, 2, "timer expected");
@@ -766,6 +792,7 @@ static luaL_Reg evq_meth[] = {
     {"add_dirwatch",	levq_add_dirwatch},
     {"add_signal",	levq_add_signal},
     {"ignore_signal",	levq_ignore_signal},
+    {"signal",		levq_signal},
     {"add_socket",	levq_add_socket},
     {"mod_socket",	levq_mod_socket},
     {"del",		levq_del},

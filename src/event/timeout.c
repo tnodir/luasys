@@ -6,9 +6,6 @@ timeout_reset (struct event *ev, msec_t now)
     struct timeout_queue *tq = ev->tq;
     const msec_t msec = tq->msec;
 
-    if (msec == TIMEOUT_INFINITE)
-	return;
-
     ev->timeout_at = now + msec;
     if (!ev->next)
 	return;
@@ -114,33 +111,22 @@ timeout_add (struct event *ev, msec_t msec, msec_t now)
 static msec_t
 timeout_get (const struct timeout_queue *tq, msec_t min, msec_t now)
 {
-    int is_infinite = 0;
-
     if (!tq) return min;
 
     if (min == TIMEOUT_INFINITE)
-	is_infinite = 1;
-    else
-	min += now;
+	min = tq->ev_head->timeout_at;
+    min += now;
 
     do {
-	if (tq->msec != TIMEOUT_INFINITE) {
-	    const msec_t t = tq->ev_head->timeout_at;
-	    if (is_infinite) {
-		is_infinite = 0;
-		min = t;
-	    }
-	    else if ((long) t < (long) min)
-		min = t;
-	}
+	const msec_t t = tq->ev_head->timeout_at;
+	if ((long) t < (long) min)
+	    min = t;
 	tq = tq->tq_next;
     } while (tq);
 
-    if (is_infinite)
-	return TIMEOUT_INFINITE;
-    else {
-	const long timeout = (long) min - (long) now;
-	return (timeout < 0L) ? 0L : (msec_t) timeout;
+    {
+	const long d = (long) min - (long) now;
+	return (d < 0L) ? 0L : (msec_t) d;
     }
 }
 

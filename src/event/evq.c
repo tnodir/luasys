@@ -24,11 +24,10 @@ evq_set_timeout (struct event *ev, msec_t msec)
 	    return 0;
 	}
 	timeout_del(ev);
-	if (msec == TIMEOUT_INFINITE)
-	    return 0;
     }
 
-    return timeout_add(ev, msec, evq->now);
+    return (msec == TIMEOUT_INFINITE) ? 0
+     : timeout_add(ev, msec, evq->now);
 }
 
 int
@@ -62,14 +61,13 @@ evq_notify (struct event *ev, unsigned int flags)
 
     if (ev->flags & EVENT_ONESHOT)
 	evq_del(ev, 0);
-    else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL)) {
-	evq_set_timeout(ev, ev->tq->msec);  /* timeout_reset */
-    }
+    else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL))
+	timeout_reset(ev, evq->now);
 
     ev->next_ready = evq->ev_ready;
     evq->ev_ready = ev;
 
-    return evq_interrupt(evq);
+    return evq_signal(evq, SYS_SIGINTR);
 }
 
 
