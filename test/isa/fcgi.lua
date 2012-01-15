@@ -11,7 +11,7 @@ sys.thread.init()
 
 
 local bind = {
-    [8080] = "127.0.0.1",
+    [9000] = "127.0.0.1",
 }
 
 local BUFER_OUT_SIZE = 32768
@@ -69,7 +69,7 @@ do
 	if buffer_out:seek() > BUFER_OUT_SIZE
 	    and chan.fd:write(buffer_out) ~= nil
 	then
-		chan.prev = nil
+	    chan.prev = nil
 	end
     end
 
@@ -211,6 +211,11 @@ do
     -- Process request
     local function process_request(req)
 	local path = req:getvar"PATH_TRANSLATED"
+	if not path then
+	    -- nginx: fastcgi_param  PATH_TRANSLATED  $document_root$fastcgi_path_info$fastcgi_script_name;
+	    error("PATH_TRANSLATED expected")
+	end
+
 	local chunk, err = dir_loadfile(path)
 	local status
 
