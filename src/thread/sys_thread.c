@@ -7,12 +7,9 @@
 #define THREAD_FUNC_RES		DWORD
 #define THREAD_FUNC_API		THREAD_FUNC_RES WINAPI
 
-typedef unsigned int (WINAPI *thread_func_t) (void *);
+typedef DWORD (WINAPI *thread_func_t) (void *);
 
-typedef unsigned int		thread_id_t;
 typedef DWORD 			thread_key_t;
-
-#define thread_getid		GetCurrentThreadId
 
 #else
 
@@ -21,10 +18,7 @@ typedef DWORD 			thread_key_t;
 
 typedef void *(*thread_func_t) (void *);
 
-typedef pthread_t 		thread_id_t;
 typedef pthread_key_t		thread_key_t;
-
-#define thread_getid		pthread_self
 
 #endif /* !WIN32 */
 
@@ -212,7 +206,7 @@ sys_new_vmthread (lua_State *L)
     vmtd = lua_newuserdata(L, sizeof(struct sys_vmthread));
     memset(vmtd, 0, sizeof(struct sys_vmthread));
     vmtd->td.L = L;
-    vmtd->td.tid = thread_getid();
+    vmtd->td.tid = sys_gettid();
     vmtd->td.vmtd = vmtd;
     luaL_getmetatable(L, THREAD_TYPENAME);
     lua_setmetatable(L, -2);
@@ -244,7 +238,7 @@ sys_new_thread (struct sys_thread *td)
     ntd->mutex = td->mutex;
     ntd->L = NL;
     ntd->vmtd = td->vmtd;
-    ntd->tid = thread_getid();
+    ntd->tid = sys_gettid();
     luaL_getmetatable(L, THREAD_TYPENAME);
     lua_setmetatable(L, -2);
 
@@ -346,6 +340,20 @@ thread_init (lua_State *L)
 }
 
 
+/*
+ * Arguments: ..., error_message (string)
+ */
+static void
+thread_abort (lua_State *L)
+{
+    const char *msg = (lua_type(L, -1) == LUA_TSTRING)
+     ? lua_tostring(L, -1) : NULL;
+
+    if (!msg) msg = "(error object is not a string)";
+    luai_writestringerror("%s\n", msg);
+    abort();
+}
+
 #if LUA_VERSION_NUM < 502
 static void
 thread_setfield (lua_State *L, const char *name, lua_CFunction f)
@@ -433,7 +441,8 @@ thread_startvm (struct sys_thread *td)
     sys_set_thread(td);
     sys_vm2_enter(td);
 
-    lua_call(L, lua_gettop(L) - 1, 1);
+    if (lua_pcall(L, lua_gettop(L) - 1, 1, 0))
+	thread_abort(L);
     res = lua_tointeger(L, -1);
 
     lua_close(L);
@@ -544,7 +553,8 @@ thread_start (struct sys_thread *td)
     sys_set_thread(td);
     sys_vm2_enter(td);
 
-    lua_call(L, lua_gettop(L) - 1, 1);
+    if (lua_pcall(L, lua_gettop(L) - 1, 1, 0))
+	thread_abort(L);
     res = lua_tointeger(L, -1);
 
     td = sys_del_thread(td);  /* remove reference to self */
@@ -830,6 +840,16 @@ static luaL_Reg thread_lib[] = {
 static void
 thread_createmeta (lua_State *L)
 {
+    const struct meta_s {
+	const char *tname;
+	luaL_Reg *meth;
+    } meta[] = {
+	{THREAD_TYPENAME,	thread_meth},
+	{DPOOL_TYPENAME,	dpool_meth},
+	{PIPE_TYPENAME,		pipe_meth},
+    };
+    int i;
+
     /* already created? */
     luaL_getmetatable(L, THREAD_TYPENAME);
     {
@@ -838,23 +858,13 @@ thread_createmeta (lua_State *L)
 	if (created) return;
     }
 
-    luaL_newmetatable(L, THREAD_TYPENAME);
-    lua_pushvalue(L, -1);  /* push metatable */
-    lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
-    luaL_setfuncs(L, thread_meth, 0);
-    lua_pop(L, 1);
-
-    luaL_newmetatable(L, DPOOL_TYPENAME);
-    lua_pushvalue(L, -1);  /* push metatable */
-    lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
-    luaL_setfuncs(L, dpool_meth, 0);
-    lua_pop(L, 1);
-
-    luaL_newmetatable(L, PIPE_TYPENAME);
-    lua_pushvalue(L, -1);  /* push metatable */
-    lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
-    luaL_setfuncs(L, pipe_meth, 0);
-    lua_pop(L, 1);
+    for (i = 0; i < (int) (sizeof(meta) / sizeof(struct meta_s)); ++i) {
+	luaL_newmetatable(L, meta[i].tname);
+	lua_pushvalue(L, -1);  /* push metatable */
+	lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
+	luaL_setfuncs(L, meta[i].meth, 0);
+	lua_pop(L, 1);
+    }
 
     /* create threads table */
     lua_pushlightuserdata(L, THREAD_KEY_ADDRESS);

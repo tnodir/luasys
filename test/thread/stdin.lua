@@ -50,8 +50,11 @@ do
 
     local function start()
 	local _, err = pcall(read_stdin)
-	if not thread.self():interrupted(err) then
-	    print(err)
+	if err and not thread.self():interrupted(err) then
+	    print("Error:", err)
+	    err = nill
+	end
+	if not err then
 	    error("Thread Interrupt Error expected")
 	end
 	print("Worker:", "Terminated")
