@@ -15,7 +15,8 @@
 #else
 
 struct period {
-    LARGE_INTEGER start, freq;
+    LARGE_INTEGER start;
+    lua_Number cycle;
 };
 
 #endif
@@ -183,8 +184,10 @@ sys_period (lua_State *L)
 #endif
 #else
     struct period *p = lua_newuserdata(L, sizeof(struct period));
+    LARGE_INTEGER freq;
 
-    QueryPerformanceFrequency(&p->freq);
+    QueryPerformanceFrequency(&freq);
+    p->cycle = (lua_Number) 1000000.0 / freq.QuadPart;
 #endif
     luaL_getmetatable(L, PERIOD_TYPENAME);
     lua_setmetatable(L, -2);
@@ -252,7 +255,7 @@ period_get (lua_State *L)
     LARGE_INTEGER stop;
 
     QueryPerformanceCounter(&stop);
-    usec = (lua_Number) (stop.QuadPart - p->start.QuadPart) / p->freq.QuadPart;
+    usec = (lua_Number) (stop.QuadPart - p->start.QuadPart) * p->cycle;
 #endif
     lua_pushnumber(L, usec);
     return 1;
