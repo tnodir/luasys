@@ -215,7 +215,7 @@ evq_modify (struct event *ev, unsigned int flags)
 	if (flags & EVENT_WRITE)
 	    event |= WFD_WRITE;
 
-	if (WSAEventSelect((int) ev->fd, wth->handles[ev->index], event) == SOCKET_ERROR)
+	if (WSAEventSelect((int) ev->fd, wth->handles[ev->w.index], event) == SOCKET_ERROR)
 	    return -1;
     }
     return 0;

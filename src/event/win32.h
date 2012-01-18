@@ -41,8 +41,12 @@ struct win32overlapped {
 
 #define EVENT_EXTRA							\
     struct win32thr *wth;						\
-    unsigned int index;							\
-    struct win32overlapped *rov, *wov;  /* IOCP overlaps */
+    union {								\
+	unsigned int index;						\
+	struct {							\
+	    struct win32overlapped *rov, *wov;  /* IOCP overlaps */	\
+	} iocp;								\
+    } w;
 
 #define EVQ_EXTRA							\
     HANDLE ack_event;							\

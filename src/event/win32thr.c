@@ -200,7 +200,7 @@ win32thr_add (struct win32thr *wth, struct event *ev)
     wth->handles[i + 1] = wth->signal;  /* raise signal event */
     wth->handles[i] = hEvent;
     wth->events[i] = ev;
-    ev->index = i;
+    ev->w.index = i;
 
     wth->n++;
     evq->nevents++;
@@ -217,7 +217,7 @@ win32thr_del (struct win32thr *wth, struct event *ev)
     ev->wth = NULL;
     wth->evq->nevents--;
 
-    i = ev->index;
+    i = ev->w.index;
     if (ev->flags & EVENT_SOCKET) {
 	HANDLE hEvent = wth->handles[i];
 	WSAEventSelect((int) ev->fd, hEvent, 0);
@@ -225,7 +225,7 @@ win32thr_del (struct win32thr *wth, struct event *ev)
     }
     if (i < n) {
 	ev = wth->events[n];
-	ev->index = i;
+	ev->w.index = i;
 	wth->events[i] = ev;
 	wth->handles[i] = wth->handles[n];
     }
