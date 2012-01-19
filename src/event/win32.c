@@ -68,16 +68,17 @@ evq_add (struct event_queue *evq, struct event *ev)
 	return 0;
     }
 
-    if ((ev_flags & (EVENT_SOCKET | EVENT_SOCKET_ACC_CONN)) == EVENT_SOCKET) {
-	if (CreateIoCompletionPort((HANDLE) ev->fd, evq->iocp.h, (ULONG_PTR) ev, 0)) {
-	    if (!win32iocp_set(ev, ev_flags)) {
-		ev->flags |= EVENT_AIO;
-		evq->iocp.n++;
-		evq->nevents++;
-		return 0;
-	    }
-	    win32iocp_cancel(ev, (EVENT_READ | EVENT_WRITE));
+    if ((ev_flags & (EVENT_SOCKET | EVENT_SOCKET_ACC_CONN)) == EVENT_SOCKET
+     && evq->iocp.h
+     && CreateIoCompletionPort((HANDLE) ev->fd, evq->iocp.h, (ULONG_PTR) ev, 0)) {
+	if (!win32iocp_set(ev, ev_flags)) {
+	    ev->flags |= EVENT_AIO;
+	    evq->iocp.n++;
+	    evq->nevents++;
+	    return 0;
 	}
+	if (ev->flags & EVENT_PENDING)
+	    win32iocp_cancel(ev, (EVENT_READ | EVENT_WRITE));
     }
 
     while (wth->n >= NEVENT - 1)
