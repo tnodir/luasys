@@ -2,7 +2,7 @@
 
 #ifdef _WIN32
 
-#define SYSMEM_HAVE_MMAP
+#define SYS_HAVE_MMAP
 
 #else
 
@@ -10,7 +10,7 @@
 #include <sys/mman.h>
 
 #ifdef _POSIX_MAPPED_FILES
-#define SYSMEM_HAVE_MMAP
+#define SYS_HAVE_MMAP
 #endif
 
 #endif
@@ -314,7 +314,7 @@ mem_realloc (lua_State *L)
 }
 
 
-#ifdef SYSMEM_HAVE_MMAP
+#ifdef SYS_HAVE_MMAP
 
 /*
  * Arguments: membuf_udata, fd_udata, [protection (string: "rw"),
@@ -448,7 +448,7 @@ mem_sync (lua_State *L)
     return !res ? 1 : 0;
 }
 
-#endif /* SYSMEM_HAVE_MMAP */
+#endif /* SYS_HAVE_MMAP */
 
 
 /*
@@ -467,7 +467,7 @@ mem_free (lua_State *L)
 	case SYSMEM_ALLOC:
 	    free(mb->data);
 	    break;
-#ifdef SYSMEM_HAVE_MMAP
+#ifdef SYS_HAVE_MMAP
 	case SYSMEM_MAP:
 #ifndef _WIN32
 	    munmap(mb->data, mb->len);
@@ -475,7 +475,7 @@ mem_free (lua_State *L)
 	    UnmapViewOfFile(mb->data);
 #endif
 	    break;
-#endif /* SYSMEM_HAVE_MMAP */
+#endif /* SYS_HAVE_MMAP */
 	}
 	mb->data = NULL;
 	mb->flags &= SYSMEM_TYPE_MASK;
@@ -709,7 +709,7 @@ static luaL_Reg mem_meth[] = {
     {"typesize",	mem_typesize},
     {"alloc",		mem_alloc},
     {"realloc",		mem_realloc},
-#ifdef SYSMEM_HAVE_MMAP
+#ifdef SYS_HAVE_MMAP
     {"map",		mem_map},
     {"sync",		mem_sync},
 #endif
