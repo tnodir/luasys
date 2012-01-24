@@ -104,10 +104,10 @@ signal_kqueue (struct event_queue *evq, int signo, int action)
     struct kevent kev;
     int res;
 
+    memset(&kev, 0, sizeof(struct kevent));
     kev.ident = signo;
     kev.filter = EVFILT_SIGNAL;
     kev.flags = action;
-    kev.udata = NULL;
 
     do res = kevent(evq->kqueue_fd, &kev, 1, NULL, 0, NULL);
     while (res == -1 && errno == EINTR);

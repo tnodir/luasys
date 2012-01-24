@@ -15,9 +15,9 @@ evq_init (struct event_queue *evq)
 	fd_t *sig_fd = evq->sig_fd;
 	struct kevent kev;
 
+	memset(&kev, 0, sizeof(struct kevent));
 	kev.filter = EVFILT_READ;
 	kev.flags = EV_ADD;
-	kev.udata = NULL;
 
 	sig_fd[0] = sig_fd[1] = (fd_t) -1;
 	if (pipe(sig_fd) || fcntl(sig_fd[0], F_SETFL, O_NONBLOCK)
@@ -59,10 +59,11 @@ kqueue_set (struct event_queue *evq, struct event *ev, int filter, int action)
     } else
 	kev += evq->nchanges++;
 
+    memset(kev, 0, sizeof(struct kevent));
     kev->ident = ev->fd;
     kev->filter = filter;
     kev->flags = action | ((ev->flags & EVENT_ONESHOT) ? EV_ONESHOT : 0);
-    kev->udata = ev;
+    kev->udata = (intptr_t) ev;
     return 0;
 }
 
@@ -107,11 +108,12 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
 	struct kevent kev;
 	int res;
 
+	memset(&kev, 0, sizeof(struct kevent));
 	kev.ident = ev->fd;
 	kev.filter = EVFILT_VNODE;
 	kev.flags = EV_ADD;
 	kev.fflags = filter;
-	kev.udata = ev;
+	kev.udata = (intptr_t) ev;
 
 	do res = kevent(evq->kqueue_fd, &kev, 1, NULL, 0, NULL);
 	while (res == -1 && errno == EINTR);
@@ -243,7 +245,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	    continue;
 	}
 
-	ev = kev->udata;
+	ev = (struct event *) kev->udata;
 	if (!ev) {
 	    ev_ready = signal_process_interrupt(evq, ev_ready, timeout);
 	    continue;
