@@ -27,7 +27,7 @@ struct message_item {
     int len: 16;  /* length of value in bytes */
     union {
 	lua_Number num;
-	char bool;
+	char boolean;
 	void *ptr;
 	char str[1];
     } v;
@@ -162,8 +162,8 @@ pipe_msg_build (lua_State *L, struct message *msg, int idx)
 	    len = sizeof(item->v.num);
 	    break;
 	case LUA_TBOOLEAN:
-	    item->v.bool = (char) lua_toboolean(L, idx);
-	    len = sizeof(item->v.bool);
+	    item->v.boolean = (char) lua_toboolean(L, idx);
+	    len = sizeof(item->v.boolean);
 	    break;
 	case LUA_TNIL:
 	    len = 0;
@@ -209,7 +209,7 @@ pipe_msg_parse (lua_State *L, struct message *msg)
 	    lua_pushnumber(L, item->v.num);
 	    break;
 	case LUA_TBOOLEAN:
-	    lua_pushboolean(L, item->v.bool);
+	    lua_pushboolean(L, item->v.boolean);
 	    break;
 	case LUA_TNIL:
 	    lua_pushnil(L);

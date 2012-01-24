@@ -211,7 +211,7 @@ void sys_vm2_leave (struct sys_thread *td);
 void sys_vm_enter (void);
 void sys_vm_leave (void);
 
-struct sys_thread *sys_new_thread (struct sys_thread *td);
+struct sys_thread *sys_new_thread (lua_State *L, struct sys_thread *td);
 struct sys_thread *sys_del_thread (struct sys_thread *td);
 
 
