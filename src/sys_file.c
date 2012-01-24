@@ -332,7 +332,7 @@ sys_close (lua_State *L)
 #ifndef _WIN32
 	    int res;
 	    do res = close(*fdp);
-	    while (res == -1 && SYS_ERRNO == EINTR);
+	    while (res == -1 && sys_isintr());
 	    lua_pushboolean(L, !res);
 #else
 	    lua_pushboolean(L, CloseHandle(*fdp));
@@ -417,7 +417,7 @@ sys_set_std (lua_State *L)
     dst = (*stream == 'i') ? STDIN_FILENO
      : (*stream == 'o') ? STDOUT_FILENO : STDERR_FILENO;
     do res = dup2(fd, dst);
-    while (res == -1 && SYS_ERRNO == EINTR);
+    while (res == -1 && sys_isintr());
     if (res != -1) {
 #else
     dst = (*stream == 'i') ? STD_INPUT_HANDLE
@@ -482,10 +482,10 @@ sys_set_end (lua_State *L)
     const int64_t off = (int64_t) offset;  /* to avoid warning */
     int res;
 
+    sys_vm_leave();
 #ifndef _WIN32
     do res = ftruncate(fd, off);
-    while (res == -1 && SYS_ERRNO == EINTR);
-    if (!res) {
+    while (res == -1 && sys_isintr());
 #else
     {
 	LONG off_hi = INT64_HIGH(off);
@@ -494,11 +494,13 @@ sys_set_end (lua_State *L)
 
 	cur_lo = SetFilePointer(fd, 0L, &cur_hi, SEEK_CUR);
 	SetFilePointer(fd, off_lo, &off_hi, SEEK_SET);
-	res = SetEndOfFile(fd);
+	res = !SetEndOfFile(fd);
 	SetFilePointer(fd, cur_lo, &cur_hi, SEEK_SET);
     }
-    if (res) {
 #endif
+    sys_vm_enter();
+
+    if (!res) {
 	lua_settop(L, 1);
 	return 1;
     }
@@ -531,7 +533,7 @@ sys_lock (lua_State *L)
 
     sys_vm_leave();
     do res = fcntl(fd, F_SETLK, &lock);
-    while (res == -1 && SYS_ERRNO == EINTR);
+    while (res == -1 && sys_isintr());
     sys_vm_enter();
 
     if (res != -1) {
@@ -576,7 +578,7 @@ sys_write (lua_State *L)
 	sys_vm_leave();
 #ifndef _WIN32
 	do nw = write(fd, sb.ptr.r, sb.size);
-	while (nw == -1 && SYS_ERRNO == EINTR);
+	while (nw == -1 && sys_isintr());
 #else
 	{
 	    DWORD l;
@@ -619,7 +621,7 @@ sys_read (lua_State *L)
 	sys_vm_leave();
 #ifndef _WIN32
 	do nr = read(fd, sb.ptr.w, rlen);
-	while (nr == -1 && SYS_ERRNO == EINTR);
+	while (nr == -1 && sys_isintr());
 #else
 	{
 	    DWORD l;
@@ -663,7 +665,7 @@ sys_flush (lua_State *L)
 #if defined(_POSIX_SYNCHRONIZED_IO) && _POSIX_SYNCHRONIZED_IO > 0
     if (data_only) {
 	do res = fdatasync(fd);
-	while (res == -1 && SYS_ERRNO == EINTR);
+	while (res == -1 && sys_isintr());
     }
 #endif
 
@@ -673,7 +675,7 @@ sys_flush (lua_State *L)
 
     if (res) {
 	do res = fsync(fd);
-	while (res == -1 && SYS_ERRNO == EINTR);
+	while (res == -1 && sys_isintr());
     }
 #else
     res = !FlushFileBuffers(fd);

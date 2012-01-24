@@ -77,13 +77,21 @@ rand_next (lua_State *L)
     fd_t fd = (fd_t) lua_unboxinteger(L, 1, RAND_TYPENAME);
     int nr;
 
+    sys_vm_leave();
     do nr = read(fd, (char *) buf, len);
-    while (nr == -1 && SYS_ERRNO == EINTR);
+    while (nr == -1 && sys_isintr());
+    sys_vm_enter();
+
     if (nr == len) {
 #else
     HCRYPTPROV prov = (HCRYPTPROV) lua_unboxpointer(L, 1, RAND_TYPENAME);
+    int res;
 
-    if (CryptGenRandom(prov, len, buf)) {
+    sys_vm_leave();
+    res = CryptGenRandom(prov, len, buf);
+    sys_vm_enter();
+
+    if (res) {
 #endif
 	lua_pushinteger(L, is_udata ? 1
 	 : (ub ? num % ub : num));

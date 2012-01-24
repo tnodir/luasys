@@ -89,7 +89,7 @@ signal_set (int signo, sig_handler_t func)
 
     act.sa_handler = func;
     sigemptyset(&act.sa_mask);
-    act.sa_flags = SA_RESTART;
+    act.sa_flags = (signo == SYS_SIGINTR) ? 0 : SA_RESTART;
 
     do res = sigaction(signo, &act, NULL);
     while (res == -1 && errno == EINTR);

@@ -44,7 +44,7 @@ typedef struct {
 #ifndef _WIN32
     pthread_cond_t cond;
     thread_critsect_t cs;
-    int volatile signalled;
+    short volatile signalled;
 #else
     HANDLE h;
 #endif
@@ -83,7 +83,7 @@ thread_cond_del (thread_cond_t *tcond)
 #ifndef _WIN32
 static int
 thread_cond_wait_impl (pthread_cond_t *condp, pthread_mutex_t *csp,
-                       volatile int *signalled, int reset, msec_t timeout)
+                       volatile short *signalled, int reset, msec_t timeout)
 {
     int res = 0;
 

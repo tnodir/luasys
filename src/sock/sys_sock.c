@@ -12,8 +12,6 @@
 
 typedef int		socklen_t;
 
-#undef EINTR
-#define EINTR		WSAEINTR
 #define EINPROGRESS	WSAEINPROGRESS
 #define EALREADY	WSAEALREADY
 
@@ -171,7 +169,7 @@ sock_close (lua_State *L)
 	int res;
 
 	do res = close(*sdp);
-	while (res == -1 && SYS_ERRNO == EINTR);
+	while (res == -1 && sys_isintr());
 	lua_pushboolean(L, !res);
 #else
 	lua_pushboolean(L, !closesocket(*sdp));
@@ -380,12 +378,16 @@ sock_accept (lua_State *L)
 	slp = &from->addrlen;
 	*slp = SOCK_ADDR_LEN;
     }
+
+    sys_vm_leave();
 #ifndef _WIN32
     do sd = accept(sd, sap, slp);
-    while (sd == -1 && SYS_ERRNO == EINTR);
+    while (sd == -1 && sys_isintr());
 #else
     sd = accept(sd, sap, slp);
 #endif
+    sys_vm_enter();
+
     if (sd != (sd_t) -1) {
 	*sdp = sd;
 	lua_settop(L, 2);
@@ -411,7 +413,11 @@ sock_connect (lua_State *L)
 
     sys_vm_leave();
     do res = connect(sd, &sap->u.addr, sap->addrlen);
-    while (res == -1 && SYS_ERRNO == EINTR);
+#ifndef _WIN32
+    while (res == -1 && sys_isintr());
+#else
+    while (0);
+#endif
     sys_vm_enter();
 
     if (!res || SYS_ERRNO == EINPROGRESS || SYS_ERRNO == EALREADY
@@ -455,7 +461,11 @@ sock_send (lua_State *L)
     sys_vm_leave();
     do nw = !to ? send(sd, sb.ptr.r, sb.size, flags)
      : sendto(sd, sb.ptr.r, sb.size, flags, &to->u.addr, to->addrlen);
-    while (nw == -1 && SYS_ERRNO == EINTR);
+#ifndef _WIN32
+    while (nw == -1 && sys_isintr());
+#else
+    while (0);
+#endif
     sys_vm_enter();
     if (nw == -1) {
 	if (!SYS_EAGAIN(SYS_ERRNO))
@@ -518,7 +528,7 @@ sock_recv (lua_State *L)
 	sys_vm_leave();
 #ifndef _WIN32
 	do nr = recvfrom(sd, sb.ptr.w, rlen, flags, sap, slp);
-	while (nr == -1 && SYS_ERRNO == EINTR);
+	while (nr == -1 && sys_isintr());
 #else
 	nr = recvfrom(sd, sb.ptr.w, rlen, flags, sap, slp);
 #endif
@@ -616,7 +626,7 @@ sock_sendfile (lua_State *L)
 #ifndef _WIN32
 #if defined(__linux__)
     do res = sendfile(sd, fd, NULL, n ? n : ~((size_t) 0));
-    while (res == -1 && SYS_ERRNO == EINTR);
+    while (res == -1 && sys_isintr());
 #else
     {
 	off_t nw, off = lseek(fd, 0, SEEK_CUR);
@@ -627,7 +637,7 @@ sock_sendfile (lua_State *L)
 #else
 	do res = sendfile(fd, sd, off, n, NULL, &nw, 0);
 #endif
-	while (res == -1 && SYS_ERRNO == EINTR);
+	while (res == -1 && sys_isintr());
 	if (res != -1) {
 	    res = (size_t) nw;
 	    lseek(fd, nw, SEEK_CUR);
@@ -676,7 +686,7 @@ sock_write (lua_State *L)
 	sys_vm_leave();
 #ifndef _WIN32
 	do nw = write(sd, sb.ptr.r, sb.size);
-	while (nw == -1 && SYS_ERRNO == EINTR);
+	while (nw == -1 && sys_isintr());
 #else
 	{
 	    WSABUF wsa_buf;
@@ -724,7 +734,7 @@ sock_read (lua_State *L)
 	sys_vm_leave();
 #ifndef _WIN32
 	do nr = read(sd, sb.ptr.w, rlen);
-	while (nr == -1 && SYS_ERRNO == EINTR);
+	while (nr == -1 && sys_isintr());
 #else
 	{
 	    WSABUF wsa_buf;

@@ -214,6 +214,8 @@ void sys_vm_leave (void);
 struct sys_thread *sys_new_thread (lua_State *L, struct sys_thread *td);
 struct sys_thread *sys_del_thread (struct sys_thread *td);
 
+int sys_isintr (void);
+
 
 /*
  * Time

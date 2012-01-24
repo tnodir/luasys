@@ -46,9 +46,9 @@ struct sys_thread {
     lua_State *L;
     struct sys_vmthread *vmtd;
     thread_id_t tid;
-    int volatile interrupted;
-    int volatile killed;
     lua_Integer exit_status;
+    short volatile interrupted;
+    short volatile killed;
 };
 
 /* Main VM-Thread's data */
@@ -65,6 +65,9 @@ struct sys_vmthread {
 static thread_key_t g_TLSIndex = INVALID_TLS_INDEX;
 
 #define THREAD_KEY_ADDRESS	(&g_TLSIndex)
+
+#define thread_getvm(td)	((struct sys_thread *) (td)->vmtd)
+#define thread_isvm(td)		((td) == thread_getvm(td))
 
 static void thread_createmeta (lua_State *L);
 
@@ -90,10 +93,6 @@ sys_get_thread (void)
     return TlsGetValue(g_TLSIndex);
 #endif
 }
-
-#define thread_getvm(td)	((struct sys_thread *) (td)->vmtd)
-#define thread_isvm(td)		((td) == thread_getvm(td))
-
 
 struct sys_thread *
 sys_get_vmthread (struct sys_thread *td)
@@ -175,6 +174,18 @@ sys_vm_leave (void)
 
     td = sys_get_thread();
     if (td) sys_vm2_leave(td);
+}
+
+int
+sys_isintr (void)
+{
+#ifndef _WIN32
+    if (SYS_ERRNO == EINTR) {
+	struct sys_thread *td = sys_get_thread();
+	return !(td && (td->interrupted || td->killed));
+    }
+#endif
+    return 0;
 }
 
 
@@ -666,7 +677,7 @@ thread_sleep (lua_State *L)
 	req.tv_nsec = (msec % 1000) * 1000000;
 
 	do res = nanosleep(&req, rem);
-	while (res == -1 && SYS_ERRNO == EINTR && not_intr);
+	while (res == -1 && sys_isintr() && not_intr);
     }
 #else
     Sleep(msec);

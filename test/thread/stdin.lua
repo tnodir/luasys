@@ -25,8 +25,8 @@ local controller
 do
     local function on_event(evq, evid)
 	print("Controller:", "Close stdin")
-	stdin:close(true)
 	worker:interrupt()
+	stdin:close(true)  -- Win32 workaround
 	assert(worker:wait() == -1)
 	evq:del(evid)
     end
