@@ -542,6 +542,8 @@ sock_recv (lua_State *L)
 
 #ifdef _WIN32
 
+#define SYS_HAVE_SENDFILE
+
 #define SYS_GRAN_MASK	(64 * 1024 - 1)
 
 static DWORD
@@ -588,8 +590,15 @@ TransmitFileMap (SOCKET sd, HANDLE fd, DWORD n)
     return res;
 }
 
+#elif defined(__linux__) || defined(__FreeBSD__) \
+     || (defined(__APPLE__) && defined(__MACH__))
+
+#define SYS_HAVE_SENDFILE
+
 #endif
 
+
+#ifdef SYS_HAVE_SENDFILE
 
 /*
  * Arguments: sd_udata, fd_udata, [count (number)]
@@ -643,6 +652,9 @@ sock_sendfile (lua_State *L)
     }
     return sys_seterror(L, 0);
 }
+
+#endif
+
 
 /*
  * Arguments: sd_udata, {string | membuf_udata} ...
@@ -771,7 +783,9 @@ static luaL_Reg sock_meth[] = {
     {"connect",		sock_connect},
     {"send",		sock_send},
     {"recv",		sock_recv},
+#ifdef SYS_HAVE_SENDFILE
     {"sendfile",	sock_sendfile},
+#endif
     {"write",		sock_write},
     {"read",		sock_read},
     {"__tostring",	sock_tostring},
