@@ -297,7 +297,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	threads = evq->wth_ready;
 	evq->wth_ready = NULL;
 
-	sig_ready = (evq->sig_ready & SIGMASK);
+	sig_ready = evq->sig_ready;
 	evq->sig_ready = 0;
 	LeaveCriticalSection(head_cs);
 
@@ -312,7 +312,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	    EnterCriticalSection(head_cs);
 	    ResetEvent(head_signal);
 
-	    sig_ready = (evq->sig_ready & SIGMASK);
+	    sig_ready = evq->sig_ready;
 	    evq->sig_ready = 0;
 	    LeaveCriticalSection(head_cs);
 	}

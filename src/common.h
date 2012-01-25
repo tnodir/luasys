@@ -37,15 +37,6 @@ typedef DWORD		thread_id_t;
 #define InitCriticalSection(cs)		(InitializeCriticalSection(cs), TRUE)
 #endif
 
-#define SIGINT		CTRL_C_EVENT
-#define SIGQUIT		CTRL_BREAK_EVENT
-#define SIGHUP		CTRL_LOGOFF_EVENT
-#define SIGTERM		CTRL_SHUTDOWN_EVENT
-#define NSIG 		(SIGTERM + 1)
-
-#define SIGMASK		((1 << NSIG) - 1)
-#define SYS_SIGINTR	NSIG
-
 #define SYS_ERRNO	GetLastError()
 #define SYS_EAGAIN(e)	((e) == WSAEWOULDBLOCK)
 

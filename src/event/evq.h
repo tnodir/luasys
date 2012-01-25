@@ -88,6 +88,7 @@ struct event_queue {
 
     struct event * volatile ev_ready;  /* head of ready events */
     struct event *ev_free;  /* head of free events */
+    struct event *ev_notify;  /* head of notified events */
 
 #ifdef EVQ_POST_INIT
     struct event *ev_post;  /* have to initialize the event source */
@@ -104,7 +105,6 @@ int evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *pat
 int evq_del (struct event *ev, int reuse_fd);
 
 int evq_modify (struct event *ev, unsigned int flags);
-int evq_notify (struct event *ev, unsigned int flags);
 
 int evq_wait (struct event_queue *evq, msec_t timeout);
 
@@ -126,6 +126,25 @@ void signal_init (void);
 typedef void (*sig_handler_t) (int);
 
 int signal_set (int signo, sig_handler_t func);
+
+#define EVQ_SIGINT	SIGINT
+#define EVQ_SIGQUIT	SIGQUIT
+#define EVQ_SIGHUP	SIGHUP
+#define EVQ_SIGTERM	SIGTERM
+#define EVQ_SIGCHLD	SIGCHLD
+#define EVQ_NSIG 	5
+
+#define EVQ_SIGEVQ	SIGPIPE
+
+#else
+
+#define EVQ_SIGINT	CTRL_C_EVENT
+#define EVQ_SIGQUIT	CTRL_BREAK_EVENT
+#define EVQ_SIGHUP	CTRL_LOGOFF_EVENT
+#define EVQ_SIGTERM	CTRL_SHUTDOWN_EVENT
+#define EVQ_NSIG 	4
+
+#define EVQ_SIGEVQ	(EVQ_SIGTERM + 1)
 
 #endif
 

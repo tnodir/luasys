@@ -11,6 +11,10 @@ typedef DWORD (WINAPI *thread_func_t) (void *);
 
 typedef DWORD 			thread_key_t;
 
+typedef BOOL (WINAPI *PCancelSyncIo) (HANDLE hThread);
+
+static PCancelSyncIo cancelsyncio;
+
 #else
 
 #define THREAD_FUNC_RES		void *
@@ -717,10 +721,13 @@ thread_kill (lua_State *L)
 
     if (td == sys_get_thread()) {
 	thread_yield(L);
-    }
+    } else {
 #ifndef _WIN32
-    else pthread_kill(td->tid, SYS_SIGINTR);
+	pthread_kill(td->tid, SYS_SIGINTR);
+#else
+	if (cancelsyncio) cancelsyncio(td->th);
 #endif
+    }
     return 0;
 }
 
@@ -742,10 +749,13 @@ thread_interrupt (lua_State *L)
     if (td == sys_get_thread()) {
 	lua_pushlightuserdata(L, THREAD_KEY_ADDRESS);
 	lua_error(L);
-    }
+    } else {
 #ifndef _WIN32
-    else pthread_kill(td->tid, SYS_SIGINTR);
+	pthread_kill(td->tid, SYS_SIGINTR);
+#else
+	if (cancelsyncio) cancelsyncio(td->th);
 #endif
+    }
     return 0;
 }
 
@@ -873,6 +883,13 @@ thread_createmeta (lua_State *L)
     lua_pushlightuserdata(L, THREAD_KEY_ADDRESS);
     lua_newtable(L);
     lua_rawset(L, LUA_REGISTRYINDEX);
+
+#ifdef _WIN32
+    if (is_WinNT) {
+	cancelsyncio = (PCancelSyncIo) GetProcAddress(
+	 GetModuleHandleA("kernel32.dll"), "CancelSynchronousIo");
+    }
+#endif
 }
 
 /*

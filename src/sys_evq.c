@@ -6,6 +6,15 @@
     (lua_type(L, (i)) == LUA_TLIGHTUSERDATA ? lua_touserdata(L, (i)) : NULL)
 
 
+static const int sig_flags[] = {
+    EVQ_SIGINT, EVQ_SIGHUP, EVQ_SIGQUIT, EVQ_SIGTERM
+};
+
+static const char *const sig_names[] = {
+    "INT", "HUP", "QUIT", "TERM", NULL
+};
+
+
 /* Find the log base 2 of an N-bit integer in O(lg(N)) operations with multiply and lookup */
 static int
 getmaxbit (unsigned int v)
@@ -357,7 +366,7 @@ static int
 levq_signal (lua_State *L)
 {
     struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
-    const int signo = lua_isnoneornil(L, 2) ? SYS_SIGINTR
+    const int signo = lua_isnoneornil(L, 2) ? EVQ_SIGEVQ
      : sig_flags[luaL_checkoption(L, 2, NULL, sig_names)];
 
     if (!evq_signal(evq, signo)) {
@@ -726,7 +735,7 @@ levq_now (lua_State *L)
 }
 
 /*
- * Arguments: evq_udata, ev_ludata, [events (string: "r", "w", "rw")]
+ * Arguments: evq_udata, ev_ludata
  * Returns: [evq_udata]
  */
 static int
@@ -734,20 +743,16 @@ levq_notify (lua_State *L)
 {
     struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
     struct event *ev = levq_toevent(L, 2);
-    const char *evstr = lua_tostring(L, 3);
-    unsigned int res;
-
-    (void) evq;
 
     lua_assert(ev && !event_deleted(ev));
 
     if (!(ev->flags & EVENT_TIMER))
 	luaL_argerror(L, 2, "timer expected");
 
-    res = (!evstr ? EVENT_READ_RES : (evstr[0] == 'r')
-     ? EVENT_READ_RES | (evstr[1] ? EVENT_WRITE_RES : 0) : EVENT_WRITE_RES);
+    ev->next_object = evq->ev_notify;
+    evq->ev_notify = ev;
 
-    if (!evq_notify(ev, res)) {
+    if (!evq_signal(evq, EVQ_SIGEVQ)) {
 	lua_settop(L, 1);
 	return 1;
     }

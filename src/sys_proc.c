@@ -410,21 +410,18 @@ proc_wait (lua_State *L)
 }
 
 /*
- * Arguments: pid_udata, [signal (string)]
+ * Arguments: pid_udata
  * Returns: [pid_udata]
  */
 static int
 proc_kill (lua_State *L)
 {
     struct sys_pid *pidp = checkudata(L, 1, PID_TYPENAME);
-#ifndef _WIN32
-    const int signo = sig_flags[luaL_checkoption(L, 2, "TERM", sig_names)];
-#endif
 
     if (pidp->id == -1) return 0;
 
 #ifndef _WIN32
-    if (!kill(pidp->id, signo)) {
+    if (!kill(pidp->id, SIGKILL)) {
 #else
     if (TerminateProcess(pidp->h, (unsigned int) -1)) {
 #endif

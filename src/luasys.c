@@ -21,15 +21,6 @@ int is_WinNT;
 #endif
 
 
-static const int sig_flags[] = {
-    SIGHUP, SIGINT, SIGQUIT, SIGTERM
-};
-
-static const char *const sig_names[] = {
-    "HUP", "INT", "QUIT", "TERM", NULL
-};
-
-
 /*
  * Arguments: ..., [number]
  * Returns: string

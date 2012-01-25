@@ -26,10 +26,11 @@ static PCIOEx cancelioex;
 static void
 win32iocp_init (void)
 {
-    gqcsex = (PGQCSEx) GetProcAddress(GetModuleHandleA("kernel32.dll"),
-                                      "GetQueuedCompletionStatusEx");
-    cancelioex = (PCIOEx) GetProcAddress(GetModuleHandleA("kernel32.dll"),
-                                         "CancelIoEx");
+    gqcsex = (PGQCSEx) GetProcAddress(
+     GetModuleHandleA("kernel32.dll"), "GetQueuedCompletionStatusEx");
+
+    cancelioex = (PCIOEx) GetProcAddress(
+     GetModuleHandleA("kernel32.dll"), "CancelIoEx");
 }
 
 static void
