@@ -28,9 +28,6 @@ typedef DWORD		ssize_t;
 #define ULONG_PTR	DWORD
 #endif
 
-typedef DWORD		thread_id_t;
-#define sys_gettid	GetCurrentThreadId
-
 #if (_WIN32_WINNT >= 0x0500)
 #define InitCriticalSection(cs)		InitializeCriticalSectionAndSpinCount(cs, 3000)
 #else
@@ -50,15 +47,6 @@ extern int is_WinNT;
 #include <fcntl.h>
 
 #include <pthread.h>
-
-typedef pthread_t	thread_id_t;
-#define sys_gettid	pthread_self
-
-#if !defined(PTHREAD_MUTEX_RECURSIVE)
-extern int pthread_mutexattr_setkind_np (pthread_mutexattr_t *attr, int kind);
-#define pthread_mutexattr_settype	pthread_mutexattr_setkind_np
-#define PTHREAD_MUTEX_RECURSIVE		PTHREAD_MUTEX_RECURSIVE_NP
-#endif
 
 #define SYS_ERRNO	errno
 #define SYS_EAGAIN(e)	((e) == EAGAIN || (e) == EWOULDBLOCK)
@@ -188,6 +176,26 @@ int sys_seterror (lua_State *L, int err);
  * Threading
  */
 
+#ifdef _WIN32
+
+typedef DWORD			thread_id_t;
+#define sys_gettid		GetCurrentThreadId
+#define sys_equaltid(t1,t2)	((t1) == (t2))
+
+#else
+
+typedef pthread_t		thread_id_t;
+#define sys_gettid		pthread_self
+#define sys_equaltid(t1,t2)	pthread_equal((t1), (t2))
+
+#if !defined(PTHREAD_MUTEX_RECURSIVE)
+extern int pthread_mutexattr_setkind_np (pthread_mutexattr_t *attr, int kind);
+#define pthread_mutexattr_settype	pthread_mutexattr_setkind_np
+#define PTHREAD_MUTEX_RECURSIVE		PTHREAD_MUTEX_RECURSIVE_NP
+#endif
+
+#endif
+
 struct sys_thread;
 
 void sys_set_thread (struct sys_thread *td);
@@ -202,8 +210,8 @@ void sys_vm2_leave (struct sys_thread *td);
 void sys_vm_enter (void);
 void sys_vm_leave (void);
 
-struct sys_thread *sys_new_thread (lua_State *L, struct sys_thread *td);
-struct sys_thread *sys_del_thread (struct sys_thread *td);
+struct sys_thread *sys_new_thread (struct sys_thread *td, const int insert);
+void sys_del_thread (struct sys_thread *td);
 
 int sys_isintr (void);
 

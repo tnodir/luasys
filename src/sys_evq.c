@@ -592,7 +592,7 @@ levq_loop (lua_State *L)
 #undef ARG_LAST
 #define ARG_LAST	1
 
-    lua_assert(evq->tid == sys_gettid());
+    lua_assert(pthread_equal(evq->tid, sys_gettid()));
 
     lua_settop(L, ARG_LAST);
     lua_getfenv(L, 1);

@@ -137,7 +137,7 @@ lisapi_open (LPEXTENSION_CONTROL_BLOCK ecb)
 	*ecbp = ecb;
     }
     else {
-	td = sys_new_thread(NULL, g_ISAPI.vmtd);
+	td = sys_new_thread(g_ISAPI.vmtd, 0);
 	if (!td) return NULL;
 
 	L = sys_lua_tothread(td);
