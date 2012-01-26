@@ -77,6 +77,6 @@ struct win32overlapped {
 	    FindNextChangeNotification((ev)->fd);			\
     } while (0)
 
-int win32iocp_set (struct event *ev, unsigned int ev_flags);
+EVQ_API int win32iocp_set (struct event *ev, unsigned int ev_flags);
 
 #endif

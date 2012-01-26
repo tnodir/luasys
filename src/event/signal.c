@@ -50,7 +50,7 @@ signal_handler (int signo)
 #endif
 }
 
-void
+EVQ_API void
 signal_init (void)
 {
     if (g_SignalInit) return;
@@ -87,7 +87,7 @@ evq_interrupt (struct event_queue *evq)
     return (nw == -1) ? -1 : 0;
 }
 
-int
+EVQ_API int
 evq_signal (struct event_queue *evq, int signo)
 {
     int res = 0;
@@ -100,7 +100,7 @@ evq_signal (struct event_queue *evq, int signo)
     return res;
 }
 
-int
+EVQ_API int
 signal_set (int signo, sig_handler_t func)
 {
     struct sigaction act;
@@ -135,7 +135,7 @@ signal_kqueue (struct event_queue *evq, int signo, int action)
 }
 #endif
 
-int
+EVQ_API int
 evq_ignore_signal (struct event_queue *evq, int signo, int ignore)
 {
 #ifndef USE_KQUEUE

@@ -3,7 +3,7 @@
 #define EPOLLFD_READ	(EPOLLIN | EPOLLERR | EPOLLHUP)
 #define EPOLLFD_WRITE	(EPOLLOUT | EPOLLERR | EPOLLHUP)
 
-int
+EVQ_API int
 evq_init (struct event_queue *evq)
 {
     evq->epoll_fd = epoll_create(NEVENT);
@@ -36,7 +36,7 @@ evq_init (struct event_queue *evq)
     return 0;
 }
 
-void
+EVQ_API void
 evq_done (struct event_queue *evq)
 {
     pthread_mutex_destroy(&evq->cs);
@@ -51,7 +51,7 @@ evq_done (struct event_queue *evq)
     close(evq->epoll_fd);
 }
 
-int
+EVQ_API int
 evq_add (struct event_queue *evq, struct event *ev)
 {
     const unsigned int ev_flags = ev->flags;
@@ -79,7 +79,7 @@ evq_add (struct event_queue *evq, struct event *ev)
     return 0;
 }
 
-int
+EVQ_API int
 evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
 {
     const unsigned int filter = (ev->flags >> EVENT_EOF_SHIFT_RES)
@@ -98,7 +98,7 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
     return evq_add(evq, ev);
 }
 
-int
+EVQ_API int
 evq_del (struct event *ev, int reuse_fd)
 {
     struct event_queue *evq = ev->evq;
@@ -122,7 +122,7 @@ evq_del (struct event *ev, int reuse_fd)
     return 0;
 }
 
-int
+EVQ_API int
 evq_modify (struct event *ev, unsigned int flags)
 {
     struct epoll_event epev;
@@ -136,7 +136,7 @@ evq_modify (struct event *ev, unsigned int flags)
     return epoll_ctl(ev->evq->epoll_fd, EPOLL_CTL_MOD, ev->fd, &epev);
 }
 
-int
+EVQ_API int
 evq_wait (struct event_queue *evq, msec_t timeout)
 {
     struct epoll_event ep_events[NEVENT];

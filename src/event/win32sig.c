@@ -47,7 +47,7 @@ signal_handler (int signo)
     return res;
 }
 
-void
+EVQ_API void
 signal_init ()
 {
     if (g_SignalInit) return;
@@ -56,7 +56,7 @@ signal_init ()
     InitCriticalSection(&g_Signal.cs);
 }
 
-int
+EVQ_API int
 evq_signal (struct event_queue *evq, int signo)
 {
     struct win32thr *wth = &evq->head;
@@ -70,7 +70,7 @@ evq_signal (struct event_queue *evq, int signo)
     return res;
 }
 
-int
+EVQ_API int
 evq_ignore_signal (struct event_queue *evq, int signo, int ignore)
 {
     const int bit = 1 << signo;

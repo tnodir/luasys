@@ -183,7 +183,7 @@ win32iocp_cancel (struct event *ev, unsigned int rw_flags)
     }
 }
 
-int
+EVQ_API int
 win32iocp_set (struct event *ev, unsigned int rw_flags)
 {
     static WSABUF buf = {0, 0};

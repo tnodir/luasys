@@ -1,6 +1,10 @@
 #ifndef EVQ_H
 #define EVQ_H
 
+#ifndef EVQ_API
+#define EVQ_API		static
+#endif
+
 struct event;
 struct event_queue;
 
@@ -97,24 +101,24 @@ struct event_queue {
     EVQ_EXTRA
 };
 
-int evq_init (struct event_queue *evq);
-void evq_done (struct event_queue *evq);
+EVQ_API int evq_init (struct event_queue *evq);
+EVQ_API void evq_done (struct event_queue *evq);
 
-int evq_add (struct event_queue *evq, struct event *ev);
-int evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path);
-int evq_del (struct event *ev, int reuse_fd);
+EVQ_API int evq_add (struct event_queue *evq, struct event *ev);
+EVQ_API int evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path);
+EVQ_API int evq_del (struct event *ev, int reuse_fd);
 
-int evq_modify (struct event *ev, unsigned int flags);
+EVQ_API int evq_modify (struct event *ev, unsigned int flags);
 
-int evq_wait (struct event_queue *evq, msec_t timeout);
+EVQ_API int evq_wait (struct event_queue *evq, msec_t timeout);
 
-int evq_set_timeout (struct event *ev, msec_t msec);
-int evq_add_timer (struct event_queue *evq, struct event *ev, msec_t msec);
+EVQ_API int evq_set_timeout (struct event *ev, msec_t msec);
+EVQ_API int evq_add_timer (struct event_queue *evq, struct event *ev, msec_t msec);
 
-int evq_signal (struct event_queue *evq, int signo);
-int evq_ignore_signal (struct event_queue *evq, int signo, int ignore);
+EVQ_API int evq_signal (struct event_queue *evq, int signo);
+EVQ_API int evq_ignore_signal (struct event_queue *evq, int signo, int ignore);
 
-void signal_init (void);
+EVQ_API void signal_init (void);
 
 #ifndef _WIN32
 
@@ -125,7 +129,7 @@ void signal_init (void);
 
 typedef void (*sig_handler_t) (int);
 
-int signal_set (int signo, sig_handler_t func);
+EVQ_API int signal_set (int signo, sig_handler_t func);
 
 #define EVQ_SIGINT	SIGINT
 #define EVQ_SIGQUIT	SIGQUIT

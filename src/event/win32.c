@@ -8,7 +8,7 @@
 #include "win32thr.c"
 
 
-int
+EVQ_API int
 evq_init (struct event_queue *evq)
 {
     struct win32thr *wth = &evq->head;
@@ -36,7 +36,7 @@ evq_init (struct event_queue *evq)
     return 0;
 }
 
-void
+EVQ_API void
 evq_done (struct event_queue *evq)
 {
     win32thr_poll(evq);
@@ -51,7 +51,7 @@ evq_done (struct event_queue *evq)
     DeleteCriticalSection(&evq->head.cs);
 }
 
-int
+EVQ_API int
 evq_add (struct event_queue *evq, struct event *ev)
 {
     const unsigned int ev_flags = ev->flags;
@@ -94,7 +94,7 @@ evq_add (struct event_queue *evq, struct event *ev)
     return win32thr_add(wth, ev);
 }
 
-int
+EVQ_API int
 evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
 {
     const DWORD flags = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME
@@ -125,7 +125,7 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
     return evq_add(evq, ev);
 }
 
-int
+EVQ_API int
 evq_set_timeout (struct event *ev, msec_t msec)
 {
     struct win32thr *wth = ev->wth;
@@ -146,7 +146,7 @@ evq_set_timeout (struct event *ev, msec_t msec)
      : timeout_add(ev, msec, evq->now);
 }
 
-int
+EVQ_API int
 evq_add_timer (struct event_queue *evq, struct event *ev, msec_t msec)
 {
     ev->wth = &evq->head;
@@ -157,7 +157,7 @@ evq_add_timer (struct event_queue *evq, struct event *ev, msec_t msec)
     return -1;
 }
 
-int
+EVQ_API int
 evq_del (struct event *ev, int reuse_fd)
 {
     struct win32thr *wth = ev->wth;
@@ -194,7 +194,7 @@ evq_del (struct event *ev, int reuse_fd)
     return win32thr_del(wth, ev);
 }
 
-int
+EVQ_API int
 evq_modify (struct event *ev, unsigned int flags)
 {
     const unsigned int ev_flags = ev->flags;
@@ -222,7 +222,7 @@ evq_modify (struct event *ev, unsigned int flags)
     return 0;
 }
 
-int
+EVQ_API int
 evq_wait (struct event_queue *evq, msec_t timeout)
 {
     struct event *ev_ready = NULL;

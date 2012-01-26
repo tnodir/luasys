@@ -4,7 +4,7 @@
 #define POLLFD_WRITE	(POLLOUT | POLLERR | POLLHUP | POLLNVAL)
 
 
-int
+EVQ_API int
 evq_init (struct event_queue *evq)
 {
     fd_t *sig_fd = evq->sig_fd;
@@ -40,7 +40,7 @@ evq_init (struct event_queue *evq)
     return 0;
 }
 
-void
+EVQ_API void
 evq_done (struct event_queue *evq)
 {
     pthread_mutex_destroy(&evq->cs);
@@ -52,7 +52,7 @@ evq_done (struct event_queue *evq)
     free(evq->events);
 }
 
-int
+EVQ_API int
 evq_add (struct event_queue *evq, struct event *ev)
 {
     unsigned int npolls;
@@ -99,7 +99,7 @@ evq_add (struct event_queue *evq, struct event *ev)
     return 0;
 }
 
-int
+EVQ_API int
 evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
 {
     (void) evq;
@@ -109,7 +109,7 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
     return -1;
 }
 
-int
+EVQ_API int
 evq_del (struct event *ev, int reuse_fd)
 {
     struct event_queue *evq = ev->evq;
@@ -151,7 +151,7 @@ evq_del (struct event *ev, int reuse_fd)
     return 0;
 }
 
-int
+EVQ_API int
 evq_modify (struct event *ev, unsigned int flags)
 {
     short *eventp = &ev->evq->fdset[ev->index].events;
@@ -164,7 +164,7 @@ evq_modify (struct event *ev, unsigned int flags)
     return 0;
 }
 
-int
+EVQ_API int
 evq_wait (struct event_queue *evq, msec_t timeout)
 {
     struct event *ev_ready;

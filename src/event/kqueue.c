@@ -2,7 +2,7 @@
 
 #include <sys/wait.h>
 
-int
+EVQ_API int
 evq_init (struct event_queue *evq)
 {
     evq->kqueue_fd = kqueue();
@@ -31,7 +31,7 @@ evq_init (struct event_queue *evq)
     return 0;
 }
 
-void
+EVQ_API void
 evq_done (struct event_queue *evq)
 {
     pthread_mutex_destroy(&evq->cs);
@@ -67,7 +67,7 @@ kqueue_set (struct event_queue *evq, struct event *ev, int filter, int action)
     return 0;
 }
 
-int
+EVQ_API int
 evq_add (struct event_queue *evq, struct event *ev)
 {
     const unsigned int ev_flags = ev->flags;
@@ -89,7 +89,7 @@ evq_add (struct event_queue *evq, struct event *ev)
     return 0;
 }
 
-int
+EVQ_API int
 evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
 {
     const int flags = NOTE_DELETE | NOTE_WRITE | NOTE_EXTEND | NOTE_ATTRIB
@@ -128,7 +128,7 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
     return 0;
 }
 
-int
+EVQ_API int
 evq_del (struct event *ev, int reuse_fd)
 {
     struct event_queue *evq = ev->evq;
@@ -155,7 +155,7 @@ evq_del (struct event *ev, int reuse_fd)
 	? kqueue_set(evq, ev, EVFILT_WRITE, EV_DELETE) : 0);
 }
 
-int
+EVQ_API int
 evq_modify (struct event *ev, unsigned int flags)
 {
     struct event_queue *evq = ev->evq;
@@ -187,7 +187,7 @@ evq_modify (struct event *ev, unsigned int flags)
     return 0;
 }
 
-int
+EVQ_API int
 evq_wait (struct event_queue *evq, msec_t timeout)
 {
     struct event *ev_ready;
