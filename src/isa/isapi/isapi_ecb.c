@@ -118,8 +118,7 @@ ecb_write (lua_State *L)
 	lua_pushfstring(L, "HTTP/1.1 %d\r\n",
 	 (ecb->dwHttpStatusCode & ECB_STATUS_MASK));
 
-	lua_pushlightuserdata(L, ecb);
-	lua_rawget(L, LUA_REGISTRYINDEX);
+	lua_rawgetp(L, LUA_REGISTRYINDEX, ecb);
 
 	lua_pushliteral(L, "\r\n");
 	lua_concat(L, 3);
@@ -178,18 +177,14 @@ ecb_header (lua_State *L)
     lua_insert(L, 3);
     lua_pushliteral(L, "\r\n");
 
-    lua_pushlightuserdata(L, ecb);
-    lua_pushvalue(L, -1);
-    lua_insert(L, 2);
     if (headers) {
-	lua_rawget(L, LUA_REGISTRYINDEX);
+	lua_rawgetp(L, LUA_REGISTRYINDEX, ecb);
     } else {
-	lua_pop(L, 1);
 	lua_pushliteral(L, "");
     }
 
     lua_concat(L, 5);
-    lua_rawset(L, LUA_REGISTRYINDEX);
+    lua_rawsetp(L, LUA_REGISTRYINDEX, ecb);
 
     ecb->dwHttpStatusCode |= ECB_STATUS_HEADERS | ECB_STATUS_HEADERS_SEND;
     return 0;

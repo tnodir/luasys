@@ -76,8 +76,7 @@ dpool_put (lua_State *L)
 
     if (dp->n >= dp->max) {
 	if (dp->flags & DPOOL_PUTONFULL) {
-	    lua_pushlightuserdata(L, (void *) DPOOL_PUTONFULL);
-	    lua_rawget(L, 1);
+	    lua_rawgetp(L, 1, (void *) DPOOL_PUTONFULL);
 	    lua_insert(L, 2);
 	    lua_call(L, 1 + nput, LUA_MULTRET);
 	    nput = lua_gettop(L) - 1;
@@ -133,8 +132,7 @@ dpool_get (lua_State *L)
     lua_insert(L, 1);
 
     if ((dp->flags & DPOOL_GETONEMPTY) && !dp->n) {
-	lua_pushlightuserdata(L, (void *) DPOOL_GETONEMPTY);
-	lua_rawget(L, 1);
+	lua_rawgetp(L, 1, (void *) DPOOL_GETONEMPTY);
 	lua_insert(L, 2);
 	lua_call(L, 1, LUA_MULTRET);
 	nput = lua_gettop(L) - 1;
@@ -223,13 +221,11 @@ dpool_callbacks (lua_State *L)
     dp->flags |= (lua_isfunction(L, 2) ? DPOOL_PUTONFULL : 0)
      | (lua_isfunction(L, 3) ? DPOOL_GETONEMPTY : 0);
 
-    lua_pushlightuserdata(L, (void *) DPOOL_PUTONFULL);
     lua_pushvalue(L, 2);
-    lua_rawset(L, -3);
+    lua_rawsetp(L, -2, (void *) DPOOL_PUTONFULL);
 
-    lua_pushlightuserdata(L, (void *) DPOOL_GETONEMPTY);
     lua_pushvalue(L, 3);
-    lua_rawset(L, -3);
+    lua_rawsetp(L, -2, (void *) DPOOL_GETONEMPTY);
 
     return 0;
 }

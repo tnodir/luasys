@@ -235,9 +235,8 @@ HttpExtensionProc (LPEXTENSION_CONTROL_BLOCK ecb)
     if (ecb->dwHttpStatusCode & ~ECB_STATUS_MASK) {
 	ecb->dwHttpStatusCode &= ECB_STATUS_MASK;
 
-	lua_pushlightuserdata(L, ecb);
 	lua_pushnil(L);
-	lua_rawset(L, LUA_REGISTRYINDEX);
+	lua_rawsetp(L, LUA_REGISTRYINDEX, ecb);
     }
     if (status) {
 	char *s;

@@ -273,16 +273,13 @@ thread_openlibs (lua_State *L)
 static void
 thread_settable (lua_State *L, struct sys_thread *td)
 {
-    lua_pushlightuserdata(L, THREAD_KEY_ADDRESS);
-    lua_rawget(L, LUA_REGISTRYINDEX);
+    lua_rawgetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
 
-    lua_pushlightuserdata(L, td->L);
-    lua_pushvalue(L, -4);  /* thread */
-    lua_rawset(L, -3);
+    lua_pushvalue(L, -3);  /* thread */
+    lua_rawsetp(L, -2, td->L);
 
-    lua_pushlightuserdata(L, td);
-    lua_pushvalue(L, -3); /* thread_udata */
-    lua_rawset(L, -3);
+    lua_pushvalue(L, -2); /* thread_udata */
+    lua_rawsetp(L, -2, td);
 
     lua_pop(L, 3);
 }
@@ -656,10 +653,8 @@ thread_self (lua_State *L)
 
     if (!td) luaL_argerror(L, 0, "Threading not initialized");
 
-    lua_pushlightuserdata(L, THREAD_KEY_ADDRESS);
-    lua_rawget(L, LUA_REGISTRYINDEX);
-    lua_pushlightuserdata(L, td);
-    lua_rawget(L, -2);
+    lua_rawgetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
+    lua_rawgetp(L, -1, td);
     lua_pushboolean(L, thread_isvm(td));
     return 2;
 }
@@ -885,9 +880,8 @@ thread_createmeta (lua_State *L)
     }
 
     /* create threads table */
-    lua_pushlightuserdata(L, THREAD_KEY_ADDRESS);
     lua_newtable(L);
-    lua_rawset(L, LUA_REGISTRYINDEX);
+    lua_rawsetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
 
 #ifdef _WIN32
     if (is_WinNT) {

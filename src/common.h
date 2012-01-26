@@ -70,9 +70,15 @@ extern int is_WinNT;
 #define lua_resume(L,from,n)	lua_resume((L), (n))
 #define luaL_setfuncs(L,l,n)	luaL_register((L), NULL, (l))
 
-#define luaL_newlibtable(L,l)	\
+#define luaL_newlibtable(L,l) \
 	lua_createtable(L, 0, sizeof(l) / sizeof((l)[0]) - 1)
 #define luaL_newlib(L,l)	(luaL_newlibtable((L), (l)), luaL_setfuncs((L), (l), 0))
+
+#define lua_rawgetp(L,idx,p) \
+	(lua_pushlightuserdata((L), (p)), lua_rawget((L), (idx)))
+#define lua_rawsetp(L,idx,p) \
+	(lua_pushlightuserdata((L), (p)), lua_insert((L), -2), \
+	 lua_rawset((L), (idx) - ((idx) < 0 && (idx) > -99 ? -1 : 0)))
 
 #define luai_writestringerror(s,p) \
 	(fprintf(stderr, (s), (p)), fflush(stderr))
