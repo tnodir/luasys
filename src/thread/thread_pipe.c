@@ -354,6 +354,9 @@ pipe_tostring (lua_State *L)
 }
 
 
+#define PIPE_METHODS \
+    {"pipe",		pipe_new}
+
 static luaL_Reg pipe_meth[] = {
     {THREAD_XDUP_TAG,	pipe_xdup},
     {"put",		pipe_put},

@@ -40,11 +40,10 @@ struct sys_vmthread;
 
 /* Thread's data */
 struct sys_thread {
+    thread_critsect_t *vmcsp;
 #ifndef _WIN32
-    pthread_mutex_t *mutex;
     pthread_cond_t cond;
 #else
-    HANDLE mutex;
     HANDLE th;  /* thread handle */
 #endif
     lua_State *L;
@@ -58,9 +57,7 @@ struct sys_thread {
 /* Main VM-Thread's data */
 struct sys_vmthread {
     struct sys_thread td;
-#ifndef _WIN32
-    pthread_mutex_t vmmutex;
-#endif
+    thread_critsect_t vmcs;
 };
 
 #define INVALID_TLS_INDEX	(thread_key_t) -1
@@ -114,21 +111,13 @@ sys_lua_tothread (struct sys_thread *td)
 void
 sys_vm2_enter (struct sys_thread *td)
 {
-#ifndef _WIN32
-    pthread_mutex_lock(td->mutex);
-#else
-    WaitForSingleObject(td->mutex, INFINITE);
-#endif
+    thread_critsect_enter(td->vmcsp);
 }
 
 void
 sys_vm2_leave (struct sys_thread *td)
 {
-#ifndef _WIN32
-    pthread_mutex_unlock(td->mutex);
-#else
-    ReleaseMutex(td->mutex);
-#endif
+    thread_critsect_leave(td->vmcsp);
 }
 
 void
@@ -142,7 +131,7 @@ sys_vm_enter (void)
     td = sys_get_thread();
     if (!td) return;
 
-    sys_vm2_enter(td);
+    thread_critsect_enter(td->vmcsp);
 
     if (td->killed) {
 	THREAD_FUNC_RES res = (THREAD_FUNC_RES) td->exit_status;
@@ -180,7 +169,7 @@ sys_vm_leave (void)
 	return;
 
     td = sys_get_thread();
-    if (td) sys_vm2_leave(td);
+    if (td) thread_critsect_leave(td->vmcsp);
 }
 
 int
@@ -306,15 +295,9 @@ sys_new_vmthread (lua_State *L)
     luaL_getmetatable(L, THREAD_TYPENAME);
     lua_setmetatable(L, -2);
 
-#ifndef _WIN32
-    if (thread_critsect_new(&vmtd->vmmutex))
+    if (thread_critsect_new(&vmtd->vmcs))
 	return NULL;
-    vmtd->td.mutex = &vmtd->vmmutex;
-#else
-    vmtd->td.mutex = CreateMutex(NULL, FALSE, NULL);
-    if (!vmtd->td.mutex)
-	return NULL;
-#endif
+    vmtd->td.vmcsp = &vmtd->vmcs;
 
     thread_settable(L, &vmtd->td);  /* save thread to avoid GC */
     return &vmtd->td;
@@ -334,7 +317,7 @@ sys_new_thread (struct sys_thread *vmtd, const int insert)
 
     td = lua_newuserdata(L, sizeof(struct sys_thread));
     memset(td, 0, sizeof(struct sys_thread));
-    td->mutex = vmtd->mutex;
+    td->vmcsp = vmtd->vmcsp;
     td->L = NL;
     td->vmtd = vmtd->vmtd;
     td->tid = sys_gettid();
@@ -373,20 +356,16 @@ thread_done (lua_State *L)
 {
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
 
-    if (td->mutex) {
+    if (td->vmcsp) {
 	if (thread_isvm(td)) {
-#ifndef _WIN32
-	    pthread_mutex_destroy(td->mutex);
-#else
-	    CloseHandle(td->mutex);
-#endif
+	    thread_critsect_del(td->vmcsp);
 	}
 #ifndef _WIN32
 	pthread_cond_destroy(&td->cond);
 #else
 	CloseHandle(td->th);
 #endif
-	td->mutex = NULL;
+	td->vmcsp = NULL;
     }
     return 0;
 }
@@ -791,7 +770,7 @@ thread_wait (lua_State *L)
     if (!td->killed) {
 	sys_vm_leave();
 #ifndef _WIN32
-	res = thread_cond_wait_impl(&td->cond, td->mutex, &td->killed, 0, timeout);
+	res = thread_cond_wait_impl(&td->cond, td->vmcsp, &td->killed, 0, timeout);
 #else
 	res = thread_cond_wait_impl(td->th, timeout);
 #endif
@@ -844,8 +823,8 @@ static luaL_Reg thread_lib[] = {
     {"self",		thread_self},
     {"sleep",		thread_sleep},
     {"yield",		thread_yield},
-    {"data_pool",	dpool_new},
-    {"pipe",		pipe_new},
+    DPOOL_METHODS,
+    PIPE_METHODS,
     {NULL, NULL}
 };
 
