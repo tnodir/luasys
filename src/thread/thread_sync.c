@@ -44,7 +44,8 @@ typedef struct {
 #ifndef _WIN32
     pthread_cond_t cond;
     thread_critsect_t cs;
-    short volatile signalled;
+#define THREAD_COND_SIGNALLED	1
+    unsigned int volatile signalled;
 #else
     HANDLE h;
 #endif
@@ -83,13 +84,16 @@ thread_cond_del (thread_cond_t *tcond)
 #ifndef _WIN32
 static int
 thread_cond_wait_impl (pthread_cond_t *condp, pthread_mutex_t *csp,
-                       volatile short *signalled, int reset, msec_t timeout)
+                       volatile unsigned int *signalled,
+                       const unsigned int test_value,
+                       const int reset, const msec_t timeout)
 {
     int res = 0;
 
     if (timeout == TIMEOUT_INFINITE) {
 	pthread_mutex_lock(csp);
-	while (!*signalled && !res) res = pthread_cond_wait(condp, csp);
+	while (*signalled != test_value && !res)
+	    res = pthread_cond_wait(condp, csp);
     } else {
 	struct timespec ts;
 	struct timeval tv;
@@ -137,7 +141,7 @@ thread_cond_wait (thread_cond_t *tcond, msec_t timeout)
     sys_vm_leave();
 #ifndef _WIN32
     res = thread_cond_wait_impl(&tcond->cond, &tcond->cs,
-     &tcond->signalled, 1, timeout);
+     &tcond->signalled, THREAD_COND_SIGNALLED, 1, timeout);
 #else
     res = thread_cond_wait_impl(tcond->h, timeout);
 #endif
@@ -146,7 +150,8 @@ thread_cond_wait (thread_cond_t *tcond, msec_t timeout)
 }
 
 #ifndef _WIN32
-#define thread_cond_signal_nolock(tcond)	((tcond)->signalled = -1, pthread_cond_signal(&(tcond)->cond))
+#define thread_cond_signal_nolock(tcond) \
+	((tcond)->signalled = THREAD_COND_SIGNALLED, pthread_cond_signal(&(tcond)->cond))
 #else
 #define thread_cond_signal_nolock(tcond)	(!SetEvent((tcond)->h))
 #endif
@@ -159,7 +164,7 @@ thread_cond_signal (thread_cond_t *tcond)
     int res;
 
     pthread_mutex_lock(csp);
-    tcond->signalled = -1;
+    tcond->signalled = THREAD_COND_SIGNALLED;
     res = pthread_cond_signal(&tcond->cond);
     pthread_mutex_unlock(csp);
 

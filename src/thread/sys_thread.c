@@ -50,8 +50,9 @@ struct sys_thread {
     struct sys_vmthread *vmtd;
     thread_id_t tid;
     lua_Integer exit_status;
-    short volatile interrupted;
-    short volatile killed;
+#define THREAD_KILLED		1
+#define THREAD_INTERRUPTED	2
+    unsigned int volatile state;
 };
 
 /* Main VM-Thread's data */
@@ -108,6 +109,40 @@ sys_lua_tothread (struct sys_thread *td)
 }
 
 
+/*
+ * Arguments: [status (number)]
+ */
+static THREAD_FUNC_RES
+thread_exit (struct sys_thread *td)
+{
+    THREAD_FUNC_RES res;
+
+    if (td->state != THREAD_KILLED) {
+	td->state = THREAD_KILLED;
+	td->exit_status = lua_tointeger(td->L, -1);
+    }
+    res = (THREAD_FUNC_RES) td->exit_status;
+
+    if (thread_isvm(td)) {
+	thread_critsect_del(td->vmcsp);
+	lua_close(td->L);
+    } else {
+	struct sys_thread *vmtd = thread_getvm(td);
+
+	sys_del_thread(td);  /* remove reference to self */
+#ifndef _WIN32
+	pthread_cond_broadcast(&td->cond);
+#endif
+	sys_vm2_leave(vmtd);
+    }
+#ifndef _WIN32
+    pthread_exit(res);
+#else
+    _endthreadex(res);
+#endif
+    return res;
+}
+
 void
 sys_vm2_enter (struct sys_thread *td)
 {
@@ -123,53 +158,30 @@ sys_vm2_leave (struct sys_thread *td)
 void
 sys_vm_enter (void)
 {
-    struct sys_thread *td;
+    if (g_TLSIndex != INVALID_TLS_INDEX) {
+	struct sys_thread *td = sys_get_thread();
 
-    if (g_TLSIndex == INVALID_TLS_INDEX)
-	return;
+	if (!td) return;
+	thread_critsect_enter(td->vmcsp);
 
-    td = sys_get_thread();
-    if (!td) return;
-
-    thread_critsect_enter(td->vmcsp);
-
-    if (td->killed) {
-	THREAD_FUNC_RES res = (THREAD_FUNC_RES) td->exit_status;
-
-	if (thread_isvm(td))
-	    lua_close(td->L);
-	else {
-#ifndef _WIN32
-	    pthread_cond_broadcast(&td->cond);
-#endif
-	    {
-		struct sys_thread *vmtd = thread_getvm(td);
-		sys_del_thread(td);
-		sys_vm2_leave(vmtd);
+	if (td->state) {
+	    if (td->state == THREAD_KILLED)
+		thread_exit(td);
+	    else /*if (td->state == THREAD_INTERRUPTED)*/ {
+		lua_pushlightuserdata(td->L, THREAD_KEY_ADDRESS);
+		lua_error(td->L);
 	    }
 	}
-#ifndef _WIN32
-	pthread_exit(res);
-#else
-	_endthreadex(res);
-#endif
-    }
-    else if (td->interrupted) {
-	lua_pushlightuserdata(td->L, THREAD_KEY_ADDRESS);
-	lua_error(td->L);
     }
 }
 
 void
 sys_vm_leave (void)
 {
-    struct sys_thread *td;
-
-    if (g_TLSIndex == INVALID_TLS_INDEX)
-	return;
-
-    td = sys_get_thread();
-    if (td) thread_critsect_leave(td->vmcsp);
+    if (g_TLSIndex != INVALID_TLS_INDEX) {
+	struct sys_thread *td = sys_get_thread();
+	if (td) thread_critsect_leave(td->vmcsp);
+    }
 }
 
 int
@@ -178,7 +190,7 @@ sys_isintr (void)
 #ifndef _WIN32
     if (SYS_ERRNO == EINTR) {
 	struct sys_thread *td = sys_get_thread();
-	return !(td && (td->interrupted || td->killed));
+	return !(td && td->state);
     }
 #endif
     return 0;
@@ -356,17 +368,13 @@ thread_done (lua_State *L)
 {
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
 
-    if (td->vmcsp) {
-	if (thread_isvm(td)) {
-	    thread_critsect_del(td->vmcsp);
-	}
 #ifndef _WIN32
-	pthread_cond_destroy(&td->cond);
+    pthread_cond_destroy(&td->cond);
+    memset(&td->cond, 0, sizeof(td->cond));
 #else
-	CloseHandle(td->th);
+    CloseHandle(td->th);
+    td->th = NULL;
 #endif
-	td->vmcsp = NULL;
-    }
     return 0;
 }
 
@@ -422,29 +430,20 @@ thread_abort (lua_State *L)
 }
 
 /*
- * Arguments: function,
- *	[arguments (string | number | boolean | lightuserdata) ...],
- *	thread, thread_udata
+ * Arguments: function, [arguments (any) ...]
  */
 static THREAD_FUNC_API
-thread_startvm (struct sys_thread *td)
+thread_start (struct sys_thread *td)
 {
     lua_State *L = td->L;
-    THREAD_FUNC_RES res;
 
     sys_set_thread(td);
     sys_vm2_enter(td);
 
     if (lua_pcall(L, lua_gettop(L) - 1, 1, 0))
 	thread_abort(L);
-    if (!td->killed) {
-	td->killed = -1;
-	td->exit_status = lua_tointeger(L, -1);
-    }
-    res = (THREAD_FUNC_RES) td->exit_status;
 
-    lua_close(L);
-    return res;
+    return thread_exit(td);
 }
 
 /*
@@ -520,12 +519,12 @@ thread_runvm (lua_State *L)
 	goto err_clean;
     }
 
-    res = pthread_create(&td->tid, &attr, (thread_func_t) thread_startvm, td);
+    res = pthread_create(&td->tid, &attr, (thread_func_t) thread_start, td);
     pthread_attr_destroy(&attr);
     if (!res) {
 #else
     hThr = _beginthreadex(NULL, 0,
-     (thread_func_t) thread_startvm, td, 0, &td->tid);
+     (thread_func_t) thread_start, td, 0, &td->tid);
     if (hThr) {
 	td->th = (HANDLE) hThr;
 #endif
@@ -538,37 +537,6 @@ thread_runvm (lua_State *L)
     lua_close(NL);
  err:
     return sys_seterror(L, res);
-}
-
-/*
- * Arguments: function, [arguments (any) ...]
- */
-static THREAD_FUNC_API
-thread_start (struct sys_thread *td)
-{
-    lua_State *L = td->L;
-    THREAD_FUNC_RES res;
-
-    sys_set_thread(td);
-    sys_vm2_enter(td);
-
-    if (lua_pcall(L, lua_gettop(L) - 1, 1, 0))
-	thread_abort(L);
-    if (!td->killed) {
-	td->killed = -1;
-	td->exit_status = lua_tointeger(L, -1);
-    }
-    res = (THREAD_FUNC_RES) td->exit_status;
-
-#ifndef _WIN32
-    pthread_cond_broadcast(&td->cond);
-#endif
-    {
-	struct sys_thread *vmtd = thread_getvm(td);
-	sys_del_thread(td);  /* remove reference to self */
-	sys_vm2_leave(vmtd);
-    }
-    return res;
 }
 
 /*
@@ -696,11 +664,11 @@ thread_kill (lua_State *L)
      : (lua_toboolean(L, 2) ? EXIT_SUCCESS : EXIT_FAILURE);
 
     td->exit_status = status;
-    td->killed = -1;
+    td->state = THREAD_KILLED;
 
-    if (td == sys_get_thread()) {
+    if (td == sys_get_thread())
 	thread_yield(L);
-    } else {
+    else {
 #ifndef _WIN32
 	pthread_kill(td->tid, SYS_SIGINTR);
 #else
@@ -720,15 +688,14 @@ thread_interrupt (lua_State *L)
     const int recover = lua_toboolean(L, 2);
 
     if (recover) {
-	td->interrupted = 0;
+	td->state &= ~THREAD_INTERRUPTED;
 	return 0;
     }
 
-    td->interrupted = -1;
-    if (td == sys_get_thread()) {
-	lua_pushlightuserdata(L, THREAD_KEY_ADDRESS);
-	lua_error(L);
-    } else {
+    td->state = THREAD_INTERRUPTED;
+    if (td == sys_get_thread())
+	thread_yield(L);
+    else {
 #ifndef _WIN32
 	pthread_kill(td->tid, SYS_SIGINTR);
 #else
@@ -749,7 +716,8 @@ thread_interrupted (lua_State *L)
     const void *err_obj = lua_isnoneornil(L, 2) ? THREAD_KEY_ADDRESS
      : lua_touserdata(L, 2);
 
-    lua_pushboolean(L, (td->interrupted && err_obj == THREAD_KEY_ADDRESS));
+    lua_pushboolean(L, (td->state == THREAD_INTERRUPTED
+     && err_obj == THREAD_KEY_ADDRESS));
     return 1;
 }
 
@@ -767,10 +735,11 @@ thread_wait (lua_State *L)
 
     if (thread_isvm(td)) luaL_argerror(L, 1, "non VM-thread expected");
 
-    if (!td->killed) {
+    if (td->state != THREAD_KILLED) {
 	sys_vm_leave();
 #ifndef _WIN32
-	res = thread_cond_wait_impl(&td->cond, td->vmcsp, &td->killed, 0, timeout);
+	res = thread_cond_wait_impl(&td->cond, td->vmcsp,
+	 &td->state, THREAD_KILLED, 0, timeout);
 #else
 	res = thread_cond_wait_impl(td->th, timeout);
 #endif
