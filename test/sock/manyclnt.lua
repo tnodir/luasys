@@ -19,6 +19,11 @@ local function ev_cb(evq, evid, fd, R)
 	assert(evq:mod_socket(evid, 'r'))
     else
 	local line = fd:read()
+	if not (line or askt[evid]) then
+	    evq:del(evid)
+	    fd:close()
+	    return
+	end
 	if line ~= s then
 	    error("got: " .. tostring(line)
 		.. " expected: " .. s)
@@ -27,10 +32,9 @@ local function ev_cb(evq, evid, fd, R)
 	iskt = iskt + 1
 	if nclnt - iskt < 1 then
 	    -- close all sockets
-	    for i = 1, nclnt do
-		evid = askt[i]
-		evq:del(evid)
-		fd:close()
+	    for evid, fd in pairs(askt) do
+		askt[evid] = nil
+		fd:shutdown()
 	    end
 	end
     end
@@ -51,7 +55,7 @@ for i = 1, nclnt do
     if not evid then
 	error(errorMessage)
     end
-    askt[i] = evid
+    askt[evid] = fd
 end
 
 
