@@ -9,12 +9,11 @@ thread.init()
 
 
 -- Pipe
-local main_pipe = thread.pipe()
 local work_pipe = thread.pipe()
 
 -- Consumer VM-Thread
 do
-    local function consume(work_pipe, main_pipe)
+    local function consume(work_pipe)
 	local sys = require"sys"
 	local thread = sys.thread
 
@@ -24,11 +23,9 @@ do
 	    print(i, s)
 	    thread.sleep(200)
 	end
-
-	main_pipe:put"end"
     end
 
-    assert(thread.runvm(string.dump(consume), work_pipe, main_pipe))
+    assert(thread.runvm(string.dump(consume), work_pipe))
 end
 
 -- Producer VM-Thread
@@ -47,4 +44,4 @@ do
 end
 
 -- Wait VM-Threads termination
-main_pipe:get()
+thread.self():wait()

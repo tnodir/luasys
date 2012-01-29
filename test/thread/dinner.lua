@@ -51,4 +51,4 @@ do
     end
 end
 
-sys.stdin:read()
+thread.self():wait()

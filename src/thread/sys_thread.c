@@ -47,7 +47,7 @@ struct sys_thread {
     HANDLE th;  /* thread handle */
 #endif
     lua_State *L;
-    struct sys_vmthread *vmtd;
+    struct sys_vmthread *vmtd, *vmref;
     thread_id_t tid;
     lua_Integer exit_status;
 #define THREAD_KILLED		1
@@ -59,6 +59,12 @@ struct sys_thread {
 struct sys_vmthread {
     struct sys_thread td;
     thread_critsect_t vmcs;
+#ifndef _WIN32
+    pthread_cond_t cond;
+#else
+    HANDLE evh;
+#endif
+    unsigned int volatile nref;
 };
 
 #define INVALID_TLS_INDEX	(thread_key_t) -1
@@ -109,6 +115,24 @@ sys_lua_tothread (struct sys_thread *td)
 }
 
 
+static int
+thread_wait_all (struct sys_vmthread *vmtd, msec_t timeout)
+{
+    int res = 0;
+
+    if (vmtd->nref) {
+	sys_vm2_leave(&vmtd->td);
+#ifndef _WIN32
+	res = thread_cond_wait_impl(&vmtd->cond, &vmtd->vmcs,
+	 &vmtd->nref, 0, 0, timeout);
+#else
+	res = thread_cond_wait_impl(vmtd->evh, timeout);
+#endif
+	sys_vm2_enter(&vmtd->td);
+    }
+    return res;
+}
+
 /*
  * Arguments: [status (number)]
  */
@@ -123,8 +147,25 @@ thread_exit (struct sys_thread *td)
     }
     res = (THREAD_FUNC_RES) td->exit_status;
 
+    /* decrease VM-thread's reference count */
+    if (td->vmref) {
+	struct sys_vmthread *vmref = td->vmref;
+
+	sys_vm2_leave(td);
+	sys_vm2_enter(&vmref->td);
+	if (!--vmref->nref) {
+#ifndef _WIN32
+	    pthread_cond_signal(&vmref->cond);
+#else
+	    SetEvent(vmref->evh);
+#endif
+	}
+	sys_vm2_leave(&vmref->td);
+	sys_vm2_enter(td);
+    }
+
     if (thread_isvm(td)) {
-	thread_critsect_del(td->vmcsp);
+	thread_wait_all(td->vmtd, TIMEOUT_INFINITE);
 	lua_close(td->L);
     } else {
 	struct sys_thread *vmtd = thread_getvm(td);
@@ -286,7 +327,7 @@ thread_settable (lua_State *L, struct sys_thread *td)
 }
 
 static struct sys_thread *
-sys_new_vmthread (lua_State *L)
+sys_new_vmthread (lua_State *L, struct sys_vmthread *vmref)
 {
     struct sys_vmthread *vmtd;
 
@@ -310,6 +351,18 @@ sys_new_vmthread (lua_State *L)
     if (thread_critsect_new(&vmtd->vmcs))
 	return NULL;
     vmtd->td.vmcsp = &vmtd->vmcs;
+
+    if (vmref) {
+	vmtd->td.vmref = vmref;
+	vmref->nref++;
+    }
+
+#ifndef _WIN32
+    if ((errno = pthread_cond_init(&vmtd->cond, NULL)))
+#else
+    if (!(vmtd->evh = CreateEvent(NULL, FALSE, FALSE, NULL)))  /* auto-reset */
+#endif
+	return NULL;
 
     thread_settable(L, &vmtd->td);  /* save thread to avoid GC */
     return &vmtd->td;
@@ -335,6 +388,9 @@ sys_new_thread (struct sys_thread *vmtd, const int insert)
     td->tid = sys_gettid();
     luaL_getmetatable(L, THREAD_TYPENAME);
     lua_setmetatable(L, -2);
+
+    td->vmref = vmtd->vmtd;
+    td->vmref->nref++;
 
 #ifndef _WIN32
     if ((errno = pthread_cond_init(&td->cond, NULL)))
@@ -368,13 +424,23 @@ thread_done (lua_State *L)
 {
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
 
+    if (td->L) {
+	td->L = NULL;
+
+	if (thread_isvm(td)) {
+	    thread_critsect_del(td->vmcsp);
 #ifndef _WIN32
-    pthread_cond_destroy(&td->cond);
-    memset(&td->cond, 0, sizeof(td->cond));
-#else
-    CloseHandle(td->th);
-    td->th = NULL;
+	    pthread_cond_destroy(&td->vmtd->cond);
 #endif
+	} else {
+#ifndef _WIN32
+	    pthread_cond_destroy(&td->cond);
+#endif
+	}
+#ifdef _WIN32
+	CloseHandle(td->th);
+#endif
+    }
     return 0;
 }
 
@@ -402,7 +468,7 @@ thread_init (lua_State *L)
     /* VM Mutex */
     td = sys_get_thread();
     if (!td) {
-	td = sys_new_vmthread(L);
+	td = sys_new_vmthread(L, NULL);
 	if (!td) goto err;
 
 	sys_set_thread(td);
@@ -466,7 +532,7 @@ thread_runvm (lua_State *L)
 
     if (!td) luaL_argerror(L, 0, "Threading not initialized");
 
-    td = sys_new_vmthread(NULL);
+    td = sys_new_vmthread(NULL, td->vmtd);
     if (!td) goto err;
     NL = td->L;
 
@@ -667,7 +733,7 @@ thread_kill (lua_State *L)
     td->state = THREAD_KILLED;
 
     if (td == sys_get_thread())
-	thread_yield(L);
+	thread_exit(td);
     else {
 #ifndef _WIN32
 	pthread_kill(td->tid, SYS_SIGINTR);
@@ -723,7 +789,7 @@ thread_interrupted (lua_State *L)
 
 /*
  * Arguments: thread_udata, [timeout (milliseconds)]
- * Returns: [status (number) | timeout (false)]
+ * Returns: [status (number) | timeout (false) | no_workers (true)]
  */
 static int
 thread_wait (lua_State *L)
@@ -731,11 +797,17 @@ thread_wait (lua_State *L)
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
     const msec_t timeout = lua_isnoneornil(L, 2)
      ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
-    int res = 0;
+    int res;
 
-    if (thread_isvm(td)) luaL_argerror(L, 1, "non VM-thread expected");
+    if (thread_isvm(td)) {
+	res = thread_wait_all(td->vmtd, timeout);
+	if (!res) {
+	    lua_pushboolean(L, 1);  /* no workers */
+	    return 1;
+	}
+    } else {
+	if (td->state == THREAD_KILLED) goto result;
 
-    if (td->state != THREAD_KILLED) {
 	sys_vm_leave();
 #ifndef _WIN32
 	res = thread_cond_wait_impl(&td->cond, td->vmcsp,
@@ -751,6 +823,7 @@ thread_wait (lua_State *L)
 	    lua_pushboolean(L, 0);
 	    return 1;  /* timed out */
 	}
+ result:
 	lua_pushinteger(L, td->exit_status);
 	return 1;
     }

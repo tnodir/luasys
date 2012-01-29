@@ -110,7 +110,8 @@ thread_cond_wait_impl (pthread_cond_t *condp, pthread_mutex_t *csp,
 	ts.tv_nsec = tv.tv_usec * 1000;
 
 	pthread_mutex_lock(csp);
-	while (!*signalled && !res) res = pthread_cond_timedwait(condp, csp, &ts);
+	while (*signalled != test_value && !res)
+	    res = pthread_cond_timedwait(condp, csp, &ts);
     }
     if (!res && reset) *signalled = 0;
     pthread_mutex_unlock(csp);
