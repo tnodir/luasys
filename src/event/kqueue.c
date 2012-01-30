@@ -63,7 +63,7 @@ kqueue_set (struct event_queue *evq, struct event *ev, int filter, int action)
     kev->ident = ev->fd;
     kev->filter = filter;
     kev->flags = action | ((ev->flags & EVENT_ONESHOT) ? EV_ONESHOT : 0);
-    kev->udata = (intptr_t) ev;
+    kev->udata = (void *) ev;
     return 0;
 }
 
@@ -113,7 +113,7 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
 	kev.filter = EVFILT_VNODE;
 	kev.flags = EV_ADD;
 	kev.fflags = filter;
-	kev.udata = (intptr_t) ev;
+	kev.udata = (void *) ev;
 
 	do res = kevent(evq->kqueue_fd, &kev, 1, NULL, 0, NULL);
 	while (res == -1 && errno == EINTR);
