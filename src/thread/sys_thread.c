@@ -11,10 +11,6 @@ typedef DWORD (WINAPI *thread_func_t) (void *);
 
 typedef DWORD 			thread_key_t;
 
-typedef BOOL (WINAPI *PCancelSyncIo) (HANDLE hThread);
-
-static PCancelSyncIo cancelsyncio;
-
 #else
 
 #define THREAD_FUNC_RES		void *
@@ -34,7 +30,8 @@ typedef pthread_key_t		thread_key_t;
 
 #define THREAD_XDUP_TAG		"xdup__"
 
-#define THREAD_STACK_SIZE	65536
+#define THREAD_STACK_SIZE	(64 * 1024)
+#define THREAD_VM_STACK_SIZE	(16 * 1024)
 
 struct sys_vmthread;
 
@@ -59,9 +56,7 @@ struct sys_thread {
 struct sys_vmthread {
     struct sys_thread td;
     thread_critsect_t vmcs;
-#ifndef _WIN32
-    pthread_cond_t cond;
-#else
+#ifdef _WIN32
     HANDLE evh;
 #endif
     unsigned int volatile nref;
@@ -116,14 +111,14 @@ sys_lua_tothread (struct sys_thread *td)
 
 
 static int
-thread_wait_all (struct sys_vmthread *vmtd, msec_t timeout)
+thread_waitvm (struct sys_vmthread *vmtd, msec_t timeout)
 {
     int res = 0;
 
     if (vmtd->nref) {
 	sys_vm2_leave(&vmtd->td);
 #ifndef _WIN32
-	res = thread_cond_wait_impl(&vmtd->cond, &vmtd->vmcs,
+	res = thread_cond_wait_impl(&vmtd->td.cond, &vmtd->vmcs,
 	 &vmtd->nref, 0, 0, timeout);
 #else
 	res = thread_cond_wait_impl(vmtd->evh, timeout);
@@ -139,6 +134,7 @@ thread_wait_all (struct sys_vmthread *vmtd, msec_t timeout)
 static THREAD_FUNC_RES
 thread_exit (struct sys_thread *td)
 {
+    struct sys_vmthread *vmref = td->vmref;
     THREAD_FUNC_RES res;
 
     if (td->state != THREAD_KILLED) {
@@ -147,35 +143,32 @@ thread_exit (struct sys_thread *td)
     }
     res = (THREAD_FUNC_RES) td->exit_status;
 
-    /* decrease VM-thread's reference count */
-    if (td->vmref) {
-	struct sys_vmthread *vmref = td->vmref;
+    if (thread_isvm(td)) {
+	thread_waitvm(td->vmtd, TIMEOUT_INFINITE);
+	lua_close(td->L);
+    } else {
+	struct sys_thread *vmtd = thread_getvm(td);
 
-	sys_vm2_leave(td);
+#ifndef _WIN32
+	pthread_cond_broadcast(&td->cond);
+#endif
+	sys_del_thread(td);  /* td is garbage from here */
+	sys_vm2_leave(vmtd);
+    }
+
+    /* decrease VM-thread's reference count */
+    if (vmref) {
 	sys_vm2_enter(&vmref->td);
 	if (!--vmref->nref) {
 #ifndef _WIN32
-	    pthread_cond_signal(&vmref->cond);
+	    pthread_cond_signal(&vmref->td.cond);
 #else
 	    SetEvent(vmref->evh);
 #endif
 	}
 	sys_vm2_leave(&vmref->td);
-	sys_vm2_enter(td);
     }
 
-    if (thread_isvm(td)) {
-	thread_wait_all(td->vmtd, TIMEOUT_INFINITE);
-	lua_close(td->L);
-    } else {
-	struct sys_thread *vmtd = thread_getvm(td);
-
-	sys_del_thread(td);  /* remove reference to self */
-#ifndef _WIN32
-	pthread_cond_broadcast(&td->cond);
-#endif
-	sys_vm2_leave(vmtd);
-    }
 #ifndef _WIN32
     pthread_exit(res);
 #else
@@ -358,7 +351,7 @@ sys_new_vmthread (lua_State *L, struct sys_vmthread *vmref)
     }
 
 #ifndef _WIN32
-    if ((errno = pthread_cond_init(&vmtd->cond, NULL)))
+    if ((errno = pthread_cond_init(&vmtd->td.cond, NULL)))
 #else
     if (!(vmtd->evh = CreateEvent(NULL, FALSE, FALSE, NULL)))  /* auto-reset */
 #endif
@@ -429,15 +422,13 @@ thread_done (lua_State *L)
 
 	if (thread_isvm(td)) {
 	    thread_critsect_del(td->vmcsp);
-#ifndef _WIN32
-	    pthread_cond_destroy(&td->vmtd->cond);
-#endif
-	} else {
-#ifndef _WIN32
-	    pthread_cond_destroy(&td->cond);
+#ifdef _WIN32
+	    CloseHandle(td->vmtd->evh);
 #endif
 	}
-#ifdef _WIN32
+#ifndef _WIN32
+	pthread_cond_destroy(&td->cond);
+#else
 	CloseHandle(td->th);
 #endif
     }
@@ -580,7 +571,8 @@ thread_runvm (lua_State *L)
 #ifndef _WIN32
     if ((res = pthread_attr_init(&attr)))
 	goto err_clean;
-    if ((res = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED))) {
+    if ((res = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED))
+     || (res = pthread_attr_setstacksize(&attr, THREAD_VM_STACK_SIZE))) {
 	pthread_attr_destroy(&attr);
 	goto err_clean;
     }
@@ -589,7 +581,7 @@ thread_runvm (lua_State *L)
     pthread_attr_destroy(&attr);
     if (!res) {
 #else
-    hThr = _beginthreadex(NULL, 0,
+    hThr = _beginthreadex(NULL, THREAD_VM_STACK_SIZE,
      (thread_func_t) thread_start, td, 0, &td->tid);
     if (hThr) {
 	td->th = (HANDLE) hThr;
@@ -738,7 +730,7 @@ thread_kill (lua_State *L)
 #ifndef _WIN32
 	pthread_kill(td->tid, SYS_SIGINTR);
 #else
-	if (cancelsyncio) cancelsyncio(td->th);
+	if (pCancelSynchronousIo) pCancelSynchronousIo(td->th);
 #endif
     }
     return 0;
@@ -765,7 +757,7 @@ thread_interrupt (lua_State *L)
 #ifndef _WIN32
 	pthread_kill(td->tid, SYS_SIGINTR);
 #else
-	if (cancelsyncio) cancelsyncio(td->th);
+	if (pCancelSynchronousIo) pCancelSynchronousIo(td->th);
 #endif
     }
     return 0;
@@ -800,7 +792,7 @@ thread_wait (lua_State *L)
     int res;
 
     if (thread_isvm(td)) {
-	res = thread_wait_all(td->vmtd, timeout);
+	res = thread_waitvm(td->vmtd, timeout);
 	if (!res) {
 	    lua_pushboolean(L, 1);  /* no workers */
 	    return 1;
@@ -903,13 +895,6 @@ thread_createmeta (lua_State *L)
     /* create threads table */
     lua_newtable(L);
     lua_rawsetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
-
-#ifdef _WIN32
-    if (is_WinNT) {
-	cancelsyncio = (PCancelSyncIo) GetProcAddress(
-	 GetModuleHandleA("kernel32.dll"), "CancelSynchronousIo");
-    }
-#endif
 }
 
 /*

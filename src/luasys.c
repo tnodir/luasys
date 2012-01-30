@@ -5,11 +5,7 @@
 #include <sys/stat.h>
 
 
-#ifdef _WIN32
-
-int is_WinNT;
-
-#else
+#ifndef _WIN32
 
 #include <sys/ioctl.h>
 #include <sys/wait.h>
@@ -288,26 +284,11 @@ luaopen_sys (lua_State *L)
     luaL_register(L, LUA_SYSLIBNAME, sys_lib);
     createmeta(L);
 
-#ifdef _WIN32
-#ifdef _WIN32_WCE
-    is_WinNT = 1;
-#else
-    /* Is Win32 NT platform? */
-    {
-	OSVERSIONINFO osvi;
-
-	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-	is_WinNT = (GetVersionEx(&osvi)
-	 && osvi.dwPlatformId == VER_PLATFORM_WIN32_NT);
-    }
-#endif
-    luaopen_sys_win32(L);
-#else
-    /* Ignore sigpipe or it will crash us */
-    signal_set(SIGPIPE, SIG_IGN);
-#endif
     signal_init();
 
+#ifdef _WIN32
+    luaopen_sys_win32(L);
+#endif
     luaopen_sys_mem(L);
     luaopen_sys_thread(L);
 

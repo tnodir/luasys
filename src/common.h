@@ -21,11 +21,11 @@
 #include <mmsystem.h>	/* timeGetTime */
 
 #if defined(_MSC_VER) || defined(__BORLANDC__)
-typedef DWORD		ssize_t;
+typedef SSIZE_T		ssize_t;
 #endif
 
 #ifndef ULONG_PTR
-#define ULONG_PTR	DWORD
+typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #endif
 
 #if (_WIN32_WINNT >= 0x0500)
@@ -36,8 +36,6 @@ typedef DWORD		ssize_t;
 
 #define SYS_ERRNO	GetLastError()
 #define SYS_EAGAIN(e)	((e) == WSAEWOULDBLOCK)
-
-extern int is_WinNT;
 
 #else
 
@@ -237,13 +235,47 @@ msec_t get_milliseconds (void);
 #define TIMEOUT_INFINITE	((msec_t) -1)
 
 
+#ifdef _WIN32
+
+/*
+ * Windows NT specifics
+ */
+
+#ifndef STATUS_CANCELLED
+#define STATUS_CANCELLED	((DWORD) 0xC0000120L)
+#endif
+
+#ifndef FILE_SKIP_SET_EVENT_ON_HANDLE
+typedef struct _OVERLAPPED_ENTRY {
+    ULONG_PTR lpCompletionKey;
+    LPOVERLAPPED lpOverlapped;
+    ULONG_PTR Internal;
+    DWORD dwNumberOfBytesTransferred;
+} OVERLAPPED_ENTRY, *LPOVERLAPPED_ENTRY;
+#endif
+
+typedef BOOL (WINAPI *PCancelSynchronousIo) (HANDLE hThread);
+
+typedef BOOL (WINAPI *PCancelIoEx) (HANDLE hThread, LPOVERLAPPED overlapped);
+
+typedef BOOL (WINAPI *PGetQueuedCompletionStatusEx) (HANDLE handle,
+	LPOVERLAPPED_ENTRY entries, ULONG count, PULONG n,
+	DWORD timeout, BOOL alertable);
+
+extern PCancelSynchronousIo pCancelSynchronousIo;
+extern PCancelIoEx pCancelIoEx;
+extern PGetQueuedCompletionStatusEx pGetQueuedCompletionStatusEx;
+
+extern int is_WinNT;
+
+
 /*
  * Convert Windows OS filenames to UTF-8
  */
 
-#ifdef _WIN32
 void *utf8_to_filename (const char *s);
 char *filename_to_utf8 (const void *s);
+
 #endif
 
 

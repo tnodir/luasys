@@ -65,6 +65,8 @@ signal_init (void)
 	pthread_mutex_init(&g_Signal.cs, &mattr);
 	pthread_mutexattr_destroy(&mattr);
     }
+    /* Ignore sigpipe or it will crash us */
+    signal_set(SIGPIPE, SIG_IGN);
     /* To interrupt blocking syscalls */
     signal_set(SYS_SIGINTR, signal_handler);
 }

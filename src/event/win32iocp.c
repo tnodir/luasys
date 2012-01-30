@@ -2,36 +2,6 @@
 
 #define NENTRY	64
 
-#ifndef STATUS_CANCELLED
-#define STATUS_CANCELLED	((DWORD) 0xC0000120L)
-#endif
-
-#ifndef FILE_SKIP_SET_EVENT_ON_HANDLE
-typedef struct _OVERLAPPED_ENTRY {
-    ULONG_PTR lpCompletionKey;
-    LPOVERLAPPED lpOverlapped;
-    ULONG_PTR Internal;
-    DWORD dwNumberOfBytesTransferred;
-} OVERLAPPED_ENTRY, *LPOVERLAPPED_ENTRY;
-#endif
-
-typedef BOOL (WINAPI *PGQCSEx) (HANDLE handle, LPOVERLAPPED_ENTRY entries,
-                                ULONG count, PULONG n, DWORD timeout, BOOL alertable);
-typedef BOOL (WINAPI *PCIOEx) (HANDLE handle, LPOVERLAPPED overlapped);
-
-static PGQCSEx gqcsex;
-static PCIOEx cancelioex;
-
-
-static void
-win32iocp_init (void)
-{
-    gqcsex = (PGQCSEx) GetProcAddress(
-     GetModuleHandleA("kernel32.dll"), "GetQueuedCompletionStatusEx");
-
-    cancelioex = (PCIOEx) GetProcAddress(
-     GetModuleHandleA("kernel32.dll"), "CancelIoEx");
-}
 
 static void
 win32iocp_done (struct event_queue *evq)
@@ -96,8 +66,9 @@ win32iocp_process (struct event_queue *evq, struct event *ev_ready, msec_t now)
 	BOOL status;
 	int cancelled = 0;
 
-	if (gqcsex) {
-	    if (!nentries && !gqcsex(iocph, entries, NENTRY, &nentries, 0L, FALSE))
+	if (pGetQueuedCompletionStatusEx) {
+	    if (!nentries
+	     && !pGetQueuedCompletionStatusEx(iocph, entries, NENTRY, &nentries, 0L, FALSE))
 		break;
 
 	    {
@@ -123,7 +94,7 @@ win32iocp_process (struct event_queue *evq, struct event *ev_ready, msec_t now)
 	}
 
 	if (!ov || !ev) {
-	    if (gqcsex) continue;
+	    if (pGetQueuedCompletionStatusEx) continue;
 	    break;  /* error */
 	}
 
@@ -165,18 +136,18 @@ win32iocp_process (struct event_queue *evq, struct event *ev_ready, msec_t now)
 static void
 win32iocp_cancel (struct event *ev, unsigned int rw_flags)
 {
-    if (!cancelioex) {
+    if (!pCancelIoEx) {
 	CancelIo(ev->fd);
 	rw_flags = (EVENT_READ | EVENT_WRITE);
     }
     if ((rw_flags & EVENT_READ) && ev->w.iocp.rov) {
-	if (cancelioex) cancelioex(ev->fd, (OVERLAPPED *) ev->w.iocp.rov);
+	if (pCancelIoEx) pCancelIoEx(ev->fd, (OVERLAPPED *) ev->w.iocp.rov);
 	ev->w.iocp.rov->u.ov.hEvent = NULL;
 	ev->w.iocp.rov = NULL;
 	ev->flags &= ~EVENT_RPENDING;
     }
     if ((rw_flags & EVENT_WRITE) && ev->w.iocp.wov) {
-	if (cancelioex) cancelioex(ev->fd, (OVERLAPPED *) ev->w.iocp.wov);
+	if (pCancelIoEx) pCancelIoEx(ev->fd, (OVERLAPPED *) ev->w.iocp.wov);
 	ev->w.iocp.wov->u.ov.hEvent = NULL;
 	ev->w.iocp.wov = NULL;
 	ev->flags &= ~EVENT_WPENDING;

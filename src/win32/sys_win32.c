@@ -1,5 +1,12 @@
 /* Lua System: Win32 specifics */
 
+static PCancelSynchronousIo pCancelSynchronousIo;
+static PCancelIoEx pCancelIoEx;
+static PGetQueuedCompletionStatusEx pGetQueuedCompletionStatusEx;
+
+int is_WinNT;
+
+
 /*
  * Arguments: fd_udata, path (string),
  *	[maximum_message_size (number), timeout (milliseconds)]
@@ -114,12 +121,42 @@ static luaL_Reg win32_lib[] = {
 };
 
 
+static void
+win32_init (void)
+{
+#ifdef _WIN32_WCE
+    is_WinNT = 1;
+#else
+    /* Is Win32 NT platform? */
+    {
+	OSVERSIONINFO osvi;
+
+	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+	is_WinNT = (GetVersionEx(&osvi)
+	 && osvi.dwPlatformId == VER_PLATFORM_WIN32_NT);
+    }
+#endif
+
+    if (is_WinNT) {
+	HANDLE mh = GetModuleHandleA("kernel32.dll");
+
+	pCancelSynchronousIo = (PCancelSynchronousIo) GetProcAddress(mh,
+	 "CancelSynchronousIo");
+	pCancelIoEx = (PCancelIoEx) GetProcAddress(mh,
+	 "CancelIoEx");
+	pGetQueuedCompletionStatusEx = (PGetQueuedCompletionStatusEx) GetProcAddress(mh,
+	 "GetQueuedCompletionStatusEx");
+    }
+}
+
 /*
  * Arguments: ..., sys_lib (table)
  */
 static void
 luaopen_sys_win32 (lua_State *L)
 {
+    win32_init();
+
     luaL_newlib(L, win32_lib);
     lua_pushvalue(L, -1);  /* push win32_lib */
     lua_setfield(L, -3, "win32");

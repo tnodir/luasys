@@ -29,7 +29,6 @@ evq_init (struct event_queue *evq)
 
     if (is_WinNT) {
 	evq->iocp.h = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
-	win32iocp_init();
     }
 
     evq->now = get_milliseconds();
