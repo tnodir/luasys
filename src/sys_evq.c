@@ -577,6 +577,8 @@ levq_timeout_manual (lua_State *L)
 
 /*
  * Arguments: evq_udata, [timeout (milliseconds), once (boolean), fetch (boolean)]
+ * Returns: [evq_udata | timeout (false)]
+ *	|
  * Returns: [callback (function), evq_udata, ev_ludata, obj_udata,
  *	read (boolean), write (boolean), timeout (number), eof_status (number)]
  */
@@ -703,7 +705,9 @@ levq_loop (lua_State *L)
 
 	if (once) break;
     }
-    return 0;
+
+    lua_settop(L, 1);
+    return 1;
 }
 
 /*
