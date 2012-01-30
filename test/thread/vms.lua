@@ -7,6 +7,7 @@ local thread = sys.thread
 
 thread.init()
 
+assert(thread.self():wait())
 
 -- Pipe
 local work_pipe = thread.pipe()
@@ -44,4 +45,4 @@ do
 end
 
 -- Wait VM-Threads termination
-thread.self():wait()
+assert(thread.self():wait())

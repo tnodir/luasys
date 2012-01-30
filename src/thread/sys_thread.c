@@ -31,7 +31,6 @@ typedef pthread_key_t		thread_key_t;
 #define THREAD_XDUP_TAG		"xdup__"
 
 #define THREAD_STACK_SIZE	(64 * 1024)
-#define THREAD_VM_STACK_SIZE	(16 * 1024)
 
 struct sys_vmthread;
 
@@ -341,14 +340,14 @@ sys_new_vmthread (lua_State *L, struct sys_vmthread *vmref)
     luaL_getmetatable(L, THREAD_TYPENAME);
     lua_setmetatable(L, -2);
 
-    if (thread_critsect_new(&vmtd->vmcs))
-	return NULL;
-    vmtd->td.vmcsp = &vmtd->vmcs;
-
     if (vmref) {
 	vmtd->td.vmref = vmref;
 	vmref->nref++;
     }
+
+    if (thread_critsect_new(&vmtd->vmcs))
+	return NULL;
+    vmtd->td.vmcsp = &vmtd->vmcs;
 
 #ifndef _WIN32
     if ((errno = pthread_cond_init(&vmtd->td.cond, NULL)))
@@ -572,7 +571,7 @@ thread_runvm (lua_State *L)
     if ((res = pthread_attr_init(&attr)))
 	goto err_clean;
     if ((res = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED))
-     || (res = pthread_attr_setstacksize(&attr, THREAD_VM_STACK_SIZE))) {
+     || (res = pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE))) {
 	pthread_attr_destroy(&attr);
 	goto err_clean;
     }
@@ -581,7 +580,7 @@ thread_runvm (lua_State *L)
     pthread_attr_destroy(&attr);
     if (!res) {
 #else
-    hThr = _beginthreadex(NULL, THREAD_VM_STACK_SIZE,
+    hThr = _beginthreadex(NULL, THREAD_STACK_SIZE,
      (thread_func_t) thread_start, td, 0, &td->tid);
     if (hThr) {
 	td->th = (HANDLE) hThr;

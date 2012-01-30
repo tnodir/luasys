@@ -53,5 +53,5 @@ do
 end
 
 -- Wait threads termination
-consumer:wait()
-producer:wait()
+assert(consumer:wait())
+assert(producer:wait())

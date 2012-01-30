@@ -51,4 +51,4 @@ do
     end
 end
 
-thread.self():wait()
+assert(thread.self():wait())
