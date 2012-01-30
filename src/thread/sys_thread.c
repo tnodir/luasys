@@ -59,6 +59,8 @@ struct sys_vmthread {
     HANDLE evh;
 #endif
     unsigned int volatile nref;
+    int cpu;  /* bind VM-thread and it's workers to processor */
+    size_t stack_size;  /* for new threads */
 };
 
 #define INVALID_TLS_INDEX	(thread_key_t) -1
@@ -72,6 +74,8 @@ static thread_key_t g_TLSIndex = INVALID_TLS_INDEX;
 #define thread_isvm(td)		((td) == thread_getvm(td))
 
 static void thread_createmeta (lua_State *L);
+
+static int thread_affin_run (struct sys_thread *td, int cpu);
 
 
 void
@@ -341,8 +345,9 @@ sys_new_vmthread (lua_State *L, struct sys_vmthread *vmref)
     lua_setmetatable(L, -2);
 
     if (vmref) {
-	vmtd->td.vmref = vmref;
 	vmref->nref++;
+	vmtd->td.vmref = vmref;
+	vmtd->stack_size = vmref->stack_size;
     }
 
     if (thread_critsect_new(&vmtd->vmcs))
@@ -435,11 +440,13 @@ thread_done (lua_State *L)
 }
 
 /*
+ * Arguments: [stack_size (number)]
  * Returns: [boolean]
  */
 static int
 thread_init (lua_State *L)
 {
+    const size_t stack_size = luaL_optinteger(L, 1, THREAD_STACK_SIZE);
     struct sys_thread *td;
 
     /* TLS Index */
@@ -464,6 +471,8 @@ thread_init (lua_State *L)
 	sys_set_thread(td);
 	sys_vm2_enter(td);
     }
+    td->vmtd->stack_size = stack_size;
+
     lua_pushboolean(L, 1);
     return 1;
  err:
@@ -503,27 +512,27 @@ thread_start (struct sys_thread *td)
 }
 
 /*
- * Arguments: filename (string) | function_dump (string),
+ * Arguments: [bind_cpu (number)], filename (string) | function_dump (string),
  *	[arguments (string | number | boolean | lightuserdata | share_object) ...]
  * Returns: [boolean]
  */
 static int
 thread_runvm (lua_State *L)
 {
-    const char *path = luaL_checkstring(L, 1);
+    const int is_affin = (lua_type(L, 1) == LUA_TNUMBER);
+    const int cpu = is_affin ? lua_tointeger(L, 1) : 0;
+    const char *path = luaL_checkstring(L, is_affin ? 2 : 1);
     struct sys_thread *td = sys_get_thread();
     lua_State *NL;
-#ifndef _WIN32
-    pthread_attr_t attr;
-#else
-    unsigned long hThr;
-#endif
-    int res = 0;
 
     if (!td) luaL_argerror(L, 0, "Threading not initialized");
 
+    if (is_affin) lua_remove(L, 1);
+
     td = sys_new_vmthread(NULL, td->vmtd);
     if (!td) goto err;
+
+    td->vmtd->cpu = cpu;
     NL = td->L;
 
     if (path[0] == LUA_SIGNATURE[0]
@@ -567,33 +576,13 @@ thread_runvm (lua_State *L)
 	}
     }
 
-#ifndef _WIN32
-    if ((res = pthread_attr_init(&attr)))
-	goto err_clean;
-    if ((res = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED))
-     || (res = pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE))) {
-	pthread_attr_destroy(&attr);
-	goto err_clean;
-    }
-
-    res = pthread_create(&td->tid, &attr, (thread_func_t) thread_start, td);
-    pthread_attr_destroy(&attr);
-    if (!res) {
-#else
-    hThr = _beginthreadex(NULL, THREAD_STACK_SIZE,
-     (thread_func_t) thread_start, td, 0, &td->tid);
-    if (hThr) {
-	td->th = (HANDLE) hThr;
-#endif
+    if (!thread_affin_run(td, cpu)) {
 	lua_pushboolean(L, 1);
 	return 1;
     }
-#ifndef _WIN32
- err_clean:
-#endif
     lua_close(NL);
  err:
-    return sys_seterror(L, res);
+    return sys_seterror(L, 0);
 }
 
 /*
@@ -604,13 +593,6 @@ static int
 thread_run (lua_State *L)
 {
     struct sys_thread *td, *vmtd = sys_get_thread();
-#ifndef _WIN32
-    pthread_attr_t attr;
-    int res = 0;
-#else
-    unsigned long hThr;
-    const int res = 0;
-#endif
 
     if (!vmtd) luaL_argerror(L, 0, "Threading not initialized");
     luaL_checktype(L, 1, LUA_TFUNCTION);
@@ -618,33 +600,13 @@ thread_run (lua_State *L)
     td = sys_new_thread(vmtd, 1);
     if (!td->L) goto err;
 
-#ifndef _WIN32
-    if ((res = pthread_attr_init(&attr)))
-	goto err_clean;
-    if ((res = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED))
-     || (res = pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE))) {
-	pthread_attr_destroy(&attr);
-	goto err_clean;
-    }
-
-    res = pthread_create(&td->tid, &attr, (thread_func_t) thread_start, td);
-    pthread_attr_destroy(&attr);
-    if (!res) {
-#else
-    hThr = _beginthreadex(NULL, THREAD_STACK_SIZE,
-     (thread_func_t) thread_start, td, 0, &td->tid);
-    if (hThr) {
-	td->th = (HANDLE) hThr;
-#endif
+    if (!thread_affin_run(td, 0)) {
 	lua_xmove(L, td->L, lua_gettop(L) - 1);  /* move function and args to new thread */
 	return 1;
     }
-#ifndef _WIN32
- err_clean:
-#endif
     sys_del_thread(td);
  err:
-    return sys_seterror(L, res);
+    return sys_seterror(L, 0);
 }
 
 /*
@@ -835,6 +797,7 @@ thread_tostring (lua_State *L)
 }
 
 
+#include "thread_affin.c"
 #include "thread_dpool.c"
 #include "thread_pipe.c"
 
@@ -856,6 +819,7 @@ static luaL_Reg thread_lib[] = {
     {"self",		thread_self},
     {"sleep",		thread_sleep},
     {"yield",		thread_yield},
+    AFFIN_METHODS,
     DPOOL_METHODS,
     PIPE_METHODS,
     {NULL, NULL}

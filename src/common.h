@@ -1,6 +1,8 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#define _GNU_SOURCE	/* pthread_*affinity_np */
+
 #define _FILE_OFFSET_BITS  64
 
 #include <sys/types.h>

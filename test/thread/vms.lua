@@ -7,7 +7,6 @@ local thread = sys.thread
 
 thread.init()
 
-assert(thread.self():wait())
 
 -- Pipe
 local work_pipe = thread.pipe()
@@ -26,7 +25,7 @@ do
 	end
     end
 
-    assert(thread.runvm(string.dump(consume), work_pipe))
+    assert(thread.runvm(1, string.dump(consume), work_pipe))
 end
 
 -- Producer VM-Thread
@@ -41,7 +40,7 @@ do
 	end
     end
 
-    assert(thread.runvm(string.dump(produce), work_pipe))
+    assert(thread.runvm(2, string.dump(produce), work_pipe))
 end
 
 -- Wait VM-Threads termination
