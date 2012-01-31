@@ -162,6 +162,8 @@ evq_del (struct event *ev, int reuse_fd)
     struct win32thr *wth = ev->wth;
     const unsigned int ev_flags = ev->flags;
 
+    (void) reuse_fd;
+
     if (ev_flags & (EVENT_TIMER | EVENT_AIO | EVENT_SIGNAL | EVENT_WINMSG)) {
 	struct event_queue *evq = wth->evq;
 

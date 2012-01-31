@@ -1,8 +1,8 @@
 /* Lua System: Win32 specifics */
 
-static PCancelSynchronousIo pCancelSynchronousIo;
-static PCancelIoEx pCancelIoEx;
-static PGetQueuedCompletionStatusEx pGetQueuedCompletionStatusEx;
+PCancelSynchronousIo pCancelSynchronousIo;
+PCancelIoEx pCancelIoEx;
+PGetQueuedCompletionStatusEx pGetQueuedCompletionStatusEx;
 
 int is_WinNT;
 

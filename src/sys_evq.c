@@ -70,7 +70,7 @@ static int
 levq_done (lua_State *L)
 {
     struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
-    struct event *buffers[EVQ_BUF_MAX - EVQ_BUF_IDX + 1];  /* cache */
+    struct event *buffers[EVQ_BUF_MAX + 1];  /* cache */
 
     memset(buffers, 0, sizeof(buffers));
 

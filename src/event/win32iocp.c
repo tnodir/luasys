@@ -7,10 +7,10 @@ static void
 win32iocp_done (struct event_queue *evq)
 {
     struct win32overlapped **ovp = evq->ov_buffers;
-    int i;
+    unsigned int i;
 
-    for (i = 0; *ovp && i < sizeof(evq->ov_buffers); ++i) {
-	free(*ovp);
+    for (i = 0; *ovp && i < sizeof(evq->ov_buffers) / sizeof(void *); ++i) {
+	free(*ovp++);
     }
 }
 
@@ -23,8 +23,8 @@ win32iocp_new_overlapped (struct event_queue *evq)
 	evq->ov_free = ov->u.next_free;
     } else {
 	const int n = evq->ov_buf_nevents;
-	const int buf_idx = evq->ov_buf_index + EVQ_BUF_IDX;
-	const int nmax = (1 << buf_idx);
+	const int buf_idx = evq->ov_buf_index;
+	const int nmax = (1 << (buf_idx + EVQ_BUF_IDX));
 
 	ov = evq->ov_buffers[buf_idx];
 	if (ov) {
@@ -34,7 +34,7 @@ win32iocp_new_overlapped (struct event_queue *evq)
 		evq->ov_buf_index++;
 	    }
 	} else {
-	    if (buf_idx > EVQ_BUF_MAX
+	    if (buf_idx > EVQ_BUF_MAX - EVQ_BUF_IDX
 	     || !(ov = malloc(nmax * sizeof(struct win32overlapped))))
 		return NULL;
 	    evq->ov_buffers[buf_idx] = ov;

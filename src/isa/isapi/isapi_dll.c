@@ -239,16 +239,16 @@ HttpExtensionProc (LPEXTENSION_CONTROL_BLOCK ecb)
 	lua_rawsetp(L, LUA_REGISTRYINDEX, ecb);
     }
     if (status) {
-	char *s;
+	const char *s;
 	size_t len;
 
 	lua_pushliteral(L, "\n\n<pre>");
 	lua_insert(L, -2);
 	lua_concat(L, 2);
-	s = (char *) lua_tolstring(L, -1, &len);
+	s = lua_tolstring(L, -1, &len);
 
 	ecb->dwHttpStatusCode = 500;
-	ecb->WriteClient(ecb->ConnID, s, (DWORD *) &len, 0);
+	ecb->WriteClient(ecb->ConnID, (char *) s, (DWORD *) &len, 0);
 	lua_pop(L, 1);
     }
 

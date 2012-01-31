@@ -1,6 +1,8 @@
 /* Lua System: Threading: CPU Affinity */
 
-#if defined(__linux__)
+#if !defined(_WIN32) && defined(CPU_SET)
+
+#define USE_PTHREAD_AFFIN
 
 typedef cpu_set_t	affin_mask_t;
 
@@ -19,7 +21,8 @@ typedef size_t		affin_mask_t;
 static int
 getcpucount (affin_mask_t *mp)
 {
-    int i, n = 0;
+    int n = 0;
+    unsigned int i;
 
     for (i = 0; i < CPU_SETSIZE; ++i) {
 	if (CPU_ISSET(i, mp)) ++n;
@@ -30,7 +33,7 @@ getcpucount (affin_mask_t *mp)
 static void
 getcpumask (affin_mask_t *out, affin_mask_t *mp, int cpu)
 {
-    int i;
+    unsigned int i;
 
     CPU_ZERO(out);
     for (i = 0; i < CPU_SETSIZE; ++i) {
@@ -43,7 +46,7 @@ getcpumask (affin_mask_t *out, affin_mask_t *mp, int cpu)
 static int
 thread_affin_get_mask (affin_mask_t *mp)
 {
-#if defined(__linux__)
+#if defined(USE_PTHREAD_AFFIN)
     return sched_getaffinity(getpid(), sizeof(affin_mask_t), mp);
 #elif defined(_WIN32)
     const HANDLE hProc = GetCurrentProcess();
@@ -65,19 +68,22 @@ thread_affin_set_cpu (struct sys_thread *td, int cpu)
     affin_mask_t proc_mask, thread_mask;
 
     if (!thread_affin_get_mask(&proc_mask)) {
-	getcpumask(&thread_mask, &proc_mask, cpu);
+	affin_mask_t *mp = &thread_mask;
 
-#if defined(__linux__)
-	return pthread_setaffinity_np(td->tid, sizeof(affin_mask_t), &thread_mask);
+	if (cpu) getcpumask(mp, &proc_mask, cpu);
+	else mp = &proc_mask;
+
+#if defined(USE_PTHREAD_AFFIN)
+	return pthread_setaffinity_np(td->tid, sizeof(affin_mask_t), mp);
 #elif defined(_WIN32)
-	return (SetThreadAffinityMask(td->th, thread_mask) > 0) ? 0 : -1;
+	return (SetThreadAffinityMask(td->th, *mp) > 0) ? 0 : -1;
 #endif
     }
     return -1;
 }
 
 static int
-thread_affin_run (struct sys_thread *td, int cpu)
+thread_affin_run (struct sys_thread *td, const int is_affin)
 {
 #ifndef _WIN32
     pthread_attr_t attr;
@@ -94,22 +100,24 @@ thread_affin_run (struct sys_thread *td, int cpu)
     res = pthread_create(&td->tid, &attr, (thread_func_t) thread_start, td);
     pthread_attr_destroy(&attr);
     if (!res) {
-#if defined(__linux__)
-	if (cpu) thread_affin_set_cpu(td, cpu);
+#if defined(USE_PTHREAD_AFFIN)
+	if (is_affin)
+	    thread_affin_set_cpu(td, td->vmtd->cpu);
 #endif
 	return 0;
     }
  err:
     errno = res;
 #else
-    const HANDLE hThr = (HANDLE) _beginthreadex(NULL, td->vmtd->stack_size,
-     (thread_func_t) thread_start, td, 0, &td->tid);
+    const unsigned long hThr = _beginthreadex(NULL, td->vmtd->stack_size,
+     (thread_func_t) thread_start, td, 0, (unsigned int *) &td->tid);
+
+    (void) is_affin;
 
     if (hThr) {
-	td->th = hThr;
-	cpu = td->vmtd->cpu;
-	if (cpu && is_WinNT)
-	    thread_affin_set_cpu(td, cpu);
+	td->th = (HANDLE) hThr;
+	if (is_WinNT && td->vmtd->cpu)
+	    thread_affin_set_cpu(td, td->vmtd->cpu);
 	return 0;
     }
 #endif
@@ -123,9 +131,12 @@ static int
 thread_affin_nprocs (lua_State *L)
 {
     affin_mask_t mask;
+    int n = 0;
 
-    thread_affin_get_mask(&mask);
-    lua_pushinteger(L, getcpucount(&mask));
+    if (!thread_affin_get_mask(&mask)) {
+	n = getcpucount(&mask);
+    }
+    lua_pushinteger(L, n);
     return 1;
 }
 

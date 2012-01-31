@@ -4,10 +4,10 @@
 
 #include <process.h>
 
-#define THREAD_FUNC_RES		DWORD
+#define THREAD_FUNC_RES		unsigned int
 #define THREAD_FUNC_API		THREAD_FUNC_RES WINAPI
 
-typedef DWORD (WINAPI *thread_func_t) (void *);
+typedef unsigned int (WINAPI *thread_func_t) (void *);
 
 typedef DWORD 			thread_key_t;
 
@@ -59,7 +59,7 @@ struct sys_vmthread {
     HANDLE evh;
 #endif
     unsigned int volatile nref;
-    int cpu;  /* bind VM-thread and it's workers to processor */
+    int cpu;  /* bind to processor (inherited by sub-threads) */
     size_t stack_size;  /* for new threads */
 };
 
@@ -75,7 +75,7 @@ static thread_key_t g_TLSIndex = INVALID_TLS_INDEX;
 
 static void thread_createmeta (lua_State *L);
 
-static int thread_affin_run (struct sys_thread *td, int cpu);
+static int thread_affin_run (struct sys_thread *td, const int is_affin);
 
 
 void
@@ -347,6 +347,7 @@ sys_new_vmthread (lua_State *L, struct sys_vmthread *vmref)
     if (vmref) {
 	vmref->nref++;
 	vmtd->td.vmref = vmref;
+	vmtd->cpu = vmref->cpu;
 	vmtd->stack_size = vmref->stack_size;
     }
 
@@ -527,12 +528,13 @@ thread_runvm (lua_State *L)
 
     if (!td) luaL_argerror(L, 0, "Threading not initialized");
 
-    if (is_affin) lua_remove(L, 1);
-
     td = sys_new_vmthread(NULL, td->vmtd);
     if (!td) goto err;
 
-    td->vmtd->cpu = cpu;
+    if (is_affin) {
+	lua_remove(L, 1);
+	td->vmtd->cpu = cpu;
+    }
     NL = td->L;
 
     if (path[0] == LUA_SIGNATURE[0]
@@ -576,7 +578,7 @@ thread_runvm (lua_State *L)
 	}
     }
 
-    if (!thread_affin_run(td, cpu)) {
+    if (!thread_affin_run(td, is_affin)) {
 	lua_pushboolean(L, 1);
 	return 1;
     }

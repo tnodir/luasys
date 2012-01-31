@@ -2,6 +2,8 @@
 
 #define WSVC_TYPENAME	"sys.win32.service"
 
+typedef DWORD (WINAPI *svc_func_t) (void *);
+
 
 /*
  * Arguments: name (string), filename (string), [manual_start (boolean)]
@@ -138,9 +140,13 @@ svc_main (DWORD argc, char *argv[])
 }
 
 static DWORD WINAPI
-svc_start (void *name)
+svc_start (const char *svc_name)
 {
+    char name[128];
     SERVICE_TABLE_ENTRY table[] = {{NULL, NULL}, {NULL, NULL}};
+
+    strncpy(name, svc_name, sizeof(name));
+    name[sizeof(name) - 1] = '\0';
 
     table[0].lpServiceName = name;
     table[0].lpServiceProc = svc_main;
@@ -155,7 +161,7 @@ svc_start (void *name)
 static int
 svc_handle (lua_State *L)
 {
-    char *svc_name = (char *) luaL_checkstring(L, 1);
+    const char *svc_name = luaL_checkstring(L, 1);
     const int accept_pause_cont = lua_toboolean(L, 2);
     HANDLE hThr;
     DWORD id;
@@ -174,7 +180,8 @@ svc_handle (lua_State *L)
 	g_Service.accept_pause_cont = accept_pause_cont;
     }
 
-    hThr = CreateThread(NULL, 4096, svc_start, svc_name, 0, &id);
+    hThr = CreateThread(NULL, 4096, (svc_func_t) svc_start,
+     (void *) svc_name, 0, &id);
     if (hThr != NULL) {
 	CloseHandle(hThr);
 

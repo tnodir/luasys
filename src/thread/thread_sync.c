@@ -125,6 +125,7 @@ thread_cond_wait_impl (pthread_cond_t *condp, pthread_mutex_t *csp,
     return 0;
 }
 #else
+static int
 thread_cond_wait_impl (HANDLE h, msec_t timeout)
 {
     const int res = WaitForSingleObject(h, timeout);
