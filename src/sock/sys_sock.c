@@ -552,8 +552,9 @@ sock_recv (lua_State *L)
 
 #ifdef _WIN32
 
-#define SYS_HAVE_SENDFILE
+#define USE_SENDFILE
 
+#define SENDFILE_MAX	(16 * 1024 * 1024)
 #define SYS_GRAN_MASK	(64 * 1024 - 1)
 
 static DWORD
@@ -573,12 +574,14 @@ TransmitFileMap (SOCKET sd, HANDLE fd, DWORD n)
 	    DWORD len;
 
 	    off_lo = SetFilePointer(fd, 0, &off_hi, SEEK_CUR);
+	    size_lo = (off_lo & SYS_GRAN_MASK);
 	    size = INT64_MAKE(size_lo, size_hi) - INT64_MAKE(off_lo, off_hi);
-	    len = (size < (int64_t) ~((DWORD) 0))
-	     ? (DWORD) size : ~((DWORD) 0);
+
+	    len = (size < (int64_t) ~((DWORD) 0)) ? (DWORD) size : ~((DWORD) 0);
 
 	    if (n <= 0 || n > len) n = len;
-	    size_lo = (off_lo & SYS_GRAN_MASK);
+	    if (n > SENDFILE_MAX) n = SENDFILE_MAX;
+
 	    base = MapViewOfFile(hmap, FILE_MAP_READ,
 	     off_hi, (off_lo & ~SYS_GRAN_MASK), 0);
 	}
@@ -603,12 +606,12 @@ TransmitFileMap (SOCKET sd, HANDLE fd, DWORD n)
 #elif defined(__linux__) || defined(__FreeBSD__) \
      || (defined(__APPLE__) && defined(__MACH__))
 
-#define SYS_HAVE_SENDFILE
+#define USE_SENDFILE
 
 #endif
 
 
-#ifdef SYS_HAVE_SENDFILE
+#ifdef USE_SENDFILE
 
 /*
  * Arguments: sd_udata, fd_udata, [count (number)]
@@ -793,7 +796,7 @@ static luaL_Reg sock_meth[] = {
     {"connect",		sock_connect},
     {"send",		sock_send},
     {"recv",		sock_recv},
-#ifdef SYS_HAVE_SENDFILE
+#ifdef USE_SENDFILE
     {"sendfile",	sock_sendfile},
 #endif
     {"write",		sock_write},
