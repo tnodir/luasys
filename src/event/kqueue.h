@@ -19,4 +19,10 @@
     unsigned int nchanges;						\
     struct kevent kev_list[NEVENT];
 
+#if defined (__NetBSD__)
+typedef intptr_t	kev_udata_t;
+#else
+typedef void *		kev_udata_t;
+#endif
+
 #endif
