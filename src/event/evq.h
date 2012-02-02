@@ -86,8 +86,6 @@ struct event_queue {
     int buf_nevents;  /* number of used events of current buffer */
     int buf_index;  /* environ. index of current buffer */
 
-    thread_id_t tid;  /* to make asynch. changes */
-
     msec_t now; /* current cached time */
 
     struct event * volatile ev_ready;  /* head of ready events */

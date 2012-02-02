@@ -47,8 +47,6 @@ levq_new (lua_State *L)
     lua_assert(sizeof(struct event) >= sizeof(struct timeout_queue));
 
     if (!evq_init(evq)) {
-	evq->tid = sys_gettid();
-
 	luaL_getmetatable(L, EVQ_TYPENAME);
 	lua_setmetatable(L, -2);
 
@@ -593,8 +591,6 @@ levq_loop (lua_State *L)
 
 #undef ARG_LAST
 #define ARG_LAST	1
-
-    lua_assert(pthread_equal(evq->tid, sys_gettid()));
 
     lua_settop(L, ARG_LAST);
     lua_getfenv(L, 1);

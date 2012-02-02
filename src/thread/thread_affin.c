@@ -1,16 +1,36 @@
 /* Lua System: Threading: CPU Affinity */
 
-#if !defined(_WIN32) && defined(CPU_SET)
-
-#define USE_PTHREAD_AFFIN
+#if defined(__linux__)
 
 typedef cpu_set_t	affin_mask_t;
 
-#else
+#define USE_PTHREAD_AFFIN
+
+#define CPU_NEW()	CPU_ALLOC(CPU_SETSIZE)
+#define CPU_DEL(p)	CPU_FREE(p)
+#define CPU_SIZEOF(p)	sizeof(affin_mask_t)
+#define CPU_COUNTMAX(p)	CPU_SETSIZE
+
+#elif defined(BSD)
+
+typedef cpuset_t	affin_mask_t;
+
+#define USE_PTHREAD_AFFIN
+
+#define CPU_NEW()	cpuset_create()
+#define CPU_DEL(p)	cpuset_destroy(p)
+#define CPU_SIZEOF(p)	cpuset_size(p)
+#define CPU_ZERO(p)	cpuset_zero(p)
+#define CPU_SET(i,p)	cpuset_set(i, p)
+#define CPU_ISSET(i,p)	(cpuset_isset(i, p) > 0)
+
+#else  /* _WIN32 */
 
 typedef size_t		affin_mask_t;
 
-#define CPU_SETSIZE	sizeof(affin_mask_t)
+#define CPU_NEW()	malloc(sizeof(affin_mask_t))
+#define CPU_DEL(p)	free(p)
+#define CPU_SIZEOF(p)	sizeof(affin_mask_t)
 #define CPU_ZERO(p)	(*(p) = 0)
 #define CPU_SET(i,p)	(*(p) |= (1 << (i)))
 #define CPU_ISSET(i,p)	((*(p) & (1 << (i))) != 0)
@@ -18,123 +38,107 @@ typedef size_t		affin_mask_t;
 #endif
 
 
-static int
-getcpucount (affin_mask_t *mp)
-{
-    int n = 0;
-    unsigned int i;
+#ifndef CPU_COUNTMAX
+#define CPU_COUNTMAX(p)	(CPU_SIZEOF(p) * CHAR_BIT)
+#endif
 
-    for (i = 0; i < CPU_SETSIZE; ++i) {
+#ifndef CPU_COUNT
+static int
+affin_cpu_count (affin_mask_t *mp)
+{
+    const unsigned int nmax = CPU_COUNTMAX(mp);
+    unsigned int i;
+    int n = 0;
+
+    for (i = 0; i < nmax; ++i) {
 	if (CPU_ISSET(i, mp)) ++n;
     }
     return n;
 }
 
-static void
-getcpumask (affin_mask_t *out, affin_mask_t *mp, int cpu)
+#define CPU_COUNT(p)	affin_cpu_count(p)
+#endif
+
+static int
+affin_cpu_offset (int cpu, affin_mask_t *mp)
 {
+    const unsigned int nmax = CPU_COUNTMAX(mp);
     unsigned int i;
 
-    CPU_ZERO(out);
-    for (i = 0; i < CPU_SETSIZE; ++i) {
+    for (i = 0; i < nmax; ++i) {
 	if (CPU_ISSET(i, mp) && !--cpu)
-	    break;
+	    return (int) i;
     }
-    CPU_SET(i, out);
+    return -1;
 }
 
 static int
-thread_affin_get_mask (affin_mask_t *mp)
+affin_cpu_fill (affin_mask_t *mp)
 {
 #if defined(USE_PTHREAD_AFFIN)
-    return sched_getaffinity(getpid(), sizeof(affin_mask_t), mp);
+    return pthread_getaffinity_np(pthread_self(), CPU_SIZEOF(mp), mp);
 #elif defined(_WIN32)
-    const HANDLE hProc = GetCurrentProcess();
-    DWORD_PTR proc_mask, sys_mask;
+    {
+	const HANDLE hProc = GetCurrentProcess();
+	DWORD_PTR proc_mask, sys_mask;
 
-    if (GetProcessAffinityMask(hProc, &proc_mask, &sys_mask)) {
-	*mp = proc_mask;
-	return 0;
+	if (GetProcessAffinityMask(hProc, &proc_mask, &sys_mask)) {
+	    *mp = proc_mask;
+	    return 0;
+	}
     }
     return -1;
 #else
+    (void) mp;
+
     return -1;
 #endif
 }
 
 static int
-thread_affin_set_cpu (struct sys_thread *td, int cpu)
+affin_cpu_set (thread_id_t tid, int cpu)
 {
-    affin_mask_t proc_mask, thread_mask;
+    affin_mask_t *mp = CPU_NEW();
+    int res = -1;
 
-    if (!thread_affin_get_mask(&proc_mask)) {
-	affin_mask_t *mp = &thread_mask;
+    if (!mp) goto err;
 
-	if (cpu) getcpumask(mp, &proc_mask, cpu);
-	else mp = &proc_mask;
+    if (!affin_cpu_fill(mp)) {
+	if (cpu) {
+	    const int cpu_off = affin_cpu_offset(cpu, mp);
+
+	    if (cpu_off == -1) goto err_clean;
+
+	    CPU_ZERO(mp);
+	    CPU_SET(cpu_off, mp);
+	}
 
 #if defined(USE_PTHREAD_AFFIN)
-	return pthread_setaffinity_np(td->tid, sizeof(affin_mask_t), mp);
+	res = pthread_setaffinity_np(tid, CPU_SIZEOF(mp), mp);
 #elif defined(_WIN32)
-	return (SetThreadAffinityMask(td->th, *mp) > 0) ? 0 : -1;
+	res = (SetThreadAffinityMask(tid, *mp) > 0) ? 0 : -1;
 #endif
     }
-    return -1;
-}
-
-static int
-thread_affin_run (struct sys_thread *td, const int is_affin)
-{
-#ifndef _WIN32
-    pthread_attr_t attr;
-    int res;
-
-    if ((res = pthread_attr_init(&attr)))
-	goto err;
-    if ((res = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED))
-     || (res = pthread_attr_setstacksize(&attr, td->vmtd->stack_size))) {
-	pthread_attr_destroy(&attr);
-	goto err;
-    }
-
-    res = pthread_create(&td->tid, &attr, (thread_func_t) thread_start, td);
-    pthread_attr_destroy(&attr);
-    if (!res) {
-#if defined(USE_PTHREAD_AFFIN)
-	if (is_affin)
-	    thread_affin_set_cpu(td, td->vmtd->cpu);
-#endif
-	return 0;
-    }
+ err_clean:
+    CPU_DEL(mp);
  err:
-    errno = res;
-#else
-    const unsigned long hThr = _beginthreadex(NULL, td->vmtd->stack_size,
-     (thread_func_t) thread_start, td, 0, (unsigned int *) &td->tid);
-
-    (void) is_affin;
-
-    if (hThr) {
-	td->th = (HANDLE) hThr;
-	if (is_WinNT && td->vmtd->cpu)
-	    thread_affin_set_cpu(td, td->vmtd->cpu);
-	return 0;
-    }
-#endif
-    return -1;
+    return res;
 }
 
 /*
  * Returns: number_of_processors (number)
  */
 static int
-thread_affin_nprocs (lua_State *L)
+affin_nprocs (lua_State *L)
 {
-    affin_mask_t mask;
+    affin_mask_t *mp = CPU_NEW();
     int n = 0;
 
-    if (!thread_affin_get_mask(&mask)) {
-	n = getcpucount(&mask);
+    if (mp) {
+	if (!affin_cpu_fill(mp)) {
+	    n = CPU_COUNT(mp);
+	}
+	CPU_DEL(mp);
     }
     lua_pushinteger(L, n);
     return 1;
@@ -142,4 +146,4 @@ thread_affin_nprocs (lua_State *L)
 
 
 #define AFFIN_METHODS \
-    {"nprocs",	thread_affin_nprocs}
+    {"nprocs",	affin_nprocs}

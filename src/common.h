@@ -47,6 +47,7 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #include <fcntl.h>
 
 #include <pthread.h>
+#include <sched.h>
 
 #define SYS_ERRNO	errno
 #define SYS_EAGAIN(e)	((e) == EAGAIN || (e) == EWOULDBLOCK)
@@ -182,17 +183,7 @@ int sys_seterror (lua_State *L, int err);
  * Threading
  */
 
-#ifdef _WIN32
-
-typedef DWORD			thread_id_t;
-#define sys_gettid		GetCurrentThreadId
-#define sys_equaltid(t1,t2)	((t1) == (t2))
-
-#else
-
-typedef pthread_t		thread_id_t;
-#define sys_gettid		pthread_self
-#define sys_equaltid(t1,t2)	pthread_equal((t1), (t2))
+#ifndef _WIN32
 
 #if !defined(PTHREAD_MUTEX_RECURSIVE)
 extern int pthread_mutexattr_setkind_np (pthread_mutexattr_t *attr, int kind);

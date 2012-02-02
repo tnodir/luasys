@@ -10,6 +10,7 @@
 typedef unsigned int (WINAPI *thread_func_t) (void *);
 
 typedef DWORD 			thread_key_t;
+typedef HANDLE			thread_id_t;
 
 #else
 
@@ -19,10 +20,12 @@ typedef DWORD 			thread_key_t;
 typedef void *(*thread_func_t) (void *);
 
 typedef pthread_key_t		thread_key_t;
+typedef pthread_t		thread_id_t;
 
 #endif /* !WIN32 */
 
 
+#include "thread_affin.c"
 #include "thread_sync.c"
 
 
@@ -39,8 +42,6 @@ struct sys_thread {
     thread_critsect_t *vmcsp;
 #ifndef _WIN32
     pthread_cond_t cond;
-#else
-    HANDLE th;  /* thread handle */
 #endif
     lua_State *L;
     struct sys_vmthread *vmtd, *vmref;
@@ -74,8 +75,6 @@ static thread_key_t g_TLSIndex = INVALID_TLS_INDEX;
 #define thread_isvm(td)		((td) == thread_getvm(td))
 
 static void thread_createmeta (lua_State *L);
-
-static int thread_affin_run (struct sys_thread *td, const int is_affin);
 
 
 void
@@ -339,7 +338,6 @@ sys_new_vmthread (lua_State *L, struct sys_vmthread *vmref)
     vmtd = lua_newuserdata(L, sizeof(struct sys_vmthread));
     memset(vmtd, 0, sizeof(struct sys_vmthread));
     vmtd->td.L = L;
-    vmtd->td.tid = sys_gettid();
     vmtd->td.vmtd = vmtd;
     luaL_getmetatable(L, THREAD_TYPENAME);
     lua_setmetatable(L, -2);
@@ -383,7 +381,6 @@ sys_new_thread (struct sys_thread *vmtd, const int insert)
     td->vmcsp = vmtd->vmcsp;
     td->L = NL;
     td->vmtd = vmtd->vmtd;
-    td->tid = sys_gettid();
     luaL_getmetatable(L, THREAD_TYPENAME);
     lua_setmetatable(L, -2);
 
@@ -434,7 +431,7 @@ thread_done (lua_State *L)
 #ifndef _WIN32
 	pthread_cond_destroy(&td->cond);
 #else
-	CloseHandle(td->th);
+	CloseHandle(td->tid);
 #endif
     }
     return 0;
@@ -512,8 +509,53 @@ thread_start (struct sys_thread *td)
     return thread_exit(td);
 }
 
+static int
+thread_create (struct sys_thread *td, const int is_affin)
+{
+#ifndef _WIN32
+    pthread_attr_t attr;
+    int res;
+
+    if ((res = pthread_attr_init(&attr)))
+	goto err;
+    if ((res = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED))
+     || (res = pthread_attr_setstacksize(&attr, td->vmtd->stack_size))) {
+	pthread_attr_destroy(&attr);
+	goto err;
+    }
+
+    res = pthread_create(&td->tid, &attr, (thread_func_t) thread_start, td);
+    pthread_attr_destroy(&attr);
+    if (!res) {
+#if defined(USE_PTHREAD_AFFIN)
+	if (is_affin)
+	    affin_cpu_set(td->tid, td->vmtd->cpu);
+#else
+	(void) is_affin;
+#endif
+	return 0;
+    }
+ err:
+    errno = res;
+#else
+    unsigned int tid;
+    const unsigned long hThr = _beginthreadex(NULL, td->vmtd->stack_size,
+     (thread_func_t) thread_start, td, 0, &tid);
+
+    (void) is_affin;
+
+    if (hThr) {
+	td->tid = (HANDLE) hThr;
+	if (is_WinNT && td->vmtd->cpu)
+	    affin_cpu_set(td->tid, td->vmtd->cpu);
+	return 0;
+    }
+#endif
+    return -1;
+}
+
 /*
- * Arguments: [bind_cpu (number)], filename (string) | function_dump (string),
+ * Arguments: bind_cpu (number) | nil, filename (string) | function_dump (string),
  *	[arguments (string | number | boolean | lightuserdata | share_object) ...]
  * Returns: [boolean]
  */
@@ -522,23 +564,23 @@ thread_runvm (lua_State *L)
 {
     const int is_affin = (lua_type(L, 1) == LUA_TNUMBER);
     const int cpu = is_affin ? lua_tointeger(L, 1) : 0;
-    const char *path = luaL_checkstring(L, is_affin ? 2 : 1);
+    const char *path = luaL_checkstring(L, 2);
     struct sys_thread *td = sys_get_thread();
     lua_State *NL;
+
+#undef ARG_LAST
+#define ARG_LAST	2
 
     if (!td) luaL_argerror(L, 0, "Threading not initialized");
 
     td = sys_new_vmthread(NULL, td->vmtd);
     if (!td) goto err;
 
-    if (is_affin) {
-	lua_remove(L, 1);
-	td->vmtd->cpu = cpu;
-    }
+    if (is_affin) td->vmtd->cpu = cpu;
     NL = td->L;
 
     if (path[0] == LUA_SIGNATURE[0]
-     ? luaL_loadbuffer(NL, path, lua_rawlen(L, 1), "thread")
+     ? luaL_loadbuffer(NL, path, lua_rawlen(L, ARG_LAST), "thread")
      : luaL_loadfile(NL, path)) {
 	lua_pushstring(L, lua_tostring(NL, -1));  /* error message */
 	lua_close(NL);
@@ -551,7 +593,7 @@ thread_runvm (lua_State *L)
 
 	luaL_checkstack(NL, top + LUA_MINSTACK, "too many arguments");
 
-	for (i = 2; i <= top; ++i) {
+	for (i = ARG_LAST + 1; i <= top; ++i) {
 	    switch (lua_type(L, i)) {
 	    case LUA_TSTRING:
 		lua_pushstring(NL, lua_tostring(L, i));
@@ -567,7 +609,7 @@ thread_runvm (lua_State *L)
 		break;
 	    case LUA_TUSERDATA:
 		if (!luaL_getmetafield(L, i, THREAD_XDUP_TAG))
-		    luaL_argerror(L, 2, "shareable object expected");
+		    luaL_argerror(L, i, "shareable object expected");
 		lua_pushvalue(L, i);
 		lua_pushlightuserdata(L, NL);
 		lua_call(L, 2, 0);
@@ -578,7 +620,7 @@ thread_runvm (lua_State *L)
 	}
     }
 
-    if (!thread_affin_run(td, is_affin)) {
+    if (!thread_create(td, is_affin)) {
 	lua_pushboolean(L, 1);
 	return 1;
     }
@@ -602,7 +644,7 @@ thread_run (lua_State *L)
     td = sys_new_thread(vmtd, 1);
     if (!td->L) goto err;
 
-    if (!thread_affin_run(td, 0)) {
+    if (!thread_create(td, 0)) {
 	lua_xmove(L, td->L, lua_gettop(L) - 1);  /* move function and args to new thread */
 	return 1;
     }
@@ -693,7 +735,7 @@ thread_kill (lua_State *L)
 #ifndef _WIN32
 	pthread_kill(td->tid, SYS_SIGINTR);
 #else
-	if (pCancelSynchronousIo) pCancelSynchronousIo(td->th);
+	if (pCancelSynchronousIo) pCancelSynchronousIo(td->tid);
 #endif
     }
     return 0;
@@ -720,7 +762,7 @@ thread_interrupt (lua_State *L)
 #ifndef _WIN32
 	pthread_kill(td->tid, SYS_SIGINTR);
 #else
-	if (pCancelSynchronousIo) pCancelSynchronousIo(td->th);
+	if (pCancelSynchronousIo) pCancelSynchronousIo(td->tid);
 #endif
     }
     return 0;
@@ -768,7 +810,7 @@ thread_wait (lua_State *L)
 	res = thread_cond_wait_impl(&td->cond, td->vmcsp,
 	 &td->state, THREAD_KILLED, 0, timeout);
 #else
-	res = thread_cond_wait_impl(td->th, timeout);
+	res = thread_cond_wait_impl(td->tid, timeout);
 #endif
 	sys_vm_enter();
     }
@@ -799,7 +841,6 @@ thread_tostring (lua_State *L)
 }
 
 
-#include "thread_affin.c"
 #include "thread_dpool.c"
 #include "thread_pipe.c"
 
