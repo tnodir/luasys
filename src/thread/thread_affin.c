@@ -76,7 +76,9 @@ static int
 affin_cpu_fill (affin_mask_t *mp)
 {
 #if defined(USE_PTHREAD_AFFIN)
-    return pthread_getaffinity_np(pthread_self(), CPU_SIZEOF(mp), mp);
+    const int res = pthread_getaffinity_np(pthread_self(), CPU_SIZEOF(mp), mp);
+    if (res) errno = res;
+    return res;
 #elif defined(_WIN32)
     {
 	const HANDLE hProc = GetCurrentProcess();
@@ -115,6 +117,7 @@ affin_cpu_set (thread_id_t tid, int cpu)
 
 #if defined(USE_PTHREAD_AFFIN)
 	res = pthread_setaffinity_np(tid, CPU_SIZEOF(mp), mp);
+	if (res) errno = res;
 #elif defined(_WIN32)
 	res = (SetThreadAffinityMask(tid, *mp) > 0) ? 0 : -1;
 #endif
@@ -126,7 +129,7 @@ affin_cpu_set (thread_id_t tid, int cpu)
 }
 
 /*
- * Returns: number_of_processors (number)
+ * Returns: [number_of_processors (number)]
  */
 static int
 affin_nprocs (lua_State *L)
@@ -140,6 +143,7 @@ affin_nprocs (lua_State *L)
 	}
 	CPU_DEL(mp);
     }
+    if (!n) return 0;
     lua_pushinteger(L, n);
     return 1;
 }

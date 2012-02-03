@@ -26,7 +26,8 @@ static int
 affin_nprocs (lua_State *L)
 {
     const int n = sysconf(_SC_NPROCESSORS_ONLN);
-    lua_pushinteger(L, (n < 0) ? 0 : n);
+    if (n < 1) return 0;
+    lua_pushinteger(L, n);
     return 1;
 }
 
