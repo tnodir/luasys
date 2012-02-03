@@ -25,7 +25,12 @@ typedef pthread_t		thread_id_t;
 #endif /* !WIN32 */
 
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include "thread_affin_mach.c"
+#else
 #include "thread_affin.c"
+#endif
+
 #include "thread_sync.c"
 
 
@@ -524,6 +529,16 @@ thread_create (struct sys_thread *td, const int is_affin)
 	goto err;
     }
 
+#ifdef USE_MACH_AFFIN
+    if (is_affin) {
+	res = pthread_create_suspended_np(&td->tid, &attr, (thread_func_t) thread_start, td);
+	if (!res) {
+	    mach_port_t mt = pthread_mach_thread_np(td->tid);
+	    affin_cpu_set(mt, td->vmtd->cpu);
+	    thread_resume(mt);
+	}
+    } else
+#endif
     res = pthread_create(&td->tid, &attr, (thread_func_t) thread_start, td);
     pthread_attr_destroy(&attr);
     if (!res) {
@@ -555,7 +570,7 @@ thread_create (struct sys_thread *td, const int is_affin)
 }
 
 /*
- * Arguments: bind_cpu (number) | nil, filename (string) | function_dump (string),
+ * Arguments: [bind_cpu (number)], filename (string) | function_dump (string),
  *	[arguments (string | number | boolean | lightuserdata | share_object) ...]
  * Returns: [boolean]
  */
