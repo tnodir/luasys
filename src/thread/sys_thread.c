@@ -45,11 +45,11 @@ struct sys_vmthread;
 /* Thread's data */
 struct sys_thread {
     thread_critsect_t *vmcsp;
+    lua_State *L;
+    struct sys_vmthread *vmtd, *vmref;
 #ifndef _WIN32
     pthread_cond_t cond;
 #endif
-    lua_State *L;
-    struct sys_vmthread *vmtd, *vmref;
     thread_id_t tid;
     lua_Integer exit_status;
 #define THREAD_KILLED		1
@@ -57,7 +57,7 @@ struct sys_thread {
     unsigned int volatile state;
 };
 
-/* Main VM-Thread's data */
+/* Main VM-thread's data */
 struct sys_vmthread {
     struct sys_thread td;
     thread_critsect_t vmcs;
@@ -125,10 +125,10 @@ thread_waitvm (struct sys_vmthread *vmtd, msec_t timeout)
     if (vmtd->nref) {
 	sys_vm2_leave(&vmtd->td);
 #ifndef _WIN32
-	res = thread_cond_wait_impl(&vmtd->td.cond, &vmtd->vmcs,
+	res = thread_event_wait_impl(&vmtd->td.cond, &vmtd->vmcs,
 	 &vmtd->nref, 0, 0, timeout);
 #else
-	res = thread_cond_wait_impl(vmtd->evh, timeout);
+	res = thread_event_wait_impl(vmtd->evh, timeout);
 #endif
 	sys_vm2_enter(&vmtd->td);
     }
@@ -359,9 +359,9 @@ sys_new_vmthread (lua_State *L, struct sys_vmthread *vmref)
     vmtd->td.vmcsp = &vmtd->vmcs;
 
 #ifndef _WIN32
-    if ((errno = pthread_cond_init(&vmtd->td.cond, NULL)))
+    if (thread_cond_new(&vmtd->td.cond))
 #else
-    if (!(vmtd->evh = CreateEvent(NULL, FALSE, FALSE, NULL)))  /* auto-reset */
+    if (thread_cond_new(&vmtd->evh))
 #endif
 	return NULL;
 
@@ -393,7 +393,7 @@ sys_new_thread (struct sys_thread *vmtd, const int insert)
     td->vmref->nref++;
 
 #ifndef _WIN32
-    if ((errno = pthread_cond_init(&td->cond, NULL)))
+    if (thread_cond_new(&td->cond))
 	return NULL;
 #endif
 
@@ -434,7 +434,7 @@ thread_done (lua_State *L)
 #endif
 	}
 #ifndef _WIN32
-	pthread_cond_destroy(&td->cond);
+	thread_cond_del(&td->cond);
 #else
 	CloseHandle(td->tid);
 #endif
@@ -822,10 +822,10 @@ thread_wait (lua_State *L)
 
 	sys_vm_leave();
 #ifndef _WIN32
-	res = thread_cond_wait_impl(&td->cond, td->vmcsp,
+	res = thread_event_wait_impl(&td->cond, td->vmcsp,
 	 &td->state, THREAD_KILLED, 0, timeout);
 #else
-	res = thread_cond_wait_impl(td->tid, timeout);
+	res = thread_event_wait_impl(td->tid, timeout);
 #endif
 	sys_vm_enter();
     }

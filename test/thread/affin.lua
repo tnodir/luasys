@@ -10,7 +10,7 @@ thread.init()
 print"<Enter> to start..."
 sys.stdin:read()
 
-local COUNT = 1000000000
+local COUNT = 100000000
 local NPROCS = thread.nprocs() or sys.nprocs()
 
 if NPROCS > COUNT then

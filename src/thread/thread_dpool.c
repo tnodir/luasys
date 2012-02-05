@@ -17,7 +17,7 @@ struct data_pool {
 #define DPOOL_OPEN		8
     unsigned int flags;
 
-    thread_cond_t tcond;  /* synchronization */
+    thread_event_t tev;  /* synchronization */
 };
 
 
@@ -31,7 +31,7 @@ dpool_new (lua_State *L)
     memset(dp, 0, sizeof(struct data_pool));
     dp->max = (unsigned int) -1;
 
-    if (!thread_cond_new(&dp->tcond)) {
+    if (!thread_event_new(&dp->tev)) {
 	dp->flags |= DPOOL_OPEN;
 	luaL_getmetatable(L, DPOOL_TYPENAME);
 	lua_setmetatable(L, -2);
@@ -53,7 +53,7 @@ dpool_close (lua_State *L)
 
     if (dp->flags & DPOOL_OPEN) {
 	dp->flags ^= DPOOL_OPEN;
-	thread_cond_del(&dp->tcond);
+	thread_event_del(&dp->tev);
     }
     return 0;
 }
@@ -82,7 +82,7 @@ dpool_put (lua_State *L)
 	    nput = lua_gettop(L) - 1;
 	    if (!nput) return 0;
 	} else do {
-	    if (thread_cond_wait(&dp->tcond, TIMEOUT_INFINITE))
+	    if (thread_event_wait(&dp->tev, TIMEOUT_INFINITE))
 		return sys_seterror(L, 0);
 	} while (dp->n >= dp->max);
     }
@@ -91,7 +91,7 @@ dpool_put (lua_State *L)
     if (dp->nwaits && !dp->td) {
 	dp->td = td;
 	dp->nput = nput;
-	thread_cond_signal(&dp->tcond);
+	thread_event_signal(&dp->tev);
 	thread_yield(L);
 	dp->td = NULL;
 	if (!dp->nput) return 0;  /* moved to thread */
@@ -109,7 +109,7 @@ dpool_put (lua_State *L)
 	dp->top = top;
 
 	if (!dp->n++) {
-	    thread_cond_signal(&dp->tcond);
+	    thread_event_signal(&dp->tev);
 	}
     }
     return 0;
@@ -158,7 +158,7 @@ dpool_get (lua_State *L)
 	    if (dp->idx == dp->top)
 		dp->idx = dp->top = 0;
 	    if (dp->n-- == dp->max) {
-		thread_cond_signal(&dp->tcond);
+		thread_event_signal(&dp->tev);
 	    }
 	    return nput;
 	}
@@ -167,7 +167,7 @@ dpool_get (lua_State *L)
 	{
 	    int res;
 	    dp->nwaits++;
-	    res = thread_cond_wait(&dp->tcond, timeout);
+	    res = thread_event_wait(&dp->tev, timeout);
 	    dp->nwaits--;
 	    if (res) {
 		if (res == 1) {
