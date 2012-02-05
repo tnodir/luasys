@@ -139,8 +139,7 @@ sock_socket (lua_State *L)
 	    *pair_sdp = sv[1];
 	    return 1;
 	}
-    }
-    else {
+    } else {
 	sd_t sd;
 #ifndef _WIN32
 	sd = socket(domain, type, 0);
@@ -257,8 +256,7 @@ sock_sockopt (lua_State *L)
 	    lua_settop(L, 1);
 	    return 1;
 	}
-    }
-    else if (!getsockopt(sd, level, optflag, (char *) &optval, &optlen)) {
+    } else if (!getsockopt(sd, level, optflag, (char *) &optval, &optlen)) {
 	lua_pushinteger(L, optval[0]);
 	if (optlen <= (socklen_t) sizeof(int))
 	    return 1;
@@ -304,8 +302,7 @@ sock_membership (lua_State *L)
 
 	level = IPPROTO_IP;
 	mr_len = sizeof(struct ip_mreq);
-    }
-    else {
+    } else {
 #ifdef IPPROTO_IPV6
 	memcpy(&mr.ip6.ipv6mr_multiaddr, maddrp, len);
 	mr.ip6.ipv6mr_interface = lua_tointeger(L, 3);
@@ -392,8 +389,7 @@ sock_accept (lua_State *L)
 	*sdp = sd;
 	lua_settop(L, 2);
 	return 1;
-    }
-    else if (SYS_EAGAIN(SYS_ERRNO)) {
+    } else if (SYS_EAGAIN(SYS_ERRNO)) {
 	lua_pushboolean(L, 0);
 	return 1;
     }

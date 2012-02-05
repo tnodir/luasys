@@ -302,8 +302,7 @@ sys_pid (lua_State *L)
     if (id != -1) {
 	if (id == (int) GetCurrentProcessId()) {
 	    pidp->h = GetCurrentProcess();
-	}
-	else {
+	} else {
 	    pidp->h = OpenProcess(PROCESS_ALL_ACCESS, FALSE, id);
 	    if (pidp->h == NULL)
 		return sys_seterror(L, 0);

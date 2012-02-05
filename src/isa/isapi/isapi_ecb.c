@@ -35,8 +35,7 @@ ecb_getvar (lua_State *L)
     if (val) {
 	lua_pushstring(L, val);
 	return 1;
-    }
-    else {
+    } else {
 	char buf[SYS_BUFSIZE];
 	DWORD len = sizeof(buf);
 

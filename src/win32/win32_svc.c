@@ -232,8 +232,7 @@ svc_status (lua_State *L)
 	Sleep(0);  /* yield to service controller thread */
 
 	lua_settop(L, 1);
-    }
-    else {
+    } else {
 	switch (g_Service.status.dwCurrentState) {
 	case SERVICE_STOPPED:
 	case SERVICE_STOP_PENDING:

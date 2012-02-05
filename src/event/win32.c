@@ -204,8 +204,7 @@ evq_modify (struct event *ev, unsigned int flags)
 	if (ev_flags & EVENT_PENDING)
 	    win32iocp_cancel(ev, (ev_flags & ~flags));
 	return win32iocp_set(ev, flags);
-    }
-    else {
+    } else {
 	struct win32thr *wth = ev->wth;
 	int event = 0;
 
@@ -356,8 +355,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 		} else
 		    ResetEvent(ev->fd);  /* all events must be manual-reset */
 		res |= EVENT_READ_RES;
-	    }
-	    else if (!WSAEnumNetworkEvents((int) ev->fd, *hp, &ne)) {
+	    } else if (!WSAEnumNetworkEvents((int) ev->fd, *hp, &ne)) {
 		if ((ev_flags & EVENT_READ) && (ne.lNetworkEvents & WFD_READ))
 		    res = EVENT_READ_RES;
 		if ((ev_flags & EVENT_WRITE) && (ne.lNetworkEvents & WFD_WRITE))
@@ -374,8 +372,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 		if (ev_flags & EVENT_ONESHOT) {
 		    win32thr_del(wth, ev);
 		    --i, --n, --hp;
-		}
-		else if (ev->tq && !(ev_flags & EVENT_TIMEOUT_MANUAL))
+		} else if (ev->tq && !(ev_flags & EVENT_TIMEOUT_MANUAL))
 		    timeout_reset(ev, timeout);
 	    }
 

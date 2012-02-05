@@ -108,8 +108,7 @@ sys_buffer_read_init (lua_State *L, int idx, struct sys_buffer *sb)
 	sb->size = mb->offset;
 	sb->mb = mb;
 	return 1;
-    }
-    else {
+    } else {
 	sb->ptr.r = lua_tolstring(L, idx, &sb->size);
 	if (sb->ptr.r) {
 	    sb->mb = NULL;
@@ -149,8 +148,7 @@ sys_buffer_write_init (lua_State *L, int idx, struct sys_buffer *sb,
 	sb->ptr.w = mb->data + mb->offset;
 	sb->size = mb->len - mb->offset;
 	sb->mb = mb;
-    }
-    else {
+    } else {
 	sb->ptr.w = buf;
 	sb->size = buflen;
 	sb->mb = NULL;
@@ -169,8 +167,7 @@ sys_buffer_write_next (lua_State *L, struct sys_buffer *sb,
 	    return 0;
 	sb->ptr.w = mb->data + mb->offset;
 	sb->size = mb->len - mb->offset;
-    }
-    else {
+    } else {
 	struct sys_buffer *osb = (void *) buf;
 	size_t size;
 	char *p;
@@ -180,8 +177,7 @@ sys_buffer_write_next (lua_State *L, struct sys_buffer *sb,
 	    p = malloc(2 * size);
 	    if (!p) return 0;
 	    memcpy(p, buf, size);
-	}
-	else {
+	} else {
 	    size = 2 * osb->size;
 	    p = realloc(osb->ptr.w, 2 * size);
 	    if (!p) return 0;
@@ -203,8 +199,7 @@ sys_buffer_write_done (lua_State *L, struct sys_buffer *sb,
     if (mb) {
 	mb->offset += tail;
 	return 0;
-    }
-    else {
+    } else {
 	if (sb->ptr.w == buf)
 	    lua_pushlstring(L, buf, tail);
 	else {
@@ -255,8 +250,7 @@ mem_type (lua_State *L)
 	mb->flags &= ~SYSMEM_TYPE_MASK;
 	mb->flags |= type;
 	lua_settop(L, 1);
-    }
-    else {
+    } else {
 	lua_pushstring(L,
 	 type_names[(mb->flags & SYSMEM_TYPE_MASK) >> SYSMEM_TYPE_SHIFT]);
     }

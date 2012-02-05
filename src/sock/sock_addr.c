@@ -539,16 +539,13 @@ sock_addr_inet (lua_State *L)
 	if (af == AF_INET) {
 	    lua_pushinteger(L, ntohs(sap->u.in.sin_port));
 	    lua_pushlstring(L, (char *) &sap->u.in.sin_addr, sizeof(struct in_addr));
-	}
-	else if (af == AF_INET6) {
+	} else if (af == AF_INET6) {
 	    lua_pushinteger(L, ntohs(sap->u.in6.sin6_port));
 	    lua_pushlstring(L, (char *) &sap->u.in6.sin6_addr, sizeof(struct in6_addr));
-	}
-	else
+	} else
 	    return 0;
 	return 2;
-    }
-    else {
+    } else {
 	const int port = lua_tointeger(L, 2);
 	int in_len = SOCK_ADDR_LEN, af = AF_INET;
 	const char *addr = lua_isnoneornil(L, 3) ? NULL
@@ -561,8 +558,7 @@ sock_addr_inet (lua_State *L)
 	    if (addr)
 		memcpy(&sap->u.in.sin_addr, addr, in_len);
 	    sap->addrlen = sizeof(struct sockaddr_in);
-	}
-	else {
+	} else {
 	    sap->u.in6.sin6_port = htons((unsigned short) port);
 	    if (addr)
 		memcpy(&sap->u.in6.sin6_addr, addr, in_len);
@@ -588,8 +584,7 @@ sock_addr_file (lua_State *L)
 	    lua_pushstring(L, sap->u.un.sun_path);
 	    return 1;
 	}
-    }
-    else {
+    } else {
 	size_t len;
 	const char *path = luaL_checklstring(L, 2, &len);
 

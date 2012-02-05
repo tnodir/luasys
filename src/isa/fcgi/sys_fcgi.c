@@ -265,8 +265,7 @@ fcgi_encode (lua_State *L)
 	 && cp[-2] == (unsigned char) (request_id >> 8)) {
 	    prev_len = (cp[0] << 8) | cp[1];
 	    prev_padding_len = cp[2];
-	}
-	else {
+	} else {
 	    prev_offset = 0;
 	}
     }
@@ -279,8 +278,7 @@ fcgi_encode (lua_State *L)
 	if (!prev_offset || (prev_len + len) > FCGI_MAX_CONTENT_LEN) {
 	    data_len += FCGI_HEADER_LEN;
 	    prev_offset = 0;
-	}
-	else {
+	} else {
 	    data_len -= prev_padding_len;
 	}
     }
@@ -288,8 +286,7 @@ fcgi_encode (lua_State *L)
     if (data_len <= 0) {
 	padding_len = prev_padding_len - len;  /* fits to previous padding */
 	data_len = 0;
-    }
-    else {
+    } else {
 	padding_len = 8 - data_len % 8;
 	if (padding_len == 8) padding_len = 0;
 
@@ -307,8 +304,7 @@ fcgi_encode (lua_State *L)
 	memcpy(cp, s, len);  /* concat to previous record */
 	cp += len;
 	len += prev_len;
-    }
-    else {
+    } else {
 	*cp++ = FCGI_VERSION;
 	*cp++ = FCGI_STDOUT;
 	*cp++ = (unsigned char) (request_id >> 8);
@@ -321,8 +317,7 @@ fcgi_encode (lua_State *L)
 	if (len) {
 	    memcpy(cp, s, len);
 	    cp += len;
-	}
-	else {
+	} else {
 	    *cp++ = FCGI_VERSION;
 	    *cp++ = FCGI_END_REQUEST;
 	    *cp++ = (unsigned char) (request_id >> 8);

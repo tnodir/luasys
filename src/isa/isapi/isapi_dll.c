@@ -135,8 +135,7 @@ lisapi_open (LPEXTENSION_CONTROL_BLOCK ecb)
 
 	ecbp = checkudata(L, -1, ECB_TYPENAME);
 	*ecbp = ecb;
-    }
-    else {
+    } else {
 	td = sys_new_thread(g_ISAPI.vmtd, 0);
 	if (!td) return NULL;
 
@@ -180,8 +179,7 @@ DllMain (HANDLE hmodule, DWORD reason, LPVOID reserved)
 
 	sep = strrchr(g_ISAPI.root, '\\');
 	if (sep) *sep = '\0';
-    }
-    else if (reason == DLL_PROCESS_DETACH)
+    } else if (reason == DLL_PROCESS_DETACH)
 	TerminateExtension(0);
 
     return TRUE;

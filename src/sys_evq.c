@@ -213,14 +213,13 @@ levq_add (lua_State *L)
 
     if (ev_flags & EVENT_TIMER) {
 	res = evq_add_timer(evq, ev, timeout);
-    }
-    else {
+    } else {
 	if (ev_flags & EVENT_DIRWATCH) {
 	    const char *path = luaL_checkstring(L, 2);
 	    res = evq_add_dirwatch(evq, ev, path);
-	}
-	else
+	} else {
 	    res = evq_add(evq, ev);
+	}
 
 	if (!res && timeout != TIMEOUT_INFINITE) {
 	    evq_set_timeout(ev, timeout);
@@ -507,8 +506,7 @@ levq_callback (lua_State *L)
     if (top < ARG_LAST) {
 	lua_pop(L, 1);
 	lua_rawget(L, ARG_LAST+2);
-    }
-    else {
+    } else {
 	ev->flags &= ~(EVENT_CALLBACK | EVENT_CALLBACK_THREAD);
 	if (!lua_isnoneornil(L, 3)) {
 	    ev->flags |= EVENT_CALLBACK

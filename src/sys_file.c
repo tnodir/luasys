@@ -240,8 +240,7 @@ sys_tempfile (lua_State *L)
 	if (is_WinNT) {
 	    res = GetTempPathW(MAX_PATHNAME - 24, os_path)
 	     && GetTempFileNameW(os_path, os_prefix, 0, os_path);
-	}
-	else {
+	} else {
 	    char *p = (char *) os_path;
 
 	    res = GetTempPathA(MAX_PATHNAME - 24, p)
