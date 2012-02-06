@@ -57,14 +57,7 @@ signal_init (void)
     g_SignalInit = 1;
 
     /* Initialize critical section */
-    {
-	pthread_mutexattr_t mattr;
-
-	pthread_mutexattr_init(&mattr);
-	pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(&g_Signal.cs, &mattr);
-	pthread_mutexattr_destroy(&mattr);
-    }
+    pthread_mutex_init(&g_Signal.cs, NULL);
     /* Ignore sigpipe or it will crash us */
     signal_set(SIGPIPE, SIG_IGN);
     /* To interrupt blocking syscalls */
@@ -256,28 +249,35 @@ static struct event *
 signal_process_actives (struct event_queue *evq, int signo, struct event *ev_ready, msec_t now)
 {
     struct event **sig_evp = signal_gethead(signo);
-    struct event *ev;
+    struct event *ev, *ev_next = NULL;
 
     pthread_mutex_lock(&g_Signal.cs);
     ev = *sig_evp;
     for (; ev; ev = ev->next_object) {
-	if (ev->evq == evq) {
-	    if (signo == EVQ_SIGCHLD && signal_process_child(ev))
-		continue;
-	    ev_ready = signal_process_active(ev, ev_ready, now);
+	if (ev->evq == evq && !(ev->flags & EVENT_ACTIVE)) {
+	    ev->next_ready = ev_next;
+	    ev_next = ev;
 	}
     }
     pthread_mutex_unlock(&g_Signal.cs);
+
+    for (ev = ev_next; ev; ev = ev_next) {
+	ev_next = ev->next_ready;
+	if (signo == EVQ_SIGCHLD && signal_process_child(ev))
+	    continue;
+	ev_ready = signal_process_active(ev, ev_ready, now);
+    }
     return ev_ready;
 }
 
 static struct event *
 signal_process_notifies (struct event_queue *evq, struct event *ev_ready, msec_t now)
 {
-    struct event *ev = evq->ev_notify;
+    struct event *ev = evq->ev_notify, *ev_next;
 
     evq->ev_notify = NULL;
-    for (; ev; ev = ev->next_object) {
+    for (; ev; ev = ev_next) {
+	ev_next = ev->next_object;
 	ev_ready = signal_process_active(ev, ev_ready, now);
     }
     return ev_ready;

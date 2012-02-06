@@ -188,16 +188,6 @@ int sys_seterror (lua_State *L, int err);
  * Threading
  */
 
-#ifndef _WIN32
-
-#if !defined(PTHREAD_MUTEX_RECURSIVE)
-extern int pthread_mutexattr_setkind_np (pthread_mutexattr_t *attr, int kind);
-#define pthread_mutexattr_settype	pthread_mutexattr_setkind_np
-#define PTHREAD_MUTEX_RECURSIVE		PTHREAD_MUTEX_RECURSIVE_NP
-#endif
-
-#endif
-
 struct sys_thread;
 
 void sys_set_thread (struct sys_thread *td);

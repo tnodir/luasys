@@ -163,25 +163,33 @@ static struct event *
 signal_process_actives (struct event_queue *evq, int signo, struct event *ev_ready, msec_t now)
 {
     struct event **sig_evp = signal_gethead(signo);
-    struct event *ev;
+    struct event *ev, *ev_next = NULL;
 
     EnterCriticalSection(&g_Signal.cs);
     ev = *sig_evp;
     for (; ev; ev = ev->next_object) {
-	if (ev->wth->evq == evq)
-	    ev_ready = signal_process_active(ev, ev_ready, now);
+	if (ev->wth->evq == evq && !(ev->flags & EVENT_ACTIVE)) {
+	    ev->next_ready = ev_next;
+	    ev_next = ev;
+	}
     }
     LeaveCriticalSection(&g_Signal.cs);
+
+    for (ev = ev_next; ev; ev = ev_next) {
+	ev_next = ev->next_ready;
+	ev_ready = signal_process_active(ev, ev_ready, now);
+    }
     return ev_ready;
 }
 
 static struct event *
 signal_process_notifies (struct event_queue *evq, struct event *ev_ready, msec_t now)
 {
-    struct event *ev = evq->ev_notify;
+    struct event *ev = evq->ev_notify, *ev_next;
 
     evq->ev_notify = NULL;
-    for (; ev; ev = ev->next_object) {
+    for (; ev; ev = ev_next) {
+	ev_next = ev->next_object;
 	ev_ready = signal_process_active(ev, ev_ready, now);
     }
     return ev_ready;
