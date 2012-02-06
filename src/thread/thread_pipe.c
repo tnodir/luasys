@@ -267,13 +267,7 @@ pipe_cond_wait (thread_cond_t *condp, thread_critsect_t *csp,
     int res;
 
     sys_vm_leave();
-#ifndef _WIN32
     res = thread_cond_wait_nolock(condp, csp, timeout);
-#else
-    thread_critsect_leave(csp);
-    res = thread_cond_wait(*condp, timeout);
-    thread_critsect_enter(csp);
-#endif
     sys_vm_enter();
     return res;
 }

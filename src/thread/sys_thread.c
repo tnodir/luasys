@@ -12,6 +12,9 @@ typedef unsigned int (WINAPI *thread_func_t) (void *);
 typedef DWORD 			thread_key_t;
 typedef HANDLE			thread_id_t;
 
+#define thread_cancel_syncio(tid) \
+	(pCancelSynchronousIo ? !pCancelSynchronousIo(tid) : 0)
+
 #else
 
 #define THREAD_FUNC_RES		void *
@@ -21,6 +24,9 @@ typedef void *(*thread_func_t) (void *);
 
 typedef pthread_key_t		thread_key_t;
 typedef pthread_t		thread_id_t;
+
+#define thread_cancel_syncio(tid) \
+	pthread_kill((tid), SYS_SIGINTR)
 
 #endif /* !WIN32 */
 
@@ -48,7 +54,7 @@ struct sys_thread {
     lua_State *L;
     struct sys_vmthread *vmtd, *vmref;
 #ifndef _WIN32
-    pthread_cond_t cond;
+    thread_cond_t cond;
 #endif
     thread_id_t tid;
     lua_Integer exit_status;
@@ -62,7 +68,7 @@ struct sys_vmthread {
     struct sys_thread td;
     thread_critsect_t vmcs;
 #ifdef _WIN32
-    HANDLE evh;
+    thread_cond_t cond;
 #endif
     unsigned int volatile nref;
     int cpu;  /* bind to processor (inherited by sub-threads) */
@@ -123,13 +129,14 @@ thread_waitvm (struct sys_vmthread *vmtd, msec_t timeout)
     int res = 0;
 
     if (vmtd->nref) {
-	sys_vm2_leave(&vmtd->td);
 #ifndef _WIN32
-	res = thread_cond_wait_value(&vmtd->td.cond, &vmtd->vmcs,
-	 &vmtd->nref, 0, 0, timeout);
+	thread_cond_t *condp = &vmtd->td.cond;
 #else
-	res = thread_cond_wait(vmtd->evh, timeout);
+	thread_cond_t *condp = &vmtd->cond;
 #endif
+	sys_vm2_leave(&vmtd->td);
+	res = thread_cond_wait_value(condp, &vmtd->vmcs,
+	 &vmtd->nref, 0, 0, timeout);
 	sys_vm2_enter(&vmtd->td);
     }
     return res;
@@ -168,9 +175,9 @@ thread_exit (struct sys_thread *td)
 	sys_vm2_enter(&vmref->td);
 	if (!--vmref->nref) {
 #ifndef _WIN32
-	    pthread_cond_signal(&vmref->td.cond);
+	    (void) thread_cond_signal(&vmref->td.cond);
 #else
-	    SetEvent(vmref->evh);
+	    (void) thread_cond_signal(&vmref->cond);
 #endif
 	}
 	sys_vm2_leave(&vmref->td);
@@ -361,7 +368,7 @@ sys_new_vmthread (lua_State *L, struct sys_vmthread *vmref)
 #ifndef _WIN32
     if (thread_cond_new(&vmtd->td.cond))
 #else
-    if (thread_cond_new(&vmtd->evh))
+    if (thread_cond_new(&vmtd->cond))
 #endif
 	return NULL;
 
@@ -430,7 +437,7 @@ thread_done (lua_State *L)
 	if (thread_isvm(td)) {
 	    thread_critsect_del(td->vmcsp);
 #ifdef _WIN32
-	    CloseHandle(td->vmtd->evh);
+	    thread_cond_del(&td->vmtd->cond);
 #endif
 	}
 #ifndef _WIN32
@@ -531,7 +538,8 @@ thread_create (struct sys_thread *td, const int is_affin)
 
 #ifdef USE_MACH_AFFIN
     if (is_affin) {
-	res = pthread_create_suspended_np(&td->tid, &attr, (thread_func_t) thread_start, td);
+	res = pthread_create_suspended_np(&td->tid, &attr,
+	 (thread_func_t) thread_start, td);
 	if (!res) {
 	    mach_port_t mt = pthread_mach_thread_np(td->tid);
 	    affin_cpu_set(mt, td->vmtd->cpu);
@@ -747,11 +755,7 @@ thread_kill (lua_State *L)
     if (td == sys_get_thread())
 	thread_exit(td);
     else {
-#ifndef _WIN32
-	pthread_kill(td->tid, SYS_SIGINTR);
-#else
-	if (pCancelSynchronousIo) pCancelSynchronousIo(td->tid);
-#endif
+	thread_cancel_syncio(td->tid);
     }
     return 0;
 }
@@ -774,11 +778,7 @@ thread_interrupt (lua_State *L)
     if (td == sys_get_thread())
 	thread_yield(L);
     else {
-#ifndef _WIN32
-	pthread_kill(td->tid, SYS_SIGINTR);
-#else
-	if (pCancelSynchronousIo) pCancelSynchronousIo(td->tid);
-#endif
+	thread_cancel_syncio(td->tid);
     }
     return 0;
 }
@@ -825,7 +825,7 @@ thread_wait (lua_State *L)
 	res = thread_cond_wait_value(&td->cond, td->vmcsp,
 	 &td->state, THREAD_KILLED, 0, timeout);
 #else
-	res = thread_cond_wait(td->tid, timeout);
+	res = thread_handle_wait(td->tid, timeout);
 #endif
 	sys_vm_enter();
     }
