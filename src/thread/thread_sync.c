@@ -72,13 +72,103 @@ thread_cond_new (thread_cond_t *tcond)
 #define thread_cond_signal(tcond)	!SetEvent(*tcond)
 #endif
 
+#ifndef _WIN32
+
+static void
+thread_timespec (struct timespec *ts, const msec_t timeout)
+{
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+    tv.tv_sec += timeout / 1000;
+    tv.tv_usec += (timeout % 1000) * 1000;
+    if (tv.tv_usec >= 1000000) {
+	tv.tv_sec++;
+	tv.tv_usec -= 1000000;
+    }
+
+    ts->tv_sec = tv.tv_sec;
+    ts->tv_nsec = tv.tv_usec * 1000;
+}
+
+static int
+thread_cond_wait_nolock (pthread_cond_t *condp, pthread_mutex_t *csp,
+                         const msec_t timeout)
+{
+    int res = 0;
+
+    if (timeout == TIMEOUT_INFINITE) {
+	res = pthread_cond_wait(condp, csp);
+    } else {
+	struct timespec ts;
+
+	thread_timespec(&ts, timeout);
+
+	res = pthread_cond_timedwait(condp, csp, &ts);
+    }
+
+    if (res) {
+	if (res == ETIMEDOUT)
+	    return 1;
+	errno = res;
+	return -1;
+    }
+    return 0;
+}
+
+static int
+thread_cond_wait_value (pthread_cond_t *condp, pthread_mutex_t *csp,
+                  volatile unsigned int *signalled,
+                  const unsigned int test_value,
+                  const int reset, const msec_t timeout)
+{
+    int res = 0;
+
+    if (timeout == TIMEOUT_INFINITE) {
+	pthread_mutex_lock(csp);
+	while (*signalled != test_value && !res)
+	    res = pthread_cond_wait(condp, csp);
+    } else {
+	struct timespec ts;
+
+	thread_timespec(&ts, timeout);
+
+	pthread_mutex_lock(csp);
+	while (*signalled != test_value && !res)
+	    res = pthread_cond_timedwait(condp, csp, &ts);
+    }
+    if (!res && reset) *signalled = 0;
+    pthread_mutex_unlock(csp);
+
+    if (res) {
+	if (res == ETIMEDOUT)
+	    return 1;
+	errno = res;
+	return -1;
+    }
+    return 0;
+}
+
+#else
+
+static int
+thread_cond_wait (HANDLE h, msec_t timeout)
+{
+    const int res = WaitForSingleObject(h, timeout);
+
+    return (res == WAIT_OBJECT_0) ? 0
+     : (res == WAIT_TIMEOUT) ? 1 : -1;
+}
+
+#endif
+
 
 /* Event */
 typedef struct {
     thread_cond_t cond;
 #ifndef _WIN32
     thread_critsect_t cs;
-#define THREAD_COND_SIGNALLED	1
+#define THREAD_EVENT_SIGNALLED	1
     unsigned int volatile signalled;
 #endif
 } thread_event_t;
@@ -106,60 +196,6 @@ thread_event_del (thread_event_t *tev)
     return thread_cond_del(&tev->cond);
 }
 
-#ifndef _WIN32
-static int
-thread_event_wait_impl (pthread_cond_t *condp, pthread_mutex_t *csp,
-                        volatile unsigned int *signalled,
-                        const unsigned int test_value,
-                        const int reset, const msec_t timeout)
-{
-    int res = 0;
-
-    if (timeout == TIMEOUT_INFINITE) {
-	pthread_mutex_lock(csp);
-	while (*signalled != test_value && !res)
-	    res = pthread_cond_wait(condp, csp);
-    } else {
-	struct timespec ts;
-	struct timeval tv;
-
-	gettimeofday(&tv, NULL);
-	tv.tv_sec += timeout / 1000;
-	tv.tv_usec += (timeout % 1000) * 1000;
-	if (tv.tv_usec >= 1000000) {
-	    tv.tv_sec++;
-	    tv.tv_usec -= 1000000;
-	}
-
-	ts.tv_sec = tv.tv_sec;
-	ts.tv_nsec = tv.tv_usec * 1000;
-
-	pthread_mutex_lock(csp);
-	while (*signalled != test_value && !res)
-	    res = pthread_cond_timedwait(condp, csp, &ts);
-    }
-    if (!res && reset) *signalled = 0;
-    pthread_mutex_unlock(csp);
-
-    if (res) {
-	if (res == ETIMEDOUT)
-	    return 1;
-	errno = res;
-	return -1;
-    }
-    return 0;
-}
-#else
-static int
-thread_event_wait_impl (HANDLE h, msec_t timeout)
-{
-    const int res = WaitForSingleObject(h, timeout);
-
-    return (res == WAIT_OBJECT_0) ? 0
-     : (res == WAIT_TIMEOUT) ? 1 : -1;
-}
-#endif
-
 static int
 thread_event_wait (thread_event_t *tev, msec_t timeout)
 {
@@ -167,10 +203,10 @@ thread_event_wait (thread_event_t *tev, msec_t timeout)
 
     sys_vm_leave();
 #ifndef _WIN32
-    res = thread_event_wait_impl(&tev->cond, &tev->cs,
-     &tev->signalled, THREAD_COND_SIGNALLED, 1, timeout);
+    res = thread_cond_wait_value(&tev->cond, &tev->cs,
+     &tev->signalled, THREAD_EVENT_SIGNALLED, 1, timeout);
 #else
-    res = thread_event_wait_impl(tev->cond, timeout);
+    res = thread_cond_wait(tev->cond, timeout);
 #endif
     sys_vm_enter();
     return res;
@@ -178,7 +214,8 @@ thread_event_wait (thread_event_t *tev, msec_t timeout)
 
 #ifndef _WIN32
 #define thread_event_signal_nolock(tev) \
-	((tev)->signalled = THREAD_COND_SIGNALLED, pthread_cond_signal(&(tev)->cond))
+	((tev)->signalled = THREAD_EVENT_SIGNALLED, \
+	 pthread_cond_signal(&(tev)->cond))
 #else
 #define thread_event_signal_nolock(tev)		!SetEvent((tev)->cond)
 #endif
@@ -191,7 +228,7 @@ thread_event_signal (thread_event_t *tev)
     int res;
 
     pthread_mutex_lock(csp);
-    tev->signalled = THREAD_COND_SIGNALLED;
+    tev->signalled = THREAD_EVENT_SIGNALLED;
     res = pthread_cond_signal(&tev->cond);
     pthread_mutex_unlock(csp);
 

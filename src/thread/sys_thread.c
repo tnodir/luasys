@@ -125,10 +125,10 @@ thread_waitvm (struct sys_vmthread *vmtd, msec_t timeout)
     if (vmtd->nref) {
 	sys_vm2_leave(&vmtd->td);
 #ifndef _WIN32
-	res = thread_event_wait_impl(&vmtd->td.cond, &vmtd->vmcs,
+	res = thread_cond_wait_value(&vmtd->td.cond, &vmtd->vmcs,
 	 &vmtd->nref, 0, 0, timeout);
 #else
-	res = thread_event_wait_impl(vmtd->evh, timeout);
+	res = thread_cond_wait(vmtd->evh, timeout);
 #endif
 	sys_vm2_enter(&vmtd->td);
     }
@@ -822,10 +822,10 @@ thread_wait (lua_State *L)
 
 	sys_vm_leave();
 #ifndef _WIN32
-	res = thread_event_wait_impl(&td->cond, td->vmcsp,
+	res = thread_cond_wait_value(&td->cond, td->vmcsp,
 	 &td->state, THREAD_KILLED, 0, timeout);
 #else
-	res = thread_event_wait_impl(td->tid, timeout);
+	res = thread_cond_wait(td->tid, timeout);
 #endif
 	sys_vm_enter();
     }

@@ -34,7 +34,7 @@ struct pipe_buf {
 
 struct pipe {
     thread_critsect_t cs;  /* guard access to pipe */
-    thread_event_t put_ev, get_ev;
+    thread_cond_t put_cond, get_cond;
 
     unsigned int volatile nmsg;  /* number of messages */
 
@@ -81,8 +81,8 @@ pipe_new (lua_State *L)
     lua_setmetatable(L, -2);
 
     if (thread_critsect_new(&pp->cs)
-     || thread_event_new(&pp->put_ev)
-     || thread_event_new(&pp->get_ev))
+     || thread_cond_new(&pp->put_cond)
+     || thread_cond_new(&pp->get_cond))
 	goto err;
 
     /* allocate initial buffer */
@@ -146,8 +146,8 @@ pipe_close (lua_State *L)
 
 	if (!nref) {
 	    thread_critsect_del(&pp->cs);
-	    thread_event_del(&pp->put_ev);
-	    thread_event_del(&pp->get_ev);
+	    thread_cond_del(&pp->put_cond);
+	    thread_cond_del(&pp->get_cond);
 
 	    /* deallocate buffers */
 	    if (pp->rbuf) {
@@ -260,6 +260,24 @@ pipe_msg_parse (lua_State *L, struct message *msg)
 }
 
 
+static int
+pipe_cond_wait (thread_cond_t *condp, thread_critsect_t *csp,
+                const msec_t timeout)
+{
+    int res;
+
+    sys_vm_leave();
+#ifndef _WIN32
+    res = thread_cond_wait_nolock(condp, csp, timeout);
+#else
+    thread_critsect_leave(csp);
+    res = thread_cond_wait(*condp, timeout);
+    thread_critsect_enter(csp);
+#endif
+    sys_vm_enter();
+    return res;
+}
+
 /*
  * Arguments: pipe_udata, message_items (any) ...
  * Returns: [pipe_udata]
@@ -283,11 +301,13 @@ pipe_put (lua_State *L)
 
 	if (msg.size > len) {
 	    if (!wrapped && buf.begin > msg.size) {
+		/* wrap the buffer */
 		struct message *mp = (struct message *) (pipe_buf_ptr(pb) + buf.end);
 		mp->size = 0;  /* sentinel tag */
 		buf.end = 0;
 	    } else if (pb != buf.next_buf
 	     && !buf.next_buf->begin && !buf.next_buf->end) {
+		/* use next free buffer */
 		pb = pp->wbuf = buf.next_buf;
 		buf = *pb;
 	    } else {
@@ -296,6 +316,7 @@ pipe_put (lua_State *L)
 		 ? malloc(buf_size) : NULL;
 
 		if (wpb) {
+		    /* allocate new buffer */
 		    buf.begin = buf.end = 0;
 		    buf.len = buf_size - sizeof(struct pipe_buf) - PIPE_BUF_SENTINEL_SIZE;
 		    /* buf->next_buf is already correct */
@@ -305,15 +326,15 @@ pipe_put (lua_State *L)
 		    pp->wbuf = wpb;
 		    pb = wpb;
 		} else {
-		    /* wait get signal */
+		    /* wait `get' signal */
 		    int res;
+
 		    pp->signal_on_get++;
-		    thread_critsect_leave(csp);
+		    res = pipe_cond_wait(&pp->get_cond, csp, TIMEOUT_INFINITE);
 
-		    res = thread_event_wait(&pp->get_ev, TIMEOUT_INFINITE);
-
-		    thread_critsect_enter(csp);
-		    pp->signal_on_get--;
+		    if (--pp->signal_on_get) {
+			(void) thread_cond_signal(&pp->get_cond);
+		    }
 		    if (!res) continue;
 		    thread_critsect_leave(csp);
 
@@ -329,7 +350,7 @@ pipe_put (lua_State *L)
 	break;
     }
     if (pp->signal_on_put) {
-	(void) thread_event_signal_nolock(&pp->put_ev);
+	(void) thread_cond_signal(&pp->put_cond);
     }
     thread_critsect_leave(csp);
 
@@ -350,6 +371,7 @@ pipe_get (lua_State *L)
     thread_critsect_t *csp = pipe_critsect_ptr(pp);
     struct message msg;
 
+    /* read message from buffer */
     thread_critsect_enter(csp);
     for (; ; ) {
 	if (pp->nmsg) {
@@ -357,7 +379,7 @@ pipe_get (lua_State *L)
 	    struct pipe_buf buf = *pb;
 	    struct message *mp = (struct message *) (pipe_buf_ptr(pb) + buf.begin);
 
-	    if (!mp->size) {  /* wrapped */
+	    if (!mp->size) {  /* buffer is wrapped */
 		mp = (struct message *) pipe_buf_ptr(pb);
 		buf.begin = 0;
 	    }
@@ -372,17 +394,17 @@ pipe_get (lua_State *L)
 		buf.begin = 0;
 	    }
 	    *pb = buf;
-	    pp->nmsg--;
+	    if (--pp->nmsg && pp->signal_on_put) {
+		(void) thread_cond_signal(&pp->put_cond);
+	    }
 	} else {
-	    /* wait put signal */
+	    /* wait `put' signal */
 	    int res;
+
 	    pp->signal_on_put++;
-	    thread_critsect_leave(csp);
-
-	    res = thread_event_wait(&pp->put_ev, timeout);
-
-	    thread_critsect_enter(csp);
+	    res = pipe_cond_wait(&pp->put_cond, csp, timeout);
 	    pp->signal_on_put--;
+
 	    if (!res) continue;
 	    thread_critsect_leave(csp);
 
@@ -395,11 +417,11 @@ pipe_get (lua_State *L)
 	break;
     }
     if (pp->signal_on_get) {
-	(void) thread_event_signal_nolock(&pp->get_ev);
+	(void) thread_cond_signal(&pp->get_cond);
     }
     thread_critsect_leave(csp);
 
-    return pipe_msg_parse(L, &msg);
+    return pipe_msg_parse(L, &msg);  /* deconstruct the message */
 }
 
 /*

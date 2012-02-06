@@ -10,12 +10,15 @@ thread.init()
 print"<Enter> to start..."
 sys.stdin:read()
 
-local COUNT = 100000000
+local COUNT = 1000000000
 local NPROCS = thread.nprocs() or sys.nprocs()
 
 if NPROCS > COUNT then
 	NPROCS = COUNT
 end
+
+local period = sys.period()
+period:start()
 
 -- Pipe
 local work_pipe = thread.pipe()
@@ -42,17 +45,15 @@ end
 
 -- Wait result
 do
-	local period = sys.period()
 	local sum = 0
 
-	period:start()
 	for i = 1, NPROCS do
 		local res = work_pipe:get()
 		sum = sum + res
 	end
 
-	print("time=", period:get() / 1000)
-	print("nprocs=", NPROCS)
-	print("count=", COUNT)
-	print("sum=", sum)
+	print("time:", period:get() / 1000)
+	print("nprocs:", NPROCS)
+	print("count:", COUNT)
+	print("sum:", sum)
 end
