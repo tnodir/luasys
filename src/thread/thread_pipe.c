@@ -50,12 +50,18 @@ struct pipe {
     unsigned int volatile nref;
 };
 
+struct pipe_ref {
+    struct pipe *pipe;
+    msec_t put_timeout;
+};
+
 #define pipe_buf_ptr(pb)	(char *) ((struct pipe_buf *) pb + 1)
 #define pipe_critsect_ptr(pp)	(&pp->cs)
 
 
 /*
- * Arguments: [buffer_max_size (number), buffer_min_size (number)]
+ * Arguments: [buffer_max_size (number), buffer_min_size (number),
+ *	put_timeout (milliseconds)]
  * Returns: [pipe_udata]
  */
 static int
@@ -63,7 +69,10 @@ pipe_new (lua_State *L)
 {
     const unsigned int max_size = luaL_optunsigned(L, 1, PIPE_BUF_MAXSIZE);
     const unsigned int min_size = luaL_optunsigned(L, 2, PIPE_BUF_MINSIZE);
-    struct pipe *pp, **ppp;
+    const msec_t timeout = lua_isnoneornil(L, 3)
+     ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 3);
+    struct pipe_ref *pr;
+    struct pipe *pp;
 
     if (min_size > max_size
      || min_size < PIPE_BUF_MINSIZE
@@ -72,11 +81,13 @@ pipe_new (lua_State *L)
      || ((max_size / min_size) & (max_size / min_size - 1)) != 0)
 	luaL_argerror(L, 1, "invalid size");
 
-    ppp = (struct pipe **) lua_newuserdata(L, sizeof(void *));
+    pr = lua_newuserdata(L, sizeof(struct pipe_ref));
     pp = calloc(sizeof(struct pipe), 1);
     if (!pp) goto err;
 
-    *ppp = pp;
+    pr->pipe = pp;
+    pr->put_timeout = timeout;
+
     luaL_getmetatable(L, PIPE_TYPENAME);
     lua_setmetatable(L, -2);
 
@@ -133,10 +144,10 @@ pipe_xdup (lua_State *L)
 static int
 pipe_close (lua_State *L)
 {
-    struct pipe **ppp = (struct pipe **) checkudata(L, 1, PIPE_TYPENAME);
+    struct pipe_ref *pr = checkudata(L, 1, PIPE_TYPENAME);
+    struct pipe *pp = pr->pipe;
 
-    if (*ppp) {
-	struct pipe *pp = *ppp;
+    if (pp) {
 	thread_critsect_t *csp = pipe_critsect_ptr(pp);
 	int nref;
 
@@ -160,7 +171,7 @@ pipe_close (lua_State *L)
 	    }
 	    free(pp);
 	}
-	*ppp = NULL;
+	pr->pipe = NULL;
     }
     return 0;
 }
@@ -274,12 +285,13 @@ pipe_cond_wait (thread_cond_t *condp, thread_critsect_t *csp,
 
 /*
  * Arguments: pipe_udata, message_items (any) ...
- * Returns: [pipe_udata]
+ * Returns: [pipe_udata | timedout (false)]
  */
 static int
 pipe_put (lua_State *L)
 {
-    struct pipe *pp = lua_unboxpointer(L, 1, PIPE_TYPENAME);
+    struct pipe_ref *pr = checkudata(L, 1, PIPE_TYPENAME);
+    struct pipe *pp = pr->pipe;
     thread_critsect_t *csp = pipe_critsect_ptr(pp);
     struct message msg;
 
@@ -324,7 +336,7 @@ pipe_put (lua_State *L)
 		    int res;
 
 		    pp->signal_on_get++;
-		    res = pipe_cond_wait(&pp->get_cond, csp, TIMEOUT_INFINITE);
+		    res = pipe_cond_wait(&pp->get_cond, csp, pr->put_timeout);
 
 		    if (--pp->signal_on_get) {
 			(void) thread_cond_signal(&pp->get_cond);
@@ -332,6 +344,10 @@ pipe_put (lua_State *L)
 		    if (!res) continue;
 		    thread_critsect_leave(csp);
 
+		    if (res == 1) {
+			lua_pushboolean(L, 0);
+			return 1;  /* timed out */
+		    }
 		    return sys_seterror(L, 0);
 		}
 	    }
