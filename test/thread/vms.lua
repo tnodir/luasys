@@ -51,7 +51,7 @@ do
 	local expect = to - from + 1
 	local count = 0
 	for i = from, to do
-	    local num, r, s = work_pipe:get()
+	    local _, num, r, s = work_pipe:get()
 	    if num == false then break end
 	    local d = num % 10
 	    local data = rep(d, r + 1)

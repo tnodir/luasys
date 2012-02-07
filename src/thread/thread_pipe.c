@@ -183,7 +183,7 @@ static void
 pipe_msg_build (lua_State *L, struct message *msg, int idx)
 {
     char *cp = msg->items;
-    char *endp = cp + MSG_MAXSIZE - MSG_ITEM_ALIGN;
+    const char *endp = cp + MSG_MAXSIZE - MSG_ITEM_ALIGN;
     const int top = lua_gettop(L);
 
     for (; idx <= top; ++idx) {
@@ -197,7 +197,7 @@ pipe_msg_build (lua_State *L, struct message *msg, int idx)
 	    s = lua_tolstring(L, idx, &len);
 
 	if (cp + len >= endp)
-	    luaL_argerror(L, idx, "message is too big");
+	    luaL_argerror(L, idx, "too big message");
 
 	switch (type) {
 	case LUA_TSTRING:
@@ -235,22 +235,22 @@ pipe_msg_build (lua_State *L, struct message *msg, int idx)
 static int
 pipe_msg_parse (lua_State *L, struct message *msg)
 {
-    char *cp = msg->items;
-    char *endp = (char *) msg + msg->size;
-    int i, stack_checked = 0;
+    const char *cp = msg->items;
+    const char *endp = (char *) msg + msg->size;
+    int n, stack_checked = 1;
 
-    for (i = 1; cp < endp; ++i) {
-	struct message_item *item = (struct message_item *) cp;
+    for (n = 0; cp < endp; ++n) {
+	const struct message_item *item = (const struct message_item *) cp;
 	const int len = item->len;
 
-	if (!stack_checked--) {
+	if (!--stack_checked) {
 	    stack_checked = 16;
-	    luaL_checkstack(L, stack_checked, "too large message");
+	    luaL_checkstack(L, stack_checked, "too big message");
 	}
 
 	switch (item->type) {
 	case LUA_TSTRING:
-	    lua_pushlstring(L, (char *) &item->v, len);
+	    lua_pushlstring(L, (const char *) &item->v, len);
 	    break;
 	case LUA_TNUMBER:
 	    lua_pushnumber(L, item->v.num);
@@ -267,7 +267,7 @@ pipe_msg_parse (lua_State *L, struct message *msg)
 	cp += offsetof(struct message_item, v);
 	cp += (len + (MSG_ITEM_ALIGN-1)) & ~(MSG_ITEM_ALIGN-1);
     }
-    return i - 1;
+    return n;
 }
 
 
@@ -370,7 +370,7 @@ pipe_put (lua_State *L)
 
 /*
  * Arguments: pipe_udata, [timeout (milliseconds)]
- * Returns: [message_items (any) ... | timedout (false)]
+ * Returns: [pipe_udata | timedout (false), message_items (any) ...]
  */
 static int
 pipe_get (lua_State *L)
@@ -431,7 +431,8 @@ pipe_get (lua_State *L)
     }
     thread_critsect_leave(csp);
 
-    return pipe_msg_parse(L, &msg);  /* deconstruct the message */
+    lua_settop(L, 1);
+    return 1 + pipe_msg_parse(L, &msg);  /* deconstruct the message */
 }
 
 /*

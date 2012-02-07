@@ -48,7 +48,7 @@ do
 	local sum = 0
 
 	for i = 1, NPROCS do
-		local res = work_pipe:get()
+		local _, res = work_pipe:get()
 		sum = sum + res
 	end
 
