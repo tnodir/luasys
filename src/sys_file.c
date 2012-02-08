@@ -344,14 +344,23 @@ sys_close (lua_State *L)
 }
 
 /*
- * Arguments: fd_udata
+ * Arguments: fd_udata, [handle (ludata)]
+ * Returns: [fd_udata | handle (ludata)]
  */
 static int
-sys_dispose (lua_State *L)
+sys_handle (lua_State *L)
 {
     fd_t *fdp = checkudata(L, 1, FD_TYPENAME);
-    *fdp = (fd_t) -1;
-    return 0;
+
+    if (lua_gettop(L) > 1) {
+	void *h = lua_touserdata(L, 2);
+	*fdp = !h ? (fd_t) -1 : (fd_t) h;
+	lua_settop(L, 1);
+    } else {
+	if (*fdp == (fd_t) -1) lua_pushnil(L);
+	else lua_pushlightuserdata(L, (void *) *fdp);
+    }
+    return 1;
 }
 
 /*
@@ -794,7 +803,7 @@ static luaL_Reg fd_meth[] = {
     {"tempfile",	sys_tempfile},
     {"pipe",		sys_pipe},
     {"close",		sys_close},
-    {"dispose",		sys_dispose},
+    {"handle",		sys_handle},
     {"fdopen",		sys_fdopen},
     {"fileno",		sys_fileno},
     {"set_std",		sys_set_std},

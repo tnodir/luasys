@@ -26,6 +26,8 @@ static struct {
     char root[MAX_PATHNAME];
 } g_ISAPI;
 
+static void lisapi_createmeta (lua_State *L);
+
 
 #include "isapi_ecb.c"
 
@@ -80,7 +82,7 @@ lisapi_init (void)
 
     luaL_openlibs(L);  /* open standard libraries */
 
-    lua_pushcfunction(L, traceback);  /* push traceback function */
+    lua_pushcfunction(L, traceback);  /* 1: traceback function */
 
     /* load initialization script */
     {
@@ -90,17 +92,14 @@ lisapi_init (void)
     }
 
     lua_pushstring(L, g_ISAPI.root);
-    if (lua_pcall(L, 1, 1, 1)
-     || !lua_isfunction(L, -1))
+    if (lua_pcall(L, 1, 2, 1)
+     || !lua_isfunction(L, 2)  /* 2: request handler */
+     || !lua_isfunction(L, 3))  /* 3: closing handler */
 	goto err;
 
     g_ISAPI.vmtd = sys_get_thread();
     if (g_ISAPI.vmtd) {
-	luaL_newmetatable(L, ECB_TYPENAME);
-	lua_pushvalue(L, -1);  /* push metatable */
-	lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
-	luaL_setfuncs(L, ecb_meth, 0);
-	lua_pop(L, 1);
+	lisapi_createmeta(L);
 
 	g_ISAPI.nthreads = 0;
 	g_ISAPI.L = L;
@@ -114,7 +113,8 @@ lisapi_init (void)
 
  err:
 #ifndef NDEBUG
-    fprintf(flog, "ERROR: %s\n", lua_tostring(L, -1));
+    fprintf(flog, "init: %s\n", lua_tostring(L, -1));
+    fclose(flog);
  err_log:
 #endif
     lua_close(L);
@@ -200,12 +200,20 @@ TerminateExtension (DWORD flags)
     (void) flags;
 
     if (g_ISAPI.vmtd) {
+	sys_vm2_enter(g_ISAPI.vmtd);
+	sys_set_thread(g_ISAPI.vmtd);
+
+	if (lua_pcall(g_ISAPI.L, 0, 0, 1)) {
+#ifndef NDEBUG
+	    fprintf(flog, "close: %s\n", lua_tostring(g_ISAPI.L, -1));
+#endif
+	}
 	lua_close(g_ISAPI.L);
-	g_ISAPI.vmtd = NULL;
 
 #ifndef NDEBUG
 	fclose(flog);
 #endif
+	g_ISAPI.vmtd = NULL;
     }
     return TRUE;
 }
@@ -215,6 +223,7 @@ HttpExtensionProc (LPEXTENSION_CONTROL_BLOCK ecb)
 {
     lua_State *L;
     struct sys_thread *td;
+    DWORD res = HSE_STATUS_SUCCESS;
     int status;
 
     sys_vm2_enter(g_ISAPI.vmtd);
@@ -230,29 +239,70 @@ HttpExtensionProc (LPEXTENSION_CONTROL_BLOCK ecb)
     ecb->dwHttpStatusCode = 200;
     status = lua_pcall(L, 1, 0, 1);
 
-    if (ecb->dwHttpStatusCode & ~ECB_STATUS_MASK) {
-	ecb->dwHttpStatusCode &= ECB_STATUS_MASK;
+    if (ecb->dwHttpStatusCode & ECB_STATUS_PENDING) {
+	ecb->dwHttpStatusCode &= ~ECB_STATUS_PENDING;
+	res = HSE_STATUS_PENDING;
+    } else {
+	if (ecb->dwHttpStatusCode & ~ECB_STATUS_MASK) {
+	    ecb->dwHttpStatusCode &= ECB_STATUS_MASK;
 
-	lua_pushnil(L);
-	lua_rawsetp(L, LUA_REGISTRYINDEX, ecb);
-    }
-    if (status) {
-	const char *s;
-	size_t len;
+	    lua_pushnil(L);
+	    lua_rawsetp(L, LUA_REGISTRYINDEX, ecb);
+	}
+	if (status) {
+	    const char *s;
+	    size_t len;
 
-	lua_pushliteral(L, "\n\n<pre>");
-	lua_insert(L, -2);
-	lua_concat(L, 2);
-	s = lua_tolstring(L, -1, &len);
+	    lua_pushliteral(L, "\n\n<pre>");
+	    lua_insert(L, -2);
+	    lua_concat(L, 2);
+	    s = lua_tolstring(L, -1, &len);
 
-	ecb->dwHttpStatusCode = 500;
-	ecb->WriteClient(ecb->ConnID, (char *) s, (DWORD *) &len, 0);
-	lua_pop(L, 1);
+#ifndef NDEBUG
+	    fprintf(flog, "process: %s\n", s);
+#endif
+
+	    ecb->dwHttpStatusCode = 500;
+	    ecb->WriteClient(ecb->ConnID, (char *) s, (DWORD *) &len, 0);
+	    lua_pop(L, 1);
+	}
     }
 
     lisapi_close(td, status);
  err:
     sys_vm2_leave(g_ISAPI.vmtd);
-    return HSE_STATUS_SUCCESS;
+    return res;
 }
 
+
+static luaL_Reg isapi_lib[] = {
+    {"ecb",	ecb_new},
+    {NULL, NULL}
+};
+
+
+static void
+lisapi_createmeta (lua_State *L)
+{
+    /* already created? */
+    luaL_getmetatable(L, ECB_TYPENAME);
+    {
+	const int created = !lua_isnil(L, -1);
+	lua_pop(L, 1);
+	if (created) return;
+    }
+
+    luaL_newmetatable(L, ECB_TYPENAME);
+    lua_pushvalue(L, -1);  /* push metatable */
+    lua_setfield(L, -2, "__index");  /* metatable.__index = metatable */
+    luaL_setfuncs(L, ecb_meth, 0);
+    lua_pop(L, 1);
+}
+
+LUALIB_API int
+luaopen_sys_isapi (lua_State *L)
+{
+    luaL_register(L, "sys.isapi", isapi_lib);
+    lisapi_createmeta(L);
+    return 1;
+}

@@ -637,6 +637,9 @@ thread_runvm (lua_State *L)
 		lua_pushlightuserdata(L, NL);
 		lua_call(L, 2, 0);
 		break;
+	    case LUA_TNIL:
+		lua_pushnil(NL);
+		break;
 	    default:
 		luaL_argerror(L, i, "primitive type expected");
 	    }

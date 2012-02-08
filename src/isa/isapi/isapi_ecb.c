@@ -5,7 +5,39 @@
 #define ECB_STATUS_MASK		0x0FFF
 #define ECB_STATUS_HEADERS	0x1000
 #define ECB_STATUS_HEADERS_SEND	0x2000
+#define ECB_STATUS_PENDING	0x4000
 
+
+/*
+ * Returns: ecb_udata
+ */
+static int
+ecb_new (lua_State *L)
+{
+    lua_boxpointer(L, NULL);
+    luaL_getmetatable(L, ECB_TYPENAME);
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+/*
+ * Arguments: ecb_udata, [handle (ludata)]
+ * Returns: [ecb_udata | handle (ludata)]
+ */
+static int
+ecb_handle (lua_State *L)
+{
+    LPEXTENSION_CONTROL_BLOCK *ecbp = checkudata(L, 1, ECB_TYPENAME);
+
+    if (lua_gettop(L) > 1) {
+	*ecbp = lua_touserdata(L, 2);
+	lua_settop(L, 1);
+    } else {
+	if (!*ecbp) lua_pushnil(L);
+	else lua_pushlightuserdata(L, *ecbp);
+    }
+    return 1;
+}
 
 /*
  * Arguments: ecb_udata, variable_name (string)
@@ -189,13 +221,53 @@ ecb_header (lua_State *L)
     return 0;
 }
 
+/*
+ * Arguments: ecb_udata
+ */
+static int
+ecb_req_pending (lua_State *L)
+{
+    LPEXTENSION_CONTROL_BLOCK ecb = lua_unboxpointer(L, 1, ECB_TYPENAME);
+
+    ecb->dwHttpStatusCode |= ECB_STATUS_PENDING;
+    return 0;
+}
+
+/*
+ * Arguments: ecb_udata
+ * Returns: [ecb_udata]
+ */
+static int
+ecb_req_done (lua_State *L)
+{
+    LPEXTENSION_CONTROL_BLOCK ecb = lua_unboxpointer(L, 1, ECB_TYPENAME);
+    DWORD res = HSE_STATUS_SUCCESS;
+
+    if (ecb->dwHttpStatusCode & ~ECB_STATUS_MASK) {
+	ecb->dwHttpStatusCode &= ECB_STATUS_MASK;
+
+	lua_pushnil(L);
+	lua_rawsetp(L, LUA_REGISTRYINDEX, ecb);
+    }
+
+    if (ecb->ServerSupportFunction(ecb->ConnID, HSE_REQ_DONE_WITH_SESSION,
+     &res, NULL,NULL)) {
+	lua_settop(L, 1);
+	return 1;
+    }
+    return sys_seterror(L, 0);
+}
+
 
 static luaL_Reg ecb_meth[] = {
+    {"handle",		ecb_handle},
     {"getvar",		ecb_getvar},
     {"data",		ecb_data},
     {"read",		ecb_read},
     {"write",		ecb_write},
     {"header",		ecb_header},
+    {"req_pending",	ecb_req_pending},
+    {"req_done",	ecb_req_done},
     {SYS_BUFIO_TAG,	NULL},  /* can operate with buffers */
     {NULL, NULL}
 };

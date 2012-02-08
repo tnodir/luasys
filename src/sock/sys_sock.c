@@ -180,6 +180,26 @@ sock_close (lua_State *L)
 }
 
 /*
+ * Arguments: sd_udata, [handle (ludata)]
+ * Returns: [sd_udata | handle (ludata)]
+ */
+static int
+sock_handle (lua_State *L)
+{
+    sd_t *sdp = checkudata(L, 1, SD_TYPENAME);
+
+    if (lua_gettop(L) > 1) {
+	void *h = lua_touserdata(L, 2);
+	*sdp = !h ? (sd_t) -1 : (sd_t) h;
+	lua_settop(L, 1);
+    } else {
+	if (*sdp == (sd_t) -1) lua_pushnil(L);
+	else lua_pushlightuserdata(L, (void *) *sdp);
+    }
+    return 1;
+}
+
+/*
  * Arguments: sd_udata
  * Returns: [sd_udata]
  */
@@ -782,6 +802,7 @@ sock_tostring (lua_State *L)
 static luaL_Reg sock_meth[] = {
     {"socket",		sock_socket},
     {"close",		sock_close},
+    {"handle",		sock_handle},
     {"shutdown",	sock_shutdown},
     {"nonblocking",	sock_nonblocking},
     {"sockopt",		sock_sockopt},
