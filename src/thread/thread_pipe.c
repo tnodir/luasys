@@ -60,8 +60,7 @@ struct pipe_ref {
 
 
 /*
- * Arguments: [buffer_max_size (number), buffer_min_size (number),
- *	put_timeout (milliseconds)]
+ * Arguments: [buffer_max_size (number), buffer_min_size (number)]
  * Returns: [pipe_udata]
  */
 static int
@@ -69,8 +68,6 @@ pipe_new (lua_State *L)
 {
     const unsigned int max_size = luaL_optunsigned(L, 1, PIPE_BUF_MAXSIZE);
     const unsigned int min_size = luaL_optunsigned(L, 2, PIPE_BUF_MINSIZE);
-    const msec_t timeout = lua_isnoneornil(L, 3)
-     ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 3);
     struct pipe_ref *pr;
     struct pipe *pp;
 
@@ -86,7 +83,7 @@ pipe_new (lua_State *L)
     if (!pp) goto err;
 
     pr->pipe = pp;
-    pr->put_timeout = timeout;
+    pr->put_timeout = TIMEOUT_INFINITE;
 
     luaL_getmetatable(L, PIPE_TYPENAME);
     lua_setmetatable(L, -2);
@@ -122,13 +119,16 @@ pipe_new (lua_State *L)
 static int
 pipe_xdup (lua_State *L)
 {
-    struct pipe *pp = lua_unboxpointer(L, 1, PIPE_TYPENAME);
+    struct pipe_ref *pr = checkudata(L, 1, PIPE_TYPENAME);
     lua_State *L2 = (lua_State *) lua_touserdata(L, 2);
+    struct pipe *pp = pr->pipe;
     thread_critsect_t *csp = pipe_critsect_ptr(pp);
+    struct pipe_ref *pr2;
 
     if (!L2) luaL_argerror(L, 2, "VM-thread expected");
 
-    lua_boxpointer(L2, pp);
+    pr2 = lua_newuserdata(L2, sizeof(struct pipe_ref));
+    *pr2 = *pr;
     luaL_getmetatable(L2, PIPE_TYPENAME);
     lua_setmetatable(L2, -2);
 
@@ -175,6 +175,24 @@ pipe_close (lua_State *L)
     }
     return 0;
 }
+
+/*
+ * Arguments: pipe_udata, put_timeout (milliseconds)
+ * Returns: [pipe_udata]
+ */
+static int
+pipe_put_timeout (lua_State *L)
+{
+    struct pipe_ref *pr = checkudata(L, 1, PIPE_TYPENAME);
+    const msec_t timeout = lua_isnoneornil(L, 2)
+     ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
+
+    pr->put_timeout = timeout;
+
+    lua_settop(L, 1);
+    return 1;
+}
+
 
 /*
  * Arguments: ..., message_items (any) ...
@@ -473,6 +491,7 @@ pipe_tostring (lua_State *L)
 
 static luaL_Reg pipe_meth[] = {
     {THREAD_XDUP_TAG,	pipe_xdup},
+    {"put_timeout",	pipe_put_timeout},
     {"put",		pipe_put},
     {"get",		pipe_get},
     {"__len",		pipe_count},
