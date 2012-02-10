@@ -190,11 +190,11 @@ sock_handle (lua_State *L)
 
     if (lua_gettop(L) > 1) {
 	void *h = lua_touserdata(L, 2);
-	*sdp = !h ? (sd_t) -1 : (sd_t) h;
+	*sdp = !h ? (sd_t) -1 : (sd_t) (size_t) h;
 	lua_settop(L, 1);
     } else {
 	if (*sdp == (sd_t) -1) lua_pushnil(L);
-	else lua_pushlightuserdata(L, (void *) *sdp);
+	else lua_pushlightuserdata(L, (void *) (size_t) *sdp);
     }
     return 1;
 }

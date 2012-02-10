@@ -6,6 +6,10 @@ typedef cpu_set_t	affin_mask_t;
 
 #define USE_PTHREAD_AFFIN
 
+#ifndef CPU_ALLOC
+#define CPU_ALLOC(n)	malloc(n / CHAR_BIT)
+#define CPU_FREE(p)	free(p)
+#endif
 #define CPU_NEW()	CPU_ALLOC(CPU_SETSIZE)
 #define CPU_DEL(p)	CPU_FREE(p)
 #define CPU_SIZEOF(p)	sizeof(affin_mask_t)

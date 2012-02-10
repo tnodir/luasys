@@ -354,11 +354,11 @@ sys_handle (lua_State *L)
 
     if (lua_gettop(L) > 1) {
 	void *h = lua_touserdata(L, 2);
-	*fdp = !h ? (fd_t) -1 : (fd_t) h;
+	*fdp = !h ? (fd_t) -1 : (fd_t) (size_t) h;
 	lua_settop(L, 1);
     } else {
 	if (*fdp == (fd_t) -1) lua_pushnil(L);
-	else lua_pushlightuserdata(L, (void *) *fdp);
+	else lua_pushlightuserdata(L, (void *) (size_t) *fdp);
     }
     return 1;
 }

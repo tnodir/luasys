@@ -115,7 +115,7 @@ timeout_get (const struct timeout_queue *tq, msec_t min, msec_t now)
 
     if (min == TIMEOUT_INFINITE)
 	min = tq->ev_head->timeout_at;
-    min += now;
+    else min += now;
 
     do {
 	const msec_t t = tq->ev_head->timeout_at;
