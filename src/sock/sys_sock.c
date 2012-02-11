@@ -529,9 +529,11 @@ sock_recv (lua_State *L)
     const size_t len = n;  /* how much total to read */
     size_t rlen;  /* how much to read */
     int nr;  /* number of bytes actually read */
+    struct sys_thread *td = sys_get_thread();
     struct sys_buffer sb;
     char buf[SYS_BUFSIZE];
     unsigned int i, flags = 0;
+    int res = 0;
 
     sys_buffer_write_init(L, 2, &sb, buf, sizeof(buf));
 
@@ -544,27 +546,28 @@ sock_recv (lua_State *L)
     }
     do {
 	rlen = (n <= sb.size) ? n : sb.size;
-	sys_vm_leave();
+	if (td) sys_vm2_leave(td);
 #ifndef _WIN32
 	do nr = recvfrom(sd, sb.ptr.w, rlen, flags, sap, slp);
 	while (nr == -1 && sys_isintr());
 #else
 	nr = recvfrom(sd, sb.ptr.w, rlen, flags, sap, slp);
 #endif
-	sys_vm_enter();
+	if (td) sys_vm2_enter(td);
 	if (nr == -1) break;
 	n -= nr;  /* still have to read `n' bytes */
     } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
      && sys_buffer_write_next(L, &sb, buf, 0));
     if (nr <= 0 && len == n) {
-	if (!nr || !SYS_EAGAIN(SYS_ERRNO)) goto err;
-	lua_pushboolean(L, 0);
+	if (!nr || !SYS_EAGAIN(SYS_ERRNO))
+	    res = -1;
+	else lua_pushboolean(L, 0);
     } else {
 	if (!sys_buffer_write_done(L, &sb, buf, nr))
 	    lua_pushinteger(L, len - n);
     }
-    return 1;
- err:
+    if (td) sys_check_thread(td);
+    if (!res) return 1;
     return sys_seterror(L, 0);
 }
 
@@ -749,13 +752,15 @@ sock_read (lua_State *L)
     const size_t len = n;  /* how much total to read */
     size_t rlen;  /* how much to read */
     int nr;  /* number of bytes actually read */
+    struct sys_thread *td = sys_get_thread();
     struct sys_buffer sb;
     char buf[SYS_BUFSIZE];
+    int res = 0;
 
     sys_buffer_write_init(L, 2, &sb, buf, sizeof(buf));
     do {
 	rlen = (n <= sb.size) ? n : sb.size;
-	sys_vm_leave();
+	if (td) sys_vm2_leave(td);
 #ifndef _WIN32
 	do nr = read(sd, sb.ptr.w, rlen);
 	while (nr == -1 && sys_isintr());
@@ -771,20 +776,21 @@ sock_read (lua_State *L)
 	     ? (int) l : -1;
 	}
 #endif
-	sys_vm_enter();
+	if (td) sys_vm2_enter(td);
 	if (nr == -1) break;
 	n -= nr;  /* still have to read `n' bytes */
     } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
      && sys_buffer_write_next(L, &sb, buf, 0));
     if (nr <= 0 && len == n) {
-	if (!nr || !SYS_EAGAIN(SYS_ERRNO)) goto err;
-	lua_pushboolean(L, 0);
+	if (!nr || !SYS_EAGAIN(SYS_ERRNO))
+	    res = -1;
+	else lua_pushboolean(L, 0);
     } else {
 	if (!sys_buffer_write_done(L, &sb, buf, nr))
 	    lua_pushinteger(L, len - n);
     }
-    return 1;
- err:
+    if (td) sys_check_thread(td);
+    if (!res) return 1;
     return sys_seterror(L, 0);
 }
 

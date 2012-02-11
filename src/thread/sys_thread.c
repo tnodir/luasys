@@ -113,7 +113,7 @@ sys_get_thread (void)
 struct sys_thread *
 sys_get_vmthread (struct sys_thread *td)
 {
-    return td ? (struct sys_thread *) td->vmtd : NULL;
+    return td ? thread_getvm(td) : NULL;
 }
 
 struct lua_State *
@@ -192,14 +192,31 @@ thread_exit (struct sys_thread *td)
 }
 
 void
+sys_check_thread (struct sys_thread *td)
+{
+    lua_assert(td);
+
+    if (td->state == THREAD_KILLED)
+	thread_exit(td);
+    else if (td->state == THREAD_INTERRUPTED) {
+	lua_pushlightuserdata(td->L, THREAD_KEY_ADDRESS);
+	lua_error(td->L);
+    }
+}
+
+void
 sys_vm2_enter (struct sys_thread *td)
 {
+    lua_assert(td);
+
     thread_critsect_enter(td->vmcsp);
 }
 
 void
 sys_vm2_leave (struct sys_thread *td)
 {
+    lua_assert(td);
+
     thread_critsect_leave(td->vmcsp);
 }
 
@@ -209,16 +226,10 @@ sys_vm_enter (void)
     if (g_TLSIndex != INVALID_TLS_INDEX) {
 	struct sys_thread *td = sys_get_thread();
 
-	if (!td) return;
-	thread_critsect_enter(td->vmcsp);
+	if (td) {
+	    thread_critsect_enter(td->vmcsp);
 
-	if (td->state) {
-	    if (td->state == THREAD_KILLED)
-		thread_exit(td);
-	    else /*if (td->state == THREAD_INTERRUPTED)*/ {
-		lua_pushlightuserdata(td->L, THREAD_KEY_ADDRESS);
-		lua_error(td->L);
-	    }
+	    if (td->state) sys_check_thread(td);
 	}
     }
 }

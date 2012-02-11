@@ -152,9 +152,9 @@ log_report (lua_State *L)
 	 0, 3299, NULL, sizeof(buf) / sizeof(buf[0]), 0,
 	 (const CHAR **) buf, NULL);
     }
-    sys_vm_enter();
 
     free(buf[0]);
+    sys_vm_enter();
 #endif
     lua_settop(L, 1);
     return 1;

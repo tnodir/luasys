@@ -201,6 +201,8 @@ struct sys_thread *sys_get_thread (void);
 struct sys_thread *sys_get_vmthread (struct sys_thread *);
 struct lua_State *sys_lua_tothread (struct sys_thread *);
 
+void sys_check_thread (struct sys_thread *td);
+
 void sys_vm2_enter (struct sys_thread *td);
 void sys_vm2_leave (struct sys_thread *td);
 

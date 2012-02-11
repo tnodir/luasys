@@ -42,7 +42,15 @@ sys_stat (lua_State *L)
 #ifndef _WIN32
     res = stat(path, &st);
 #else
-    res = _stat(path, &st);
+    {
+	void *os_path = utf8_to_filename(path);
+	if (!os_path)
+	    return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
+
+	res = is_WinNT ? _wstat(os_path, &st) : _stat(os_path, &st);
+
+	free(os_path);
+    }
 #endif
     sys_vm_enter();
 
@@ -153,9 +161,9 @@ sys_statfs (lua_State *L)
 	res = is_WinNT
 	 ? !GetDiskFreeSpaceExW(os_path, &na, &nt, &nf)
 	 : !GetDiskFreeSpaceExA(os_path, &na, &nt, &nf);
-	sys_vm_enter();
 
 	free(os_path);
+	sys_vm_enter();
     }
 
     ntotal = (int64_t) nt.QuadPart;
@@ -195,9 +203,9 @@ sys_remove (lua_State *L)
 	res = is_WinNT
 	 ? !DeleteFileW(os_path)
 	 : !DeleteFileA(os_path);
-	sys_vm_enter();
 
 	free(os_path);
+	sys_vm_enter();
     }
 #endif
 
@@ -237,10 +245,10 @@ sys_rename (lua_State *L)
 	res = is_WinNT
 	 ? !MoveFileW(os_old, os_new)
 	 : !MoveFileA(os_old, os_new);
-	sys_vm_enter();
 
 	free(os_old);
 	free(os_new);
+	sys_vm_enter();
     }
 #endif
 
@@ -378,9 +386,9 @@ sys_mkdir (lua_State *L)
 	res = is_WinNT
 	 ? !CreateDirectoryW(os_path, NULL)
 	 : !CreateDirectoryA(os_path, NULL);
-	sys_vm_enter();
 
 	free(os_path);
+	sys_vm_enter();
     }
 #endif
     if (!res) {
@@ -414,9 +422,9 @@ sys_rmdir (lua_State *L)
 	res = is_WinNT
 	 ? !RemoveDirectoryW(os_path)
 	 : !RemoveDirectoryA(os_path);
-	sys_vm_enter();
 
 	free(os_path);
+	sys_vm_enter();
     }
 #endif
     if (!res) {
@@ -481,9 +489,9 @@ sys_dir_open (lua_State *L, const int idx, struct dir *dp)
 	    dp->h = is_WinNT
 	     ? FindFirstFileW(os_path, &dp->data)
 	     : FindFirstFileA(os_path, (WIN32_FIND_DATAA *) &dp->data);
-	    sys_vm_enter();
 
 	    free(os_path);
+	    sys_vm_enter();
 	}
 
 	if (dp->h != INVALID_HANDLE_VALUE) {

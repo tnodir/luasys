@@ -246,9 +246,9 @@ sock_getifaddrs (lua_State *L)
     sys_vm_leave();
     res = WSAIoctl(sd, SIO_GET_INTERFACE_LIST, NULL, 0,
      result, sizeof(result), &n, NULL, NULL);
-    sys_vm_enter();
 
     closesocket(sd);
+    sys_vm_enter();
 #endif
 
     if (res == -1)
