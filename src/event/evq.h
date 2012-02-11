@@ -20,6 +20,7 @@ struct event_queue;
 #include "select.h"
 #endif
 
+#include "signal.h"
 #include "timeout.h"
 
 /* Event Queue wait result */
@@ -57,7 +58,7 @@ struct event {
 #define EVENT_AIO		0x00000800
 #define EVENT_CALLBACK		0x00001000  /* callback exist */
 #define EVENT_CALLBACK_THREAD	0x00002000  /* callback is coroutine */
-#define EVENT_SOCKET_ACC_CONN	0x00004000  /* IOCP: don't use listening or connecting socket */
+#define EVENT_SOCKET_ACC_CONN	0x00004000  /* socket is listening or connecting */
 #define EVENT_RPENDING		0x00010000  /* IOCP: read request not completed */
 #define EVENT_WPENDING		0x00020000  /* IOCP: write request not completed */
 #define EVENT_PENDING		(EVENT_RPENDING | EVENT_WPENDING)
@@ -103,20 +104,17 @@ EVQ_API int evq_init (struct event_queue *evq);
 EVQ_API void evq_done (struct event_queue *evq);
 
 EVQ_API int evq_add (struct event_queue *evq, struct event *ev);
-EVQ_API int evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path);
-EVQ_API int evq_del (struct event *ev, int reuse_fd);
+EVQ_API int evq_add_dirwatch (struct event_queue *evq, struct event *ev,
+                              const char *path);
+EVQ_API int evq_del (struct event *ev, const int reuse_fd);
 
 EVQ_API int evq_modify (struct event *ev, unsigned int flags);
 
 EVQ_API int evq_wait (struct event_queue *evq, msec_t timeout);
 
-EVQ_API int evq_set_timeout (struct event *ev, msec_t msec);
-EVQ_API int evq_add_timer (struct event_queue *evq, struct event *ev, msec_t msec);
-
-EVQ_API int evq_signal (struct event_queue *evq, int signo);
-EVQ_API int evq_ignore_signal (struct event_queue *evq, int signo, int ignore);
-
-EVQ_API void signal_init (void);
+EVQ_API int evq_set_timeout (struct event *ev, const msec_t msec);
+EVQ_API int evq_add_timer (struct event_queue *evq, struct event *ev,
+                           const msec_t msec);
 
 #ifndef _WIN32
 
@@ -124,29 +122,6 @@ EVQ_API void signal_init (void);
 #define event_get_tq_head(ev)	(ev)->evq->tq
 #define event_deleted(ev)	((ev)->evq == NULL)
 #define evq_is_empty(evq)	(!(evq)->nevents)
-
-typedef void (*sig_handler_t) (int);
-
-EVQ_API int signal_set (int signo, sig_handler_t func);
-
-#define EVQ_SIGINT	SIGINT
-#define EVQ_SIGQUIT	SIGQUIT
-#define EVQ_SIGHUP	SIGHUP
-#define EVQ_SIGTERM	SIGTERM
-#define EVQ_SIGCHLD	SIGCHLD
-#define EVQ_NSIG 	5
-
-#define EVQ_SIGEVQ	SIGPIPE
-
-#else
-
-#define EVQ_SIGINT	CTRL_C_EVENT
-#define EVQ_SIGQUIT	CTRL_BREAK_EVENT
-#define EVQ_SIGHUP	CTRL_LOGOFF_EVENT
-#define EVQ_SIGTERM	CTRL_SHUTDOWN_EVENT
-#define EVQ_NSIG 	4
-
-#define EVQ_SIGEVQ	(EVQ_SIGTERM + 1)
 
 #endif
 

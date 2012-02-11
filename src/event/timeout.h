@@ -1,5 +1,5 @@
-#ifndef TIMEOUT_H
-#define TIMEOUT_H
+#ifndef EVQ_TIMEOUT_H
+#define EVQ_TIMEOUT_H
 
 /*
  * Timer values are spread in small range (usually several minutes)

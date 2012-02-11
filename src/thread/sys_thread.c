@@ -579,7 +579,7 @@ thread_create (struct sys_thread *td, const int is_affin)
 
 /*
  * Arguments: [bind_cpu (number)], filename (string) | function_dump (string),
- *	[arguments (string | number | boolean | lightuserdata | share_object) ...]
+ *	[arguments (string | number | boolean | ludata | share_object) ...]
  * Returns: [boolean]
  */
 static int
@@ -671,7 +671,8 @@ thread_run (lua_State *L)
     if (!td->L) goto err;
 
     if (!thread_create(td, 0)) {
-	lua_xmove(L, td->L, lua_gettop(L) - 1);  /* move function and args to new thread */
+	/* move function and args to new thread */
+	lua_xmove(L, td->L, lua_gettop(L) - 1);
 	return 1;
     }
     sys_del_thread(td);

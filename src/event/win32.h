@@ -1,5 +1,5 @@
-#ifndef WIN32_H
-#define WIN32_H
+#ifndef EVQ_WIN32_H
+#define EVQ_WIN32_H
 
 #define EVQ_SOURCE	"win32.c"
 
@@ -77,6 +77,6 @@ struct win32overlapped {
 	    FindNextChangeNotification((ev)->fd);			\
     } while (0)
 
-EVQ_API int win32iocp_set (struct event *ev, unsigned int ev_flags);
+EVQ_API int win32iocp_set (struct event *ev, const unsigned int ev_flags);
 
 #endif

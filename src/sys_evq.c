@@ -147,10 +147,12 @@ levq_new_event (lua_State *L, int idx, struct event_queue *evq)
 }
 
 /*
- * Arguments: ..., EVQ_ENVIRON (table), EVQ_OBJ_UDATA (table), EVQ_CALLBACK (table)
+ * Arguments: ..., EVQ_ENVIRON (table), EVQ_OBJ_UDATA (table),
+ *	EVQ_CALLBACK (table)
  */
 static void
-levq_del_event (lua_State *L, int idx, struct event_queue *evq, struct event *ev)
+levq_del_event (lua_State *L, int idx, struct event_queue *evq,
+                struct event *ev)
 {
     const int ev_id = ev->ev_id;
 
@@ -572,7 +574,8 @@ levq_timeout_manual (lua_State *L)
 }
 
 /*
- * Arguments: evq_udata, [timeout (milliseconds), once (boolean), fetch (boolean)]
+ * Arguments: evq_udata, [timeout (milliseconds), once (boolean),
+ *	fetch (boolean)]
  * Returns: [evq_udata | timeout (false)]
  *	|
  * Returns: [callback (function), evq_udata, ev_ludata, obj_udata,
@@ -626,12 +629,14 @@ levq_loop (lua_State *L)
 	do {
 	    const unsigned int ev_flags = ev->flags;
 
-	    ev->flags &= EVENT_MASK;  /* clear EVENT_ACTIVE and EVENT_*_RES flags */
+	    /* clear EVENT_ACTIVE and EVENT_*_RES flags */
+	    ev->flags &= EVENT_MASK;
 	    evq->ev_ready = ev->next_ready;
 
-	    if (ev_flags & EVENT_DELETE)
-		levq_del_event(L, ARG_LAST+1, evq, ev);  /* postponed deletion of active event */
-	    else {
+	    if (ev_flags & EVENT_DELETE) {
+		/* postponed deletion of active event */
+		levq_del_event(L, ARG_LAST+1, evq, ev);
+	    } else {
 		if ((ev_flags & EVENT_CALLBACK) || fetch) {
 		    const int ev_id = ev->ev_id;
 
@@ -648,13 +653,15 @@ levq_loop (lua_State *L)
 		    else
 			lua_pushnil(L);
 		    if (ev_flags & EVENT_EOF_MASK_RES)
-			lua_pushinteger(L, (int) ev_flags >> EVENT_EOF_SHIFT_RES);
+			lua_pushinteger(L,
+			 (int) ev_flags >> EVENT_EOF_SHIFT_RES);
 		    else
 			lua_pushnil(L);
 		}
 
 		if (event_deleted(ev))
-		    levq_del_event(L, ARG_LAST+1, evq, ev);  /* deletion of oneshot event */
+		    /* deletion of oneshot event */
+		    levq_del_event(L, ARG_LAST+1, evq, ev);
 #ifdef EVQ_POST_INIT
 		else evq->ev_post = ev;
 #endif

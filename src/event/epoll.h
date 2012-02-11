@@ -1,5 +1,5 @@
-#ifndef EPOLL_H
-#define EPOLL_H
+#ifndef EVQ_EPOLL_H
+#define EVQ_EPOLL_H
 
 #include <sys/epoll.h>
 #include <sys/inotify.h>

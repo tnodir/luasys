@@ -32,7 +32,8 @@
 
 
 static const char *
-fcgi_decode_begin_request (lua_State *L, const unsigned char *cp, size_t size)
+fcgi_decode_begin_request (lua_State *L, const unsigned char *cp,
+                           const size_t size)
 {
     int role, keep_conn;
 
@@ -51,7 +52,7 @@ fcgi_decode_begin_request (lua_State *L, const unsigned char *cp, size_t size)
 }
 
 static const char *
-fcgi_decode_params (lua_State *L, const unsigned char *cp, size_t size)
+fcgi_decode_params (lua_State *L, const unsigned char *cp, const size_t size)
 {
     const unsigned char *endp = cp + size;
 
@@ -92,7 +93,7 @@ fcgi_decode_params (lua_State *L, const unsigned char *cp, size_t size)
 }
 
 static const char *
-fcgi_decode_stdin (lua_State *L, const unsigned char *cp, size_t size)
+fcgi_decode_stdin (lua_State *L, const unsigned char *cp, const size_t size)
 {
     int concat = 1;
 
@@ -113,7 +114,7 @@ fcgi_decode_stdin (lua_State *L, const unsigned char *cp, size_t size)
  * Arguments: ..., channel (table)
  */
 static int
-fcgi_decode_record (lua_State *L, const unsigned char *cp, size_t size,
+fcgi_decode_record (lua_State *L, const unsigned char *cp, const size_t size,
                     unsigned int *ready_request_id)
 {
     unsigned int version, type, request_id, content_len, padding_len, len;

@@ -1,7 +1,7 @@
 /* Timeouts */
 
 static void
-timeout_reset (struct event *ev, msec_t now)
+timeout_reset (struct event *ev, const msec_t now)
 {
     struct timeout_queue *tq = ev->tq;
     const msec_t msec = tq->msec;
@@ -65,7 +65,7 @@ timeout_del (struct event *ev)
 }
 
 static int
-timeout_add (struct event *ev, msec_t msec, msec_t now)
+timeout_add (struct event *ev, msec_t msec, const msec_t now)
 {
     struct timeout_queue **tq_headp = &event_get_tq_head(ev);
     struct timeout_queue *tq, *tq_prev;
@@ -109,7 +109,7 @@ timeout_add (struct event *ev, msec_t msec, msec_t now)
 }
 
 static msec_t
-timeout_get (const struct timeout_queue *tq, msec_t min, msec_t now)
+timeout_get (const struct timeout_queue *tq, msec_t min, const msec_t now)
 {
     if (!tq) return min;
 
@@ -131,7 +131,8 @@ timeout_get (const struct timeout_queue *tq, msec_t min, msec_t now)
 }
 
 static struct event *
-timeout_process (struct timeout_queue *tq, struct event *ev_ready, msec_t now)
+timeout_process (struct timeout_queue *tq, struct event *ev_ready,
+                 const msec_t now)
 {
     const long timeout = (long) now + MIN_TIMEOUT;
 

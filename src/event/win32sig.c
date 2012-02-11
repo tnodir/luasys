@@ -9,7 +9,8 @@ static struct {
 static int volatile g_SignalInit = 0;
 
 /* References count do not trace */
-#define signal_set(add)	(!SetConsoleCtrlHandler((PHANDLER_ROUTINE) signal_handler, (add)))
+#define signal_set(add) \
+	(!SetConsoleCtrlHandler((PHANDLER_ROUTINE) signal_handler, (add)))
 
 
 static struct event **
@@ -26,7 +27,7 @@ signal_gethead (int signo)
 }
 
 static int
-signal_handler (int signo)
+signal_handler (const int signo)
 {
     struct event **sig_evp = signal_gethead(signo);
     int res = 0;
@@ -48,7 +49,7 @@ signal_handler (int signo)
 }
 
 EVQ_API void
-signal_init ()
+signal_init (void)
 {
     if (g_SignalInit) return;
     g_SignalInit = 1;
@@ -57,7 +58,7 @@ signal_init ()
 }
 
 EVQ_API int
-evq_signal (struct event_queue *evq, int signo)
+evq_signal (struct event_queue *evq, const int signo)
 {
     struct win32thr *wth = &evq->head;
     int res = 0;
@@ -71,7 +72,7 @@ evq_signal (struct event_queue *evq, int signo)
 }
 
 EVQ_API int
-evq_ignore_signal (struct event_queue *evq, int signo, int ignore)
+evq_ignore_signal (struct event_queue *evq, const int signo, const int ignore)
 {
     const int bit = 1 << signo;
     int res;
@@ -143,7 +144,8 @@ signal_del (struct event *ev)
 }
 
 static struct event *
-signal_process_active (struct event *ev, struct event *ev_ready, msec_t now)
+signal_process_active (struct event *ev, struct event *ev_ready,
+                       const msec_t now)
 {
     ev->flags |= EVENT_READ_RES;
     if (ev->flags & EVENT_ACTIVE)
@@ -160,7 +162,8 @@ signal_process_active (struct event *ev, struct event *ev_ready, msec_t now)
 }
 
 static struct event *
-signal_process_actives (struct event_queue *evq, int signo, struct event *ev_ready, msec_t now)
+signal_process_actives (struct event_queue *evq, const int signo,
+                        struct event *ev_ready, const msec_t now)
 {
     struct event **sig_evp = signal_gethead(signo);
     struct event *ev, *ev_next = NULL;
@@ -183,7 +186,8 @@ signal_process_actives (struct event_queue *evq, int signo, struct event *ev_rea
 }
 
 static struct event *
-signal_process_notifies (struct event_queue *evq, struct event *ev_ready, msec_t now)
+signal_process_notifies (struct event_queue *evq, struct event *ev_ready,
+                         const msec_t now)
 {
     struct event *ev = evq->ev_notify, *ev_next;
 
@@ -197,7 +201,7 @@ signal_process_notifies (struct event_queue *evq, struct event *ev_ready, msec_t
 
 static struct event *
 signal_process_interrupt (struct event_queue *evq, unsigned int sig_ready,
-                          struct event *ev_ready, msec_t now)
+                          struct event *ev_ready, const msec_t now)
 {
     int signo;
 

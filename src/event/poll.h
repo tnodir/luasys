@@ -1,5 +1,5 @@
-#ifndef POLL_H
-#define POLL_H
+#ifndef EVQ_POLL_H
+#define EVQ_POLL_H
 
 #include <poll.h>
 

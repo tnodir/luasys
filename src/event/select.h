@@ -1,5 +1,5 @@
-#ifndef SELECT_H
-#define SELECT_H
+#ifndef EVQ_SELECT_H
+#define EVQ_SELECT_H
 
 #define EVQ_SOURCE	"select.c"
 

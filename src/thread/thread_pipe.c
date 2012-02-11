@@ -28,7 +28,9 @@ struct pipe_buf {
     struct pipe_buf *next_buf;  /* circular list */
 };
 
-#define PIPE_BUF_SENTINEL_SIZE	sizeof(unsigned short)
+/* Extra size from buffer: header + message.size */
+#define PIPE_BUF_EXTRASIZE	(sizeof(struct pipe_buf) + sizeof(short))
+
 #define PIPE_BUF_MINSIZE	(8U * MSG_MAXSIZE)
 #define PIPE_BUF_MAXSIZE	(2U * 1024 * 1024 * 1024)
 
@@ -55,7 +57,8 @@ struct pipe_ref {
     msec_t put_timeout;
 };
 
-#define pipe_buf_ptr(pb)	(char *) ((struct pipe_buf *) pb + 1)
+#define pipe_buf_ptr(pb,off) \
+	(void *) ((char *) ((struct pipe_buf *) pb + 1) + (off))
 #define pipe_critsect_ptr(pp)	(&pp->cs)
 
 
@@ -100,7 +103,7 @@ pipe_new (lua_State *L)
 	if (!pb) goto err;
 
 	memset(pb, 0, sizeof(struct pipe_buf));
-	pb->len = min_size - sizeof(struct pipe_buf) - PIPE_BUF_SENTINEL_SIZE;
+	pb->len = min_size - PIPE_BUF_EXTRASIZE;
 	pb->next_buf = pb;
 
 	pp->rbuf = pp->wbuf = pb;
@@ -326,7 +329,7 @@ pipe_put (lua_State *L)
 	if (msg.size > len) {
 	    if (!wrapped && buf.begin > msg.size) {
 		/* wrap the buffer */
-		struct message *mp = (struct message *) (pipe_buf_ptr(pb) + buf.end);
+		struct message *mp = pipe_buf_ptr(pb, buf.end);
 		mp->size = 0;  /* sentinel tag */
 		buf.end = 0;
 	    } else if (pb != buf.next_buf
@@ -342,7 +345,7 @@ pipe_put (lua_State *L)
 		if (wpb) {
 		    /* allocate new buffer */
 		    buf.begin = buf.end = 0;
-		    buf.len = buf_size - sizeof(struct pipe_buf) - PIPE_BUF_SENTINEL_SIZE;
+		    buf.len = buf_size - PIPE_BUF_EXTRASIZE;
 		    /* buf->next_buf is already correct */
 		    pb->next_buf = wpb;
 
@@ -371,7 +374,7 @@ pipe_put (lua_State *L)
 	    }
 	}
 
-	memcpy(pipe_buf_ptr(pb) + buf.end, &msg, msg.size);
+	memcpy(pipe_buf_ptr(pb, buf.end), &msg, msg.size);
 	buf.end += msg.size;
 	*pb = buf;
 	pp->nmsg++;
@@ -405,10 +408,10 @@ pipe_get (lua_State *L)
 	if (pp->nmsg) {
 	    struct pipe_buf *pb = pp->rbuf;
 	    struct pipe_buf buf = *pb;
-	    struct message *mp = (struct message *) (pipe_buf_ptr(pb) + buf.begin);
+	    struct message *mp = pipe_buf_ptr(pb, buf.begin);
 
 	    if (!mp->size) {  /* buffer is wrapped */
-		mp = (struct message *) pipe_buf_ptr(pb);
+		mp = pipe_buf_ptr(pb, 0);
 		buf.begin = 0;
 	    }
 

@@ -119,7 +119,8 @@ comm_init (lua_State *L)
 		if (*endp == '2') flag = CSTOPB;  /* else: one stop bit */
 		mask = CSTOPB;
 #else
-		dcb.StopBits = (char) (*endp == '2' ? TWOSTOPBITS : ONESTOPBIT);
+		dcb.StopBits = (char) (*endp == '2' ? TWOSTOPBITS
+		 : ONESTOPBIT);
 #endif
 		break;
 	    case 'f':  /* flow controls */
@@ -193,7 +194,8 @@ comm_control (lua_State *L)
 
     dcb.DCBlength = sizeof(DCB);
     if (!GetCommState(fd, &dcb)) goto err;
-    dcb.fDtrControl = dcb.fOutxDsrFlow = dcb.fRtsControl = dcb.fOutxCtsFlow = 0;
+    dcb.fDtrControl = dcb.fOutxDsrFlow
+     = dcb.fRtsControl = dcb.fOutxCtsFlow = 0;
 #endif
 
     for (i = 2; i <= nargs; ++i) {

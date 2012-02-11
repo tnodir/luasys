@@ -26,7 +26,7 @@ signal_gethead (int signo)
 }
 
 static void
-signal_handler (int signo)
+signal_handler (const int signo)
 {
 #ifdef USE_KQUEUE
     (void) signo;
@@ -83,7 +83,7 @@ evq_interrupt (struct event_queue *evq)
 }
 
 EVQ_API int
-evq_signal (struct event_queue *evq, int signo)
+evq_signal (struct event_queue *evq, const int signo)
 {
     int res = 0;
 
@@ -96,7 +96,7 @@ evq_signal (struct event_queue *evq, int signo)
 }
 
 EVQ_API int
-signal_set (int signo, sig_handler_t func)
+signal_set (const int signo, sig_handler_t func)
 {
     struct sigaction act;
     int res;
@@ -113,7 +113,7 @@ signal_set (int signo, sig_handler_t func)
 
 #ifdef USE_KQUEUE
 static int
-signal_kqueue (struct event_queue *evq, int signo, int action)
+signal_kqueue (struct event_queue *evq, const int signo, const int action)
 {
     struct kevent kev;
     int res;
@@ -131,7 +131,7 @@ signal_kqueue (struct event_queue *evq, int signo, int action)
 #endif
 
 EVQ_API int
-evq_ignore_signal (struct event_queue *evq, int signo, int ignore)
+evq_ignore_signal (struct event_queue *evq, const int signo, const int ignore)
 {
 #ifndef USE_KQUEUE
     (void) evq;
@@ -186,7 +186,8 @@ signal_add (struct event_queue *evq, struct event *ev)
 static int
 signal_del (struct event_queue *evq, struct event *ev)
 {
-    const int signo = (ev->flags & EVENT_PID) ? EVQ_SIGCHLD : (int) ev->fd;
+    const int signo = (ev->flags & EVENT_PID) ? EVQ_SIGCHLD
+     : (int) ev->fd;
     struct event **sig_evp = signal_gethead(signo);
     int res = 0;
 
@@ -212,7 +213,8 @@ signal_del (struct event_queue *evq, struct event *ev)
 }
 
 static struct event *
-signal_process_active (struct event *ev, struct event *ev_ready, msec_t now)
+signal_process_active (struct event *ev, struct event *ev_ready,
+                       const msec_t now)
 {
     ev->flags |= EVENT_READ_RES;
     if (ev->flags & EVENT_ACTIVE)
@@ -246,7 +248,8 @@ signal_process_child (struct event *ev)
 }
 
 static struct event *
-signal_process_actives (struct event_queue *evq, int signo, struct event *ev_ready, msec_t now)
+signal_process_actives (struct event_queue *evq, const int signo,
+                        struct event *ev_ready, const msec_t now)
 {
     struct event **sig_evp = signal_gethead(signo);
     struct event *ev, *ev_next = NULL;
@@ -271,7 +274,8 @@ signal_process_actives (struct event_queue *evq, int signo, struct event *ev_rea
 }
 
 static struct event *
-signal_process_notifies (struct event_queue *evq, struct event *ev_ready, msec_t now)
+signal_process_notifies (struct event_queue *evq, struct event *ev_ready,
+                         const msec_t now)
 {
     struct event *ev = evq->ev_notify, *ev_next;
 
@@ -284,7 +288,8 @@ signal_process_notifies (struct event_queue *evq, struct event *ev_ready, msec_t
 }
 
 static struct event *
-signal_process_interrupt (struct event_queue *evq, struct event *ev_ready, msec_t now)
+signal_process_interrupt (struct event_queue *evq, struct event *ev_ready,
+                          const msec_t now)
 {
     unsigned int sig_ready;
     int signo;

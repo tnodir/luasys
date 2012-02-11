@@ -104,7 +104,8 @@ sys_stat (lua_State *L)
 
 		free(os_path);
 	    }
-	    lua_pushboolean(L, attr > 0 && (attr & FILE_ATTRIBUTE_REPARSE_POINT));
+	    lua_pushboolean(L,
+	     attr > 0 && (attr & FILE_ATTRIBUTE_REPARSE_POINT));
 #endif
 	    lua_pushnumber(L, (lua_Number) st.st_size);  /* size in bytes */
 	    lua_pushnumber(L, (lua_Number) st.st_atime);  /* access time */
@@ -119,7 +120,8 @@ sys_stat (lua_State *L)
 
 /*
  * Arguments: path (string)
- * Returns: [total_bytes (number), available_bytes (number), free_bytes (number)]
+ * Returns: [total_bytes (number), available_bytes (number),
+ *	free_bytes (number)]
  */
 static int
 sys_statfs (lua_State *L)

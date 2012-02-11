@@ -72,17 +72,20 @@ sock_pair (int type, sd_t sv[2])
     sa.sin_port = 0;
     sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-    if ((sd = WSASocket(AF_INET, type, 0, NULL, 0, IS_OVERLAPPED)) != INVALID_SOCKET) {
+    if ((sd = WSASocket(AF_INET, type, 0, NULL, 0, IS_OVERLAPPED))
+     != INVALID_SOCKET) {
 	if (!bind(sd, (struct sockaddr *) &sa, len)
 	 && !listen(sd, 1)
 	 && !getsockname(sd, (struct sockaddr *) &sa, &len)
-	 && (sv[0] = WSASocket(AF_INET, type, 0, NULL, 0, IS_OVERLAPPED)) != INVALID_SOCKET) {
+	 && (sv[0] = WSASocket(AF_INET, type, 0, NULL, 0, IS_OVERLAPPED))
+	  != INVALID_SOCKET) {
 	    struct sockaddr_in sa2;
 	    int len2;
 
 	    sv[1] = (sd_t) -1;
 	    if (!connect(sv[0], (struct sockaddr *) &sa, len)
-	     && (sv[1] = accept(sd, (struct sockaddr *) &sa, &len)) != INVALID_SOCKET
+	     && (sv[1] = accept(sd, (struct sockaddr *) &sa, &len))
+	      != INVALID_SOCKET
 	     && !getpeername(sv[0], (struct sockaddr *) &sa, &len)
 	     && !getsockname(sv[1], (struct sockaddr *) &sa2, &len2)
 	     && len == len2
@@ -103,8 +106,8 @@ sock_pair (int type, sd_t sv[2])
 
 
 /*
- * Arguments: sd_udata, [type ("stream", "dgram"), domain ("inet", "inet6", "unix"),
- *	sd_udata (socketpair)]
+ * Arguments: sd_udata, [type ("stream", "dgram"),
+ *	domain ("inet", "inet6", "unix"), sd_udata (socketpair)]
  * Returns: [sd_udata]
  */
 static int
@@ -593,7 +596,8 @@ TransmitFileMap (SOCKET sd, HANDLE fd, DWORD n)
 	    size_lo = (off_lo & SYS_GRAN_MASK);
 	    size = INT64_MAKE(size_lo, size_hi) - INT64_MAKE(off_lo, off_hi);
 
-	    len = (size < (int64_t) ~((DWORD) 0)) ? (DWORD) size : ~((DWORD) 0);
+	    len = (size < (int64_t) ~((DWORD) 0))
+	     ? (DWORD) size : ~((DWORD) 0);
 
 	    if (n <= 0 || n > len) n = len;
 	    if (n > SENDFILE_MAX) n = SENDFILE_MAX;
@@ -714,7 +718,8 @@ sock_write (lua_State *L)
 	    wsa_buf.len = sb.size;
 	    wsa_buf.buf = sb.ptr.w;
 
-	    nw = !WSASend(sd, &wsa_buf, 1, &l, 0, NULL, NULL) ? (int) l : -1;
+	    nw = !WSASend(sd, &wsa_buf, 1, &l, 0, NULL, NULL)
+	     ? (int) l : -1;
 	}
 #endif
 	sys_vm_enter();
@@ -762,7 +767,8 @@ sock_read (lua_State *L)
 	    wsa_buf.len = rlen;
 	    wsa_buf.buf = sb.ptr.w;
 
-	    nr = !WSARecv(sd, &wsa_buf, 1, &l, &flags, NULL, NULL) ? (int) l : -1;
+	    nr = !WSARecv(sd, &wsa_buf, 1, &l, &flags, NULL, NULL)
+	     ? (int) l : -1;
 	}
 #endif
 	sys_vm_enter();

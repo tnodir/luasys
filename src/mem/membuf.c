@@ -1,6 +1,6 @@
 /* Lua System: Memory Buffers: Streams */
 
-#define SYSMEM_BUFLINE	256
+#define MEM_BUFLINE	256
 
 
 /*
@@ -9,11 +9,11 @@
 static int
 stream_write (lua_State *L, struct membuf *mb)
 {
-    const int bufio = (mb->flags & SYSMEM_OSTREAM_BUFIO);
+    const int bufio = (mb->flags & MEM_OSTREAM_BUFIO);
     int res;
 
     lua_getfenv(L, 1);
-    lua_rawgeti(L, -1, SYSMEM_OUTPUT);  /* stream object */
+    lua_rawgeti(L, -1, MEM_OUTPUT);  /* stream object */
     lua_getfield(L, -1, "write");
     lua_insert(L, -2);
 
@@ -31,32 +31,34 @@ stream_write (lua_State *L, struct membuf *mb)
 }
 
 static int
-membuf_addlstring (lua_State *L, struct membuf *mb, const char *s, size_t n)
+membuf_addlstring (lua_State *L, struct membuf *mb, const char *s,
+                   const size_t size)
 {
     int offset = mb->offset;
-    size_t newlen = offset + n, len = mb->len;
+    size_t len = mb->len;
+    const size_t newlen = offset + size;
 
     if (newlen >= len) {
 	const unsigned int flags = mb->flags;
 	void *p;
 
-	if ((flags & SYSMEM_OSTREAM) && stream_write(L, mb)) {
+	if ((flags & MEM_OSTREAM) && stream_write(L, mb)) {
 	    offset = mb->offset;
 	    len = mb->len;
-	    if (n < len - offset)
+	    if (size < len - offset)
 		goto end;
 	}
 	while ((len *= 2) <= newlen)
 	    continue;
-	if (!(flags & SYSMEM_ALLOC) || !(p = realloc(mb->data, len)))
+	if (!(flags & MEM_ALLOC) || !(p = realloc(mb->data, len)))
 	    return 0;
 	mb->len = len;
 	mb->data = p;
     }
  end:
     if (s != NULL) {
-	memcpy(mb->data + offset, s, n);
-	mb->offset = offset + n;
+	memcpy(mb->data + offset, s, size);
+	mb->offset = offset + size;
     }
     return 1;
 }
@@ -131,7 +133,7 @@ static int
 membuf_assosiate (lua_State *L, int type)
 {
     struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-    const int idx = (type == SYSMEM_ISTREAM) ? SYSMEM_INPUT : SYSMEM_OUTPUT;
+    const int idx = (type == MEM_ISTREAM) ? MEM_INPUT : MEM_OUTPUT;
 
     lua_settop(L, 2);
     if (lua_isnoneornil(L, 2))
@@ -141,8 +143,8 @@ membuf_assosiate (lua_State *L, int type)
 
 	lua_getfield(L, -1, SYS_BUFIO_TAG);
 	if (!lua_isnil(L, -1)) {
-	    mb->flags |= (type == SYSMEM_ISTREAM)
-	     ? SYSMEM_ISTREAM_BUFIO : SYSMEM_OSTREAM_BUFIO;
+	    mb->flags |= (type == MEM_ISTREAM)
+	     ? MEM_ISTREAM_BUFIO : MEM_OSTREAM_BUFIO;
 	}
 	lua_pop(L, 1);
     }
@@ -165,7 +167,7 @@ membuf_assosiate (lua_State *L, int type)
 static int
 membuf_output (lua_State *L)
 {
-    return membuf_assosiate(L, SYSMEM_OSTREAM);
+    return membuf_assosiate(L, MEM_OSTREAM);
 }
 
 /*
@@ -174,7 +176,7 @@ membuf_output (lua_State *L)
 static int
 membuf_input (lua_State *L)
 {
-    return membuf_assosiate(L, SYSMEM_ISTREAM);
+    return membuf_assosiate(L, MEM_ISTREAM);
 }
 
 
@@ -206,8 +208,8 @@ read_bytes (lua_State *L, struct membuf *mb, size_t l)
 {
     int n = mb->offset;
 
-    if (!n && (mb->flags & SYSMEM_ISTREAM)) {
-	stream_read(L, l, (mb->flags & SYSMEM_ISTREAM_BUFIO));
+    if (!n && (mb->flags & MEM_ISTREAM)) {
+	stream_read(L, l, (mb->flags & MEM_ISTREAM_BUFIO));
 	return 1;
     }
 
@@ -238,12 +240,12 @@ read_line (lua_State *L, struct membuf *mb)
 	if (n) memmove(p, nl + 1, n);
 	return 1;
     }
-    if (!(mb->flags & SYSMEM_ISTREAM)) {
+    if (!(mb->flags & MEM_ISTREAM)) {
 	n = 1;
 	goto end;
     }
     for (; ; ) {
-	stream_read(L, SYSMEM_BUFLINE, 0);
+	stream_read(L, MEM_BUFLINE, 0);
 	s = lua_tolstring(L, -1, &n);
 	if (!n) {
 	    n = 1;
@@ -283,9 +285,9 @@ membuf_read (lua_State *L)
     struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
 
     lua_settop(L, 2);
-    if (mb->flags & SYSMEM_ISTREAM) {
+    if (mb->flags & MEM_ISTREAM) {
 	lua_getfenv(L, 1);
-	lua_rawgeti(L, -1, SYSMEM_INPUT);  /* stream object */
+	lua_rawgeti(L, -1, MEM_INPUT);  /* stream object */
 	lua_getfield(L, -1, "read");
 	lua_insert(L, -2);
     }
@@ -319,7 +321,7 @@ membuf_flush (lua_State *L)
     const int is_close = lua_toboolean(L, 2);
     int res = 1;
 
-    if (mb->flags & SYSMEM_OSTREAM) {
+    if (mb->flags & MEM_OSTREAM) {
 	res = stream_write(L, mb);
 	if (is_close) mem_free(L);
     }

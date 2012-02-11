@@ -7,8 +7,6 @@
 EVQ_API int
 evq_init (struct event_queue *evq)
 {
-    fd_t *sig_fd = evq->sig_fd;
-
     evq->events = malloc(NEVENT * sizeof(void *));
     if (!evq->events)
 	return -1;
@@ -21,13 +19,15 @@ evq_init (struct event_queue *evq)
 
     pthread_mutex_init(&evq->cs, NULL);
 
-    sig_fd[0] = sig_fd[1] = (fd_t) -1;
-    if (pipe(sig_fd) || fcntl(sig_fd[0], F_SETFL, O_NONBLOCK)) {
-	evq_done(evq);
-	return -1;
-    } else {
-	struct pollfd *fdp = &evq->fdset[0];
+    {
+	fd_t *sig_fd = evq->sig_fd;
+	struct pollfd *fdp;
 
+	sig_fd[0] = sig_fd[1] = (fd_t) -1;
+	if (pipe(sig_fd) || fcntl(sig_fd[0], F_SETFL, O_NONBLOCK))
+	    goto err;
+
+	fdp = &evq->fdset[0];
 	fdp->fd = sig_fd[0];
 	fdp->events = POLLIN;
 	fdp->revents = 0;
@@ -38,6 +38,9 @@ evq_init (struct event_queue *evq)
 
     evq->now = get_milliseconds();
     return 0;
+ err:
+    evq_done(evq);
+    return -1;
 }
 
 EVQ_API void

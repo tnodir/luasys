@@ -27,7 +27,8 @@ sys_random (lua_State *L)
 #else
     HCRYPTPROV *p = lua_newuserdata(L, sizeof(void *));
 
-    if (CryptAcquireContext(p, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
+    if (CryptAcquireContext(p, NULL, NULL,
+     PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
 #endif
 	luaL_getmetatable(L, RAND_TYPENAME);
 	lua_setmetatable(L, -2);

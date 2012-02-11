@@ -21,19 +21,23 @@ evq_init (struct event_queue *evq)
 
 #ifdef USE_EVENTFD
 	sig_fd[0] = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
-	if (sig_fd[0] == -1
+	if (sig_fd[0] == -1)
+	    goto err;
 #else
 	sig_fd[0] = sig_fd[1] = (fd_t) -1;
-	if (pipe(sig_fd) || fcntl(sig_fd[0], F_SETFL, O_NONBLOCK)
+	if (pipe(sig_fd) || fcntl(sig_fd[0], F_SETFL, O_NONBLOCK))
+	    goto err;
 #endif
-	 || epoll_ctl(evq->epoll_fd, EPOLL_CTL_ADD, sig_fd[0], &epev)) {
-	    evq_done(evq);
-	    return -1;
-	}
+
+	if (epoll_ctl(evq->epoll_fd, EPOLL_CTL_ADD, sig_fd[0], &epev))
+	    goto err;
     }
 
     evq->now = get_milliseconds();
     return 0;
+ err:
+    evq_done(evq);
+    return -1;
 }
 
 EVQ_API void
@@ -99,7 +103,7 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
 }
 
 EVQ_API int
-evq_del (struct event *ev, int reuse_fd)
+evq_del (struct event *ev, const int reuse_fd)
 {
     struct event_queue *evq = ev->evq;
     const unsigned int ev_flags = ev->flags;

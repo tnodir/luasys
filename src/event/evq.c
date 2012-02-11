@@ -14,7 +14,7 @@
 #include "signal.c"
 
 EVQ_API int
-evq_set_timeout (struct event *ev, msec_t msec)
+evq_set_timeout (struct event *ev, const msec_t msec)
 {
     struct event_queue *evq = ev->evq;
 
@@ -31,7 +31,7 @@ evq_set_timeout (struct event *ev, msec_t msec)
 }
 
 EVQ_API int
-evq_add_timer (struct event_queue *evq, struct event *ev, msec_t msec)
+evq_add_timer (struct event_queue *evq, struct event *ev, const msec_t msec)
 {
     ev->evq = evq;
     if (!evq_set_timeout(ev, msec)) {

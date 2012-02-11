@@ -41,10 +41,12 @@ struct sock_addr {
 #define SOCK_ADDR_LEN	offsetof(struct sock_addr, addrlen)
 
 #define sock_addr_get_inp(sap, af) \
-    ((af) == AF_INET) ? (void *) &(sap)->u.in.sin_addr : (void *) &(sap)->u.in6.sin6_addr
+    ((af) == AF_INET ? (void *) &(sap)->u.in.sin_addr \
+     : (void *) &(sap)->u.in6.sin6_addr)
 
 #define sock_addr_get_inlen(af) \
-    ((af) == AF_INET) ? sizeof(struct in_addr) : sizeof(struct in6_addr)
+    ((af) == AF_INET ? sizeof(struct in_addr) \
+     : sizeof(struct in6_addr))
 
 
 /*
@@ -55,7 +57,8 @@ sock_checkladdr (lua_State *L, int idx, int *in_lenp, int *afp)
 {
     size_t len;
     const char *addr = luaL_checklstring(L, idx, &len);
-    const int in_len = (len == 4) ? sizeof(struct in_addr) : sizeof(struct in6_addr);
+    const int in_len = (len == 4) ? sizeof(struct in_addr)
+     : sizeof(struct in6_addr);
 
     if ((int) len != in_len)
 	luaL_argerror(L, idx, "invalid binary_address");
@@ -153,7 +156,8 @@ sock_getaddrinfo (lua_State *L)
 
     lua_settop(L, 2);
     if (!lua_istable(L, 2))
-	lua_pushlstring(L, (char *) *hp->h_addr_list, sizeof(struct in_addr));
+	lua_pushlstring(L, (char *) *hp->h_addr_list,
+	 sizeof(struct in_addr));
     else {
 	const char **ap = hp->h_addr_list;
 	int i;
@@ -493,7 +497,8 @@ sock_inet_ntop (lua_State *L)
     {
 	struct sock_addr sa;
 	void *inp = sock_addr_get_inp(&sa, af);
-	const int sl = (af == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
+	const int sl = (af == AF_INET) ? sizeof(struct sockaddr_in)
+	 : sizeof(struct sockaddr_in6);
 	DWORD buflen = sizeof(buf);
 
 	memset(&sa, 0, sizeof(struct sock_addr));
@@ -538,10 +543,12 @@ sock_addr_inet (lua_State *L)
 
 	if (af == AF_INET) {
 	    lua_pushinteger(L, ntohs(sap->u.in.sin_port));
-	    lua_pushlstring(L, (char *) &sap->u.in.sin_addr, sizeof(struct in_addr));
+	    lua_pushlstring(L, (char *) &sap->u.in.sin_addr,
+	     sizeof(struct in_addr));
 	} else if (af == AF_INET6) {
 	    lua_pushinteger(L, ntohs(sap->u.in6.sin6_port));
-	    lua_pushlstring(L, (char *) &sap->u.in6.sin6_addr, sizeof(struct in6_addr));
+	    lua_pushlstring(L, (char *) &sap->u.in6.sin6_addr,
+	     sizeof(struct in6_addr));
 	} else
 	    return 0;
 	return 2;

@@ -31,9 +31,11 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #endif
 
 #if (_WIN32_WINNT >= 0x0500)
-#define InitCriticalSection(cs)		InitializeCriticalSectionAndSpinCount(cs, 3000)
+#define InitCriticalSection(cs) \
+	InitializeCriticalSectionAndSpinCount(cs, 3000)
 #else
-#define InitCriticalSection(cs)		(InitializeCriticalSection(cs), TRUE)
+#define InitCriticalSection(cs) \
+	(InitializeCriticalSection(cs), TRUE)
 #endif
 
 #define SYS_ERRNO	GetLastError()
@@ -73,7 +75,8 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 
 #define luaL_newlibtable(L,l) \
 	lua_createtable(L, 0, sizeof(l) / sizeof((l)[0]) - 1)
-#define luaL_newlib(L,l)	(luaL_newlibtable((L), (l)), luaL_setfuncs((L), (l), 0))
+#define luaL_newlib(L,l) \
+	(luaL_newlibtable((L), (l)), luaL_setfuncs((L), (l), 0))
 
 #define lua_rawgetp(L,idx,p) \
 	(lua_pushlightuserdata((L), (p)), \
@@ -87,7 +90,8 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 
 #define lua_pushunsigned(L,u)	lua_pushnumber((L), (lua_Number) (u))
 #define lua_tounsigned(L,n)	(unsigned int) lua_tonumber((L), (n))
-#define luaL_optunsigned(L,n,d)	(unsigned int) luaL_optnumber((L), (n), (lua_Number) (d))
+#define luaL_optunsigned(L,n,d) \
+	(unsigned int) luaL_optnumber((L), (n), (lua_Number) (d))
 
 #else
 #define luaL_register(L,n,l)	luaL_newlib((L), (l))
@@ -103,14 +107,15 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #endif
 
 #define lua_boxpointer(L,u) \
-    (*(void **) (lua_newuserdata(L, sizeof(void *))) = (u))
+	(*(void **) (lua_newuserdata(L, sizeof(void *))) = (u))
 #define lua_unboxpointer(L,i,tname) \
-    (*(void **) (checkudata(L, i, tname)))
+	(*(void **) (checkudata(L, i, tname)))
 
 #define lua_boxinteger(L,n) \
-    (*(lua_Integer *) (lua_newuserdata(L, sizeof(lua_Integer))) = (lua_Integer) (n))
+	(*(lua_Integer *) (lua_newuserdata(L, sizeof(lua_Integer))) \
+	 = (lua_Integer) (n))
 #define lua_unboxinteger(L,i,tname) \
-    (*(lua_Integer *) (checkudata(L, i, tname)))
+	(*(lua_Integer *) (checkudata(L, i, tname)))
 
 
 /*
@@ -165,14 +170,14 @@ struct sys_buffer {
 };
 
 int sys_buffer_read_init (lua_State *L, int idx, struct sys_buffer *sb);
-void sys_buffer_read_next (struct sys_buffer *sb, size_t n);
+void sys_buffer_read_next (struct sys_buffer *sb, const size_t n);
 
 void sys_buffer_write_init (lua_State *L, int idx, struct sys_buffer *sb,
-                            char *buf, size_t buflen);
+                            char *buf, const size_t buflen);
 int sys_buffer_write_next (lua_State *L, struct sys_buffer *sb,
-                           char *buf, size_t buflen);
+                           char *buf, const size_t buflen);
 int sys_buffer_write_done (lua_State *L, struct sys_buffer *sb,
-                           char *buf, size_t tail);
+                           char *buf, const size_t tail);
 
 
 /*

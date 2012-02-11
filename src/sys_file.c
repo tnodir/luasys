@@ -590,7 +590,8 @@ sys_write (lua_State *L)
 #else
 	{
 	    DWORD l;
-	    nw = WriteFile(fd, sb.ptr.r, sb.size, &l, NULL) ? (int) l : -1;
+	    nw = WriteFile(fd, sb.ptr.r, sb.size, &l, NULL)
+	     ? (int) l : -1;
 	}
 #endif
 	sys_vm_enter();
@@ -633,7 +634,8 @@ sys_read (lua_State *L)
 #else
 	{
 	    DWORD l;
-	    nr = ReadFile(fd, sb.ptr.w, rlen, &l, NULL) ? (int) l : -1;
+	    nr = ReadFile(fd, sb.ptr.w, rlen, &l, NULL)
+	     ? (int) l : -1;
 	}
 #endif
 	sys_vm_enter();
@@ -661,7 +663,7 @@ static int
 sys_flush (lua_State *L)
 {
     fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
-#if defined(_POSIX_SYNCHRONIZED_IO) && _POSIX_SYNCHRONIZED_IO > 0
+#if defined(_POSIX_SYNCHRONIZED_IO) && (_POSIX_SYNCHRONIZED_IO > 0)
     const int data_only = lua_toboolean(L, 2);
 #endif
     int res;
@@ -670,7 +672,7 @@ sys_flush (lua_State *L)
 #ifndef _WIN32
     res = -1;
 
-#if defined(_POSIX_SYNCHRONIZED_IO) && _POSIX_SYNCHRONIZED_IO > 0
+#if defined(_POSIX_SYNCHRONIZED_IO) && (_POSIX_SYNCHRONIZED_IO > 0)
     if (data_only) {
 	do res = fdatasync(fd);
 	while (res == -1 && sys_isintr());

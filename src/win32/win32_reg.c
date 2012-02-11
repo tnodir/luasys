@@ -37,7 +37,8 @@ reg_root2key (lua_State *L, int idx)
     if (lua_isuserdata(L, idx))
 	hk = lua_unboxpointer(L, idx, WREG_TYPENAME);
     else
-	hk = key_flags[luaL_checkoption(L, idx, "HKEY_CURRENT_USER", key_names)];
+	hk = key_flags[luaL_checkoption(L, idx, "HKEY_CURRENT_USER",
+	 key_names)];
     return hk;
 }
 
@@ -212,7 +213,7 @@ static int
 reg_values (lua_State *L)
 {
     if (lua_gettop(L) == 1) {  /* `for' start? */
-	lua_pushcfunction(L, reg_values);  /* return generator (this function), */
+	lua_pushcfunction(L, reg_values);  /* return generator, */
 	lua_pushvalue(L, 1);  /* state (reg_udata), */
 	lua_pushinteger(L, 0);  /* and initial value */
 	return 3;

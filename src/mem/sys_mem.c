@@ -24,43 +24,44 @@ struct membuf {
     char *data;
     int len, offset;
 
-#define SYSMEM_TYPE_SHIFT	8
-#define SYSMEM_TCHAR		((0  << SYSMEM_TYPE_SHIFT) | sizeof(char))
-#define SYSMEM_TUCHAR		((1  << SYSMEM_TYPE_SHIFT) | sizeof(unsigned char))
-#define SYSMEM_TSHORT		((2  << SYSMEM_TYPE_SHIFT) | sizeof(short))
-#define SYSMEM_TUSHORT		((3  << SYSMEM_TYPE_SHIFT) | sizeof(unsigned short))
-#define SYSMEM_TINT		((4  << SYSMEM_TYPE_SHIFT) | sizeof(int))
-#define SYSMEM_TUINT		((5  << SYSMEM_TYPE_SHIFT) | sizeof(unsigned int))
-#define SYSMEM_TLONG		((6  << SYSMEM_TYPE_SHIFT) | sizeof(long))
-#define SYSMEM_TULONG		((7  << SYSMEM_TYPE_SHIFT) | sizeof(unsigned long))
-#define SYSMEM_TFLOAT		((8  << SYSMEM_TYPE_SHIFT) | sizeof(float))
-#define SYSMEM_TDOUBLE		((9  << SYSMEM_TYPE_SHIFT) | sizeof(double))
-#define SYSMEM_TNUMBER		((10 << SYSMEM_TYPE_SHIFT) | sizeof(lua_Number))
-#define SYSMEM_TBITSTRING	((11 << SYSMEM_TYPE_SHIFT) | sizeof(unsigned char))
-#define SYSMEM_SIZE_MASK	0x00FF
-#define SYSMEM_TYPE_MASK	0xFFFF
+#define MEM_TYPE_SHIFT	8
+#define MEM_TCHAR	((0  << MEM_TYPE_SHIFT) | sizeof(char))
+#define MEM_TUCHAR	((1  << MEM_TYPE_SHIFT) | sizeof(unsigned char))
+#define MEM_TSHORT	((2  << MEM_TYPE_SHIFT) | sizeof(short))
+#define MEM_TUSHORT	((3  << MEM_TYPE_SHIFT) | sizeof(unsigned short))
+#define MEM_TINT	((4  << MEM_TYPE_SHIFT) | sizeof(int))
+#define MEM_TUINT	((5  << MEM_TYPE_SHIFT) | sizeof(unsigned int))
+#define MEM_TLONG	((6  << MEM_TYPE_SHIFT) | sizeof(long))
+#define MEM_TULONG	((7  << MEM_TYPE_SHIFT) | sizeof(unsigned long))
+#define MEM_TFLOAT	((8  << MEM_TYPE_SHIFT) | sizeof(float))
+#define MEM_TDOUBLE	((9  << MEM_TYPE_SHIFT) | sizeof(double))
+#define MEM_TNUMBER	((10 << MEM_TYPE_SHIFT) | sizeof(lua_Number))
+#define MEM_TBITSTRING	((11 << MEM_TYPE_SHIFT) | sizeof(unsigned char))
+#define MEM_SIZE_MASK	0x00FF
+#define MEM_TYPE_MASK	0xFFFF
 
-#define SYSMEM_UDATA		0x010000  /* memory allocated as userdata */
-#define SYSMEM_ALLOC		0x020000  /* memory allocated */
-#define SYSMEM_MAP		0x080000  /* memory mapped */
-#define SYSMEM_ISTREAM		0x100000  /* buffer assosiated with input stream */
-#define SYSMEM_OSTREAM		0x200000  /* buffer assosiated with output stream */
-#define SYSMEM_ISTREAM_BUFIO	0x400000  /* input stream can operate with buffers */
-#define SYSMEM_OSTREAM_BUFIO	0x800000  /* output stream can operate with buffers */
+#define MEM_UDATA		0x010000  /* memory allocated as userdata */
+#define MEM_ALLOC		0x020000  /* memory allocated */
+#define MEM_MAP			0x080000  /* memory mapped */
+#define MEM_ISTREAM		0x100000  /* buffer assosiated with input stream */
+#define MEM_OSTREAM		0x200000  /* buffer assosiated with output stream */
+#define MEM_ISTREAM_BUFIO	0x400000  /* input stream can operate with buffers */
+#define MEM_OSTREAM_BUFIO	0x800000  /* output stream can operate with buffers */
     unsigned int flags;
 };
 
-#define memisptr(mb)		(!((mb)->flags & (SYSMEM_UDATA | SYSMEM_ALLOC | SYSMEM_MAP)))
-#define memtype(mb)		((mb)->flags & SYSMEM_TYPE_MASK)
-#define memtypesize(mb)		((mb)->flags & SYSMEM_SIZE_MASK)
-#define memlen(type, nitems)	((type) != SYSMEM_TBITSTRING				\
-				 ? (nitems) * ((type) & SYSMEM_SIZE_MASK)		\
-				 : ((nitems) >> 3) + 1)
+#define memisptr(mb) \
+	(!((mb)->flags & (MEM_UDATA | MEM_ALLOC | MEM_MAP)))
+#define memtype(mb)		((mb)->flags & MEM_TYPE_MASK)
+#define memtypesize(mb)		((mb)->flags & MEM_SIZE_MASK)
+#define memlen(type,nitems) \
+	((type) != MEM_TBITSTRING ? (nitems) * ((type) & MEM_SIZE_MASK) \
+	 : ((nitems) >> 3) + 1)
 
 static const int type_flags[] = {
-    SYSMEM_TCHAR, SYSMEM_TUCHAR, SYSMEM_TSHORT, SYSMEM_TUSHORT,
-    SYSMEM_TINT, SYSMEM_TUINT, SYSMEM_TLONG, SYSMEM_TULONG,
-    SYSMEM_TFLOAT, SYSMEM_TDOUBLE, SYSMEM_TNUMBER, SYSMEM_TBITSTRING
+    MEM_TCHAR, MEM_TUCHAR, MEM_TSHORT, MEM_TUSHORT, MEM_TINT, MEM_TUINT,
+    MEM_TLONG, MEM_TULONG, MEM_TFLOAT, MEM_TDOUBLE, MEM_TNUMBER,
+    MEM_TBITSTRING
 };
 
 static const char *const type_names[] = {
@@ -70,17 +71,17 @@ static const char *const type_names[] = {
 
 /* MemBuffer environ. table reserved indexes */
 enum {
-    SYSMEM_INPUT = 1,
-    SYSMEM_OUTPUT
+    MEM_INPUT = 1,
+    MEM_OUTPUT
 };
 
 
 static int membuf_addlstring (lua_State *L, struct membuf *mb,
-                              const char *s, size_t n);
+                              const char *s, const size_t size);
 
 
 static struct membuf *
-mem_tobuffer (lua_State *L, int idx)
+mem_tobuffer (lua_State *L, const int idx)
 {
     struct membuf *mb = lua_touserdata(L, idx);
 
@@ -119,7 +120,7 @@ sys_buffer_read_init (lua_State *L, int idx, struct sys_buffer *sb)
 }
 
 void
-sys_buffer_read_next (struct sys_buffer *sb, size_t n)
+sys_buffer_read_next (struct sys_buffer *sb, const size_t n)
 {
     struct membuf *mb = sb->mb;
 
@@ -139,7 +140,7 @@ sys_buffer_read_next (struct sys_buffer *sb, size_t n)
  */
 void
 sys_buffer_write_init (lua_State *L, int idx, struct sys_buffer *sb,
-                       char *buf, size_t buflen)
+                       char *buf, const size_t buflen)
 {
     struct membuf *mb = buf ? mem_tobuffer(L, idx)
      : checkudata(L, idx, MEM_TYPENAME);
@@ -157,7 +158,7 @@ sys_buffer_write_init (lua_State *L, int idx, struct sys_buffer *sb,
 
 int
 sys_buffer_write_next (lua_State *L, struct sys_buffer *sb,
-                       char *buf, size_t buflen)
+                       char *buf, const size_t buflen)
 {
     struct membuf *mb = sb->mb;
 
@@ -192,7 +193,7 @@ sys_buffer_write_next (lua_State *L, struct sys_buffer *sb,
 
 int
 sys_buffer_write_done (lua_State *L, struct sys_buffer *sb,
-                       char *buf, size_t tail)
+                       char *buf, const size_t tail)
 {
     struct membuf *mb = sb->mb;
 
@@ -223,11 +224,11 @@ mem_new (lua_State *L)
     struct membuf *mb = lua_newuserdata(L, sizeof(struct membuf) + len);
 
     memset(mb, 0, sizeof(struct membuf) + len);
-    mb->flags = SYSMEM_TCHAR;
+    mb->flags = MEM_TCHAR;
     if (len) {
 	mb->data = (char *) (mb + 1);
 	mb->len = len;
-	mb->flags |= SYSMEM_UDATA;
+	mb->flags |= MEM_UDATA;
     }
 
     luaL_getmetatable(L, MEM_TYPENAME);
@@ -247,12 +248,12 @@ mem_type (lua_State *L)
     if (lua_gettop(L) > 1) {
 	const int type = type_flags[luaL_checkoption(L, 2, NULL, type_names)];
 
-	mb->flags &= ~SYSMEM_TYPE_MASK;
+	mb->flags &= ~MEM_TYPE_MASK;
 	mb->flags |= type;
 	lua_settop(L, 1);
     } else {
 	lua_pushstring(L,
-	 type_names[(mb->flags & SYSMEM_TYPE_MASK) >> SYSMEM_TYPE_SHIFT]);
+	 type_names[(mb->flags & MEM_TYPE_MASK) >> MEM_TYPE_SHIFT]);
     }
     return 1;
 }
@@ -281,7 +282,7 @@ mem_alloc (lua_State *L)
     const int len = luaL_optinteger(L, 2, BUFF_INITIALSIZE);
     const int zerofill = lua_isboolean(L, -1) && lua_toboolean(L, -1);
 
-    mb->flags |= SYSMEM_ALLOC;
+    mb->flags |= MEM_ALLOC;
     mb->len = len;
     mb->offset = 0;
     mb->data = zerofill ? calloc(len, 1) : malloc(len);
@@ -411,7 +412,7 @@ mem_map (lua_State *L)
 #endif /* !Win32 */
     sys_vm_enter();
 
-    mb->flags |= SYSMEM_MAP;
+    mb->flags |= MEM_MAP;
     mb->len = len;
     mb->data = ptr;
     lua_settop(L, 1);
@@ -457,12 +458,12 @@ mem_free (lua_State *L)
     if (mb->data) {
 	const unsigned int mb_flags = mb->flags;
 
-	switch (mb_flags & (SYSMEM_ALLOC | SYSMEM_MAP)) {
-	case SYSMEM_ALLOC:
+	switch (mb_flags & (MEM_ALLOC | MEM_MAP)) {
+	case MEM_ALLOC:
 	    free(mb->data);
 	    break;
 #ifdef USE_MMAP
-	case SYSMEM_MAP:
+	case MEM_MAP:
 #ifndef _WIN32
 	    munmap(mb->data, mb->len);
 #else
@@ -472,7 +473,7 @@ mem_free (lua_State *L)
 #endif /* USE_MMAP */
 	}
 	mb->data = NULL;
-	mb->flags &= SYSMEM_TYPE_MASK;
+	mb->flags &= MEM_TYPE_MASK;
     }
     return 1;
 }
@@ -519,7 +520,7 @@ mem_length (lua_State *L)
     if (lua_gettop(L) == 1)
 	lua_pushinteger(L, mb->len);
     else {
-	if (mb->flags & SYSMEM_MAP)
+	if (mb->flags & MEM_MAP)
 	    luaL_argerror(L, 1, "membuf is mapped");
 
 	mb->len = lua_tointeger(L, 2);
@@ -601,18 +602,42 @@ mem_index (lua_State *L)
 	char *ptr = mb->data + memlen(type, off);
 
 	switch (type) {
-	case SYSMEM_TCHAR: lua_pushnumber(L, *((char *) ptr)); break;
-	case SYSMEM_TUCHAR: lua_pushnumber(L, *((unsigned char *) ptr)); break;
-	case SYSMEM_TSHORT: lua_pushnumber(L, *((short *) ptr)); break;
-	case SYSMEM_TUSHORT: lua_pushnumber(L, *((unsigned short *) ptr)); break;
-	case SYSMEM_TINT: lua_pushinteger(L, *((int *) ptr)); break;
-	case SYSMEM_TUINT: lua_pushinteger(L, *((unsigned int *) ptr)); break;
-	case SYSMEM_TLONG: lua_pushnumber(L, *((long *) ptr)); break;
-	case SYSMEM_TULONG: lua_pushnumber(L, *((unsigned long *) ptr)); break;
-	case SYSMEM_TFLOAT: lua_pushnumber(L, *((float *) ptr)); break;
-	case SYSMEM_TDOUBLE: lua_pushnumber(L, *((double *) ptr)); break;
-	case SYSMEM_TNUMBER: lua_pushnumber(L, *((lua_Number *) ptr)); break;
-	case SYSMEM_TBITSTRING: lua_pushboolean(L, *(ptr - 1) & (1 << (off & 7))); break;
+	case MEM_TCHAR:
+	    lua_pushnumber(L, *((char *) ptr));
+	    break;
+	case MEM_TUCHAR:
+	    lua_pushnumber(L, *((unsigned char *) ptr));
+	    break;
+	case MEM_TSHORT:
+	    lua_pushnumber(L, *((short *) ptr));
+	    break;
+	case MEM_TUSHORT:
+	    lua_pushnumber(L, *((unsigned short *) ptr));
+	    break;
+	case MEM_TINT:
+	    lua_pushinteger(L, *((int *) ptr));
+	    break;
+	case MEM_TUINT:
+	    lua_pushinteger(L, *((unsigned int *) ptr));
+	    break;
+	case MEM_TLONG:
+	    lua_pushnumber(L, *((long *) ptr));
+	    break;
+	case MEM_TULONG:
+	    lua_pushnumber(L, *((unsigned long *) ptr));
+	    break;
+	case MEM_TFLOAT:
+	    lua_pushnumber(L, *((float *) ptr));
+	    break;
+	case MEM_TDOUBLE:
+	    lua_pushnumber(L, *((double *) ptr));
+	    break;
+	case MEM_TNUMBER:
+	    lua_pushnumber(L, *((lua_Number *) ptr));
+	    break;
+	case MEM_TBITSTRING:
+	    lua_pushboolean(L, *(ptr - 1) & (1 << (off & 7)));
+	    break;
 	}
     } else {
 	lua_getmetatable(L, 1);
@@ -638,23 +663,47 @@ mem_newindex (lua_State *L)
 	    lua_Number num = lua_tonumber(L, 3);
 
 	    switch (type) {
-	    case SYSMEM_TCHAR: *((char *) ptr) = (char) num; break;
-	    case SYSMEM_TUCHAR: *((unsigned char *) ptr) = (unsigned char) num; break;
-	    case SYSMEM_TSHORT: *((short *) ptr) = (short) num; break;
-	    case SYSMEM_TUSHORT: *((unsigned short *) ptr) = (unsigned short) num; break;
-	    case SYSMEM_TINT: *((int *) ptr) = (int) num; break;
-	    case SYSMEM_TUINT: *((unsigned int *) ptr) = (unsigned int) num; break;
-	    case SYSMEM_TLONG: *((long *) ptr) = (long) num; break;
-	    case SYSMEM_TULONG: *((unsigned long *) ptr) = (unsigned long) num; break;
-	    case SYSMEM_TFLOAT: *((float *) ptr) = (float) num; break;
-	    case SYSMEM_TDOUBLE: *((double *) ptr) = (double) num; break;
-	    case SYSMEM_TNUMBER: *((lua_Number *) ptr) = num; break;
-	    case SYSMEM_TBITSTRING: luaL_argerror(L, 3, "boolean expected"); break;
+	    case MEM_TCHAR:
+		*((char *) ptr) = (char) num;
+		break;
+	    case MEM_TUCHAR:
+		*((unsigned char *) ptr) = (unsigned char) num;
+		break;
+	    case MEM_TSHORT:
+		*((short *) ptr) = (short) num;
+		break;
+	    case MEM_TUSHORT:
+		*((unsigned short *) ptr) = (unsigned short) num;
+		break;
+	    case MEM_TINT:
+		*((int *) ptr) = (int) num;
+		break;
+	    case MEM_TUINT:
+		*((unsigned int *) ptr) = (unsigned int) num;
+		break;
+	    case MEM_TLONG:
+		*((long *) ptr) = (long) num;
+		break;
+	    case MEM_TULONG:
+		*((unsigned long *) ptr) = (unsigned long) num;
+		break;
+	    case MEM_TFLOAT:
+		*((float *) ptr) = (float) num;
+		break;
+	    case MEM_TDOUBLE:
+		*((double *) ptr) = (double) num;
+		break;
+	    case MEM_TNUMBER:
+		*((lua_Number *) ptr) = num;
+		break;
+	    case MEM_TBITSTRING:
+		luaL_argerror(L, 3, "boolean expected");
+		break;
 	    }
 	}
 	break;
     case LUA_TBOOLEAN:
-	if (type != SYSMEM_TBITSTRING)
+	if (type != MEM_TBITSTRING)
 	    luaL_argerror(L, 1, "bitstring expected");
 	else {
 	    const int bit = 1 << (off & 7);

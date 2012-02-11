@@ -57,11 +57,15 @@ win32thr_poll (struct event_queue *evq)
 	    if (!wth->n) {
 		struct win32thr *p;
 
-		if (oldn > NEVENT/2 && !wth->next)  /* delayed deletion of last empty thread */
+		/* delayed deletion of last empty thread */
+		if (oldn > NEVENT/2 && !wth->next)
 		    break;
-		for (p = wth, wth = &evq->head; p != wth->next; wth = wth->next)
+
+		for (p = &evq->head; p->next != wth; p = p->next)
 		    continue;
-		wth->next = p->next;
+
+		p->next = wth->next;
+		wth = p;
 		changed = 1;
 	    } else {
 		oldn = wth->n;

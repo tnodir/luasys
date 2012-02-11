@@ -140,12 +140,12 @@ win32_init (void)
     if (is_WinNT) {
 	HANDLE mh = GetModuleHandleA("kernel32.dll");
 
-	pCancelSynchronousIo = (PCancelSynchronousIo) GetProcAddress(mh,
-	 "CancelSynchronousIo");
-	pCancelIoEx = (PCancelIoEx) GetProcAddress(mh,
-	 "CancelIoEx");
-	pGetQueuedCompletionStatusEx = (PGetQueuedCompletionStatusEx) GetProcAddress(mh,
-	 "GetQueuedCompletionStatusEx");
+	pCancelSynchronousIo = (PCancelSynchronousIo)
+	 GetProcAddress(mh, "CancelSynchronousIo");
+	pCancelIoEx = (PCancelIoEx)
+	 GetProcAddress(mh, "CancelIoEx");
+	pGetQueuedCompletionStatusEx = (PGetQueuedCompletionStatusEx)
+	 GetProcAddress(mh,"GetQueuedCompletionStatusEx");
     }
 }
 

@@ -18,8 +18,10 @@ svc_install (lua_State *L)
     SC_HANDLE mngr = OpenSCManager(NULL, NULL, SC_MANAGER_CREATE_SERVICE);
     SC_HANDLE sc = NULL;
 
-    if (!pathlen || ++pathlen >= MAX_PATHNAME)  /* include space & term. '\0' */
+    /* include space & term. '\0' */
+    if (!pathlen || ++pathlen >= MAX_PATHNAME)
 	return 0;
+
     if (mngr) {
 	char path[MAX_PATHNAME*2];
 	const int n = GetModuleFileNameA(NULL, path, MAX_PATHNAME);

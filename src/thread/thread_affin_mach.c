@@ -12,11 +12,14 @@ static int
 affin_cpu_set (mach_port_t tid, int cpu)
 {
     struct thread_affinity_policy ap;
+    int res;
 
     ap.affinity_tag = cpu;
 
-    return (thread_policy_set(tid, THREAD_AFFINITY_POLICY, (thread_policy_t) &ap,
-     THREAD_AFFINITY_POLICY_COUNT) == KERN_SUCCESS) ? 0 : -1;
+    res = thread_policy_set(tid, THREAD_AFFINITY_POLICY,
+     (thread_policy_t) &ap, THREAD_AFFINITY_POLICY_COUNT);
+
+    return (res == KERN_SUCCESS) ? 0 : -1;
 }
 
 /*

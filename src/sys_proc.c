@@ -76,10 +76,14 @@ static int
 sys_spawn (lua_State *L)
 {
     const char *cmd = luaL_checkstring(L, 1);
-    struct sys_pid *pidp = lua_isuserdata(L, 3) ? checkudata(L, 3, PID_TYPENAME) : NULL;
-    fd_t *in_fdp = lua_isuserdata(L, 4) ? checkudata(L, 4, FD_TYPENAME) : NULL;
-    fd_t *out_fdp = lua_isuserdata(L, 5) ? checkudata(L, 5, FD_TYPENAME) : NULL;
-    fd_t *err_fdp = lua_isuserdata(L, 6) ? checkudata(L, 6, FD_TYPENAME) : NULL;
+    struct sys_pid *pidp = lua_isuserdata(L, 3)
+     ? checkudata(L, 3, PID_TYPENAME) : NULL;
+    fd_t *in_fdp = lua_isuserdata(L, 4)
+     ? checkudata(L, 4, FD_TYPENAME) : NULL;
+    fd_t *out_fdp = lua_isuserdata(L, 5)
+     ? checkudata(L, 5, FD_TYPENAME) : NULL;
+    fd_t *err_fdp = lua_isuserdata(L, 6)
+     ? checkudata(L, 6, FD_TYPENAME) : NULL;
 
 #ifndef _WIN32
     const char *argv[MAX_ARGS];
@@ -228,7 +232,8 @@ sys_spawn (lua_State *L)
 #undef MAX_ARGS
 
 /*
- * Arguments: [success/failure (boolean) | status (number), close_vm (boolean)]
+ * Arguments: [success/failure (boolean) | status (number),
+ *	close_vm (boolean)]
  */
 static int
 sys_exit (lua_State *L)
@@ -347,7 +352,8 @@ proc_id (lua_State *L)
 }
 
 /*
- * Arguments: pid_udata, priority (string: "realtime", "high", "normal", "idle")
+ * Arguments: pid_udata,
+ *	priority (string: "realtime", "high", "normal", "idle")
  * Returns: boolean
  */
 static int

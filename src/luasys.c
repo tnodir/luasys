@@ -37,7 +37,8 @@ sys_strerror (lua_State *L)
 #endif
     lua_pushstring(L, strerror(err));
 #else
-    const int flags = FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM;
+    const int flags = FORMAT_MESSAGE_IGNORE_INSERTS
+     | FORMAT_MESSAGE_FROM_SYSTEM;
     WCHAR buf[512];
 
     if (is_WinNT

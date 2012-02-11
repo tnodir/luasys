@@ -96,9 +96,12 @@ evq_add (struct event_queue *evq, struct event *ev)
 EVQ_API int
 evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
 {
-    const DWORD flags = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME
-     | FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_SIZE
-     | FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION
+    const DWORD flags = FILE_NOTIFY_CHANGE_FILE_NAME
+     | FILE_NOTIFY_CHANGE_DIR_NAME
+     | FILE_NOTIFY_CHANGE_ATTRIBUTES
+     | FILE_NOTIFY_CHANGE_SIZE
+     | FILE_NOTIFY_CHANGE_LAST_WRITE
+     | FILE_NOTIFY_CHANGE_CREATION
      | FILE_NOTIFY_CHANGE_SECURITY;
     const unsigned int filter = (ev->flags >> EVENT_EOF_SHIFT_RES)
      ? FILE_NOTIFY_CHANGE_LAST_WRITE : flags;
@@ -125,7 +128,7 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
 }
 
 EVQ_API int
-evq_set_timeout (struct event *ev, msec_t msec)
+evq_set_timeout (struct event *ev, const msec_t msec)
 {
     struct win32thr *wth = ev->wth;
     struct event_queue *evq = wth->evq;
@@ -146,7 +149,7 @@ evq_set_timeout (struct event *ev, msec_t msec)
 }
 
 EVQ_API int
-evq_add_timer (struct event_queue *evq, struct event *ev, msec_t msec)
+evq_add_timer (struct event_queue *evq, struct event *ev, const msec_t msec)
 {
     ev->wth = &evq->head;
     if (!evq_set_timeout(ev, msec)) {
@@ -157,7 +160,7 @@ evq_add_timer (struct event_queue *evq, struct event *ev, msec_t msec)
 }
 
 EVQ_API int
-evq_del (struct event *ev, int reuse_fd)
+evq_del (struct event *ev, const int reuse_fd)
 {
     struct win32thr *wth = ev->wth;
     const unsigned int ev_flags = ev->flags;
@@ -216,7 +219,8 @@ evq_modify (struct event *ev, unsigned int flags)
 	if (flags & EVENT_WRITE)
 	    event |= WFD_WRITE;
 
-	if (WSAEventSelect((int) ev->fd, wth->handles[ev->w.index], event) == SOCKET_ERROR)
+	if (WSAEventSelect((int) ev->fd, wth->handles[ev->w.index], event)
+	 == SOCKET_ERROR)
 	    return -1;
     }
     return 0;
@@ -356,9 +360,11 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 		    ResetEvent(ev->fd);  /* all events must be manual-reset */
 		res |= EVENT_READ_RES;
 	    } else if (!WSAEnumNetworkEvents((int) ev->fd, *hp, &ne)) {
-		if ((ev_flags & EVENT_READ) && (ne.lNetworkEvents & WFD_READ))
+		if ((ev_flags & EVENT_READ)
+		 && (ne.lNetworkEvents & WFD_READ))
 		    res = EVENT_READ_RES;
-		if ((ev_flags & EVENT_WRITE) && (ne.lNetworkEvents & WFD_WRITE))
+		if ((ev_flags & EVENT_WRITE)
+		 && (ne.lNetworkEvents & WFD_WRITE))
 		    res |= EVENT_WRITE_RES;
 		if (ne.lNetworkEvents & FD_CLOSE)
 		    res |= EVENT_EOF_RES;

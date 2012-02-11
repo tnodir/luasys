@@ -1,5 +1,5 @@
-#ifndef KQUEUE_H
-#define KQUEUE_H
+#ifndef EVQ_KQUEUE_H
+#define EVQ_KQUEUE_H
 
 #include <sys/event.h>
 
