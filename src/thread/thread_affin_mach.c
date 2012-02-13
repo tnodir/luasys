@@ -1,8 +1,5 @@
 /* Lua System: Threading: CPU Affinity: Mac OS X */
 
-#include <mach/thread_policy.h>
-#include <mach/task_policy.h>
-#include <mach/mach_init.h>
 #include <mach/thread_act.h>
 
 #define USE_MACH_AFFIN

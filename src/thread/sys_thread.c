@@ -505,7 +505,7 @@ thread_init (lua_State *L)
  * Arguments: ..., error_message (string)
  */
 static void
-thread_abort (lua_State *L)
+thread_error_abort (lua_State *L)
 {
     const char *msg = (lua_type(L, -1) == LUA_TSTRING)
      ? lua_tostring(L, -1) : NULL;
@@ -527,7 +527,7 @@ thread_start (struct sys_thread *td)
     sys_vm2_enter(td);
 
     if (lua_pcall(L, lua_gettop(L) - 1, 1, 0))
-	thread_abort(L);
+	thread_error_abort(L);
 
     return thread_exit(td);
 }
