@@ -302,7 +302,7 @@ lisapi_createmeta (lua_State *L)
 LUALIB_API int
 luaopen_sys_isapi (lua_State *L)
 {
-    luaL_register(L, "sys.isapi", isapi_lib);
+    luaL_register(L, LUA_ISAPILIBNAME, isapi_lib);
     lisapi_createmeta(L);
     return 1;
 }
