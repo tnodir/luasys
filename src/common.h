@@ -169,10 +169,12 @@ struct sys_buffer {
     struct membuf *mb;
 };
 
-int sys_buffer_read_init (lua_State *L, int idx, struct sys_buffer *sb);
+int sys_buffer_read_init (lua_State *L, int idx,
+                          struct sys_buffer *sb);
 void sys_buffer_read_next (struct sys_buffer *sb, const size_t n);
 
-void sys_buffer_write_init (lua_State *L, int idx, struct sys_buffer *sb,
+void sys_buffer_write_init (lua_State *L, int idx,
+                            struct sys_buffer *sb,
                             char *buf, const size_t buflen);
 int sys_buffer_write_next (lua_State *L, struct sys_buffer *sb,
                            char *buf, const size_t buflen);
@@ -195,13 +197,14 @@ int sys_seterror (lua_State *L, int err);
 
 struct sys_thread;
 
-void sys_set_thread (struct sys_thread *td);
-struct sys_thread *sys_get_thread (void);
+void sys_thread_set (struct sys_thread *td);
+struct sys_thread *sys_thread_get (void);
 
-struct sys_thread *sys_get_vmthread (struct sys_thread *);
-struct lua_State *sys_lua_tothread (struct sys_thread *);
+struct lua_State *sys_thread_tolua (struct sys_thread *);
 
-void sys_check_thread (struct sys_thread *td);
+void sys_thread_yield (void);
+
+void sys_thread_check (struct sys_thread *td);
 
 void sys_vm2_enter (struct sys_thread *td);
 void sys_vm2_leave (struct sys_thread *td);
@@ -209,8 +212,9 @@ void sys_vm2_leave (struct sys_thread *td);
 void sys_vm_enter (void);
 void sys_vm_leave (void);
 
-struct sys_thread *sys_new_thread (struct sys_thread *td, const int insert);
-void sys_del_thread (struct sys_thread *td);
+struct sys_thread *sys_thread_new (struct sys_thread *td,
+                                   const int insert);
+void sys_thread_del (struct sys_thread *td);
 
 int sys_isintr (void);
 

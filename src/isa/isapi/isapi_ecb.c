@@ -105,7 +105,7 @@ ecb_read (lua_State *L)
     const size_t len = n;  /* how much total to read */
     size_t rlen;  /* how much to read */
     int nr;  /* number of bytes actually read */
-    struct sys_thread *td = sys_get_thread();
+    struct sys_thread *td = sys_thread_get();
     struct sys_buffer sb;
     char buf[SYS_BUFSIZE];
     int res = 0;
@@ -129,7 +129,7 @@ ecb_read (lua_State *L)
 	if (!sys_buffer_write_done(L, &sb, buf, nr))
 	    lua_pushinteger(L, len - n);
     }
-    if (td) sys_check_thread(td);
+    if (td) sys_thread_check(td);
     if (!res) return 1;
     return sys_seterror(L, 0);
 }

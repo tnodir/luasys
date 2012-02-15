@@ -64,7 +64,7 @@ dpool_close (lua_State *L)
 static int
 dpool_put (lua_State *L)
 {
-    struct sys_thread *td = sys_get_thread();
+    struct sys_thread *td = sys_thread_get();
     struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
     int nput = lua_gettop(L) - 1;
 
@@ -92,7 +92,7 @@ dpool_put (lua_State *L)
 	dp->td = td;
 	dp->nput = nput;
 	thread_event_signal(&dp->tev);
-	thread_yield(L);
+	sys_thread_yield();
 	dp->td = NULL;
 	if (!dp->nput) return 0;  /* moved to thread */
 	dp->nput = 0;
@@ -182,6 +182,7 @@ dpool_get (lua_State *L)
 	nput = dp->nput;
 	if (nput) {
 	    dp->nput = 0;
+	    luaL_checkstack(L, nput, NULL);
 	    lua_xmove(dp->td->L, L, nput);
 	    return nput;
 	}

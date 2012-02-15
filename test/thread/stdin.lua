@@ -50,7 +50,8 @@ do
 
     local function start()
 	local _, err = pcall(read_stdin)
-	if err and not thread.self():interrupted(err) then
+	if err and not (thread.self():interrupted()
+		and err == thread.interrupt_error()) then
 	    print("Error:", err)
 	    err = nill
 	end

@@ -97,14 +97,14 @@ lisapi_init (void)
      || !lua_isfunction(L, 3))  /* 3: closing handler */
 	goto err;
 
-    g_ISAPI.vmtd = sys_get_thread();
+    g_ISAPI.vmtd = sys_thread_get();
     if (g_ISAPI.vmtd) {
 	lisapi_createmeta(L);
 
 	g_ISAPI.nthreads = 0;
 	g_ISAPI.L = L;
 	sys_vm_leave();
-	sys_set_thread(NULL);
+	sys_thread_set(NULL);
 	return 0;
     }
 #ifndef NDEBUG
@@ -131,15 +131,15 @@ lisapi_open (LPEXTENSION_CONTROL_BLOCK ecb)
 	LPEXTENSION_CONTROL_BLOCK *ecbp;
 
 	td = g_ISAPI.threads[--g_ISAPI.nthreads];
-	L = sys_lua_tothread(td);
+	L = sys_thread_tolua(td);
 
 	ecbp = checkudata(L, -1, ECB_TYPENAME);
 	*ecbp = ecb;
     } else {
-	td = sys_new_thread(g_ISAPI.vmtd, 0);
+	td = sys_thread_new(g_ISAPI.vmtd, 0);
 	if (!td) return NULL;
 
-	L = sys_lua_tothread(td);
+	L = sys_thread_tolua(td);
 
 	lua_pushvalue(g_ISAPI.L, 1);  /* traceback function */
 	lua_pushvalue(g_ISAPI.L, 2);  /* process function */
@@ -150,7 +150,7 @@ lisapi_open (LPEXTENSION_CONTROL_BLOCK ecb)
 	lua_setmetatable(L, -2);
     }
 
-    sys_set_thread(td);
+    sys_thread_set(td);
     return td;
 }
 
@@ -158,11 +158,11 @@ static void
 lisapi_close (struct sys_thread *td, int status)
 {
     if (status || g_ISAPI.nthreads >= LISAPI_POOL_THREADS)
-	sys_del_thread(td);
+	sys_thread_del(td);
     else
 	g_ISAPI.threads[g_ISAPI.nthreads++] = td;
 
-    sys_set_thread(NULL);
+    sys_thread_set(NULL);
 }
 
 
@@ -201,7 +201,7 @@ TerminateExtension (DWORD flags)
 
     if (g_ISAPI.vmtd) {
 	sys_vm2_enter(g_ISAPI.vmtd);
-	sys_set_thread(g_ISAPI.vmtd);
+	sys_thread_set(g_ISAPI.vmtd);
 
 	if (lua_pcall(g_ISAPI.L, 0, 0, 1)) {
 #ifndef NDEBUG
@@ -231,7 +231,7 @@ HttpExtensionProc (LPEXTENSION_CONTROL_BLOCK ecb)
     td = lisapi_open(ecb);
     if (!td) goto err;
 
-    L = sys_lua_tothread(td);
+    L = sys_thread_tolua(td);
 
     lua_pushvalue(L, -2);  /* process function */
     lua_pushvalue(L, -2);  /* ecb_udata */
