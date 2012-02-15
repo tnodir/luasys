@@ -27,12 +27,6 @@ struct event_queue;
 #define EVQ_TIMEOUT	1
 #define EVQ_FAILED	-1
 
-/* Event Queue environ. table reserved indexes */
-#define EVQ_OBJ_UDATA	1  /* table: event objects */
-#define EVQ_CALLBACK	2  /* table: callback functions */
-#define EVQ_BUF_IDX	6  /* initial buffer index */
-#define EVQ_BUF_MAX	24  /* maximum buffer index */
-
 /* Directory watcher filter flags */
 #define EVQ_DIRWATCH_MODIFY	0x01
 
@@ -80,7 +74,7 @@ struct event {
 };
 
 struct event_queue {
-    unsigned int stop:		1;  /* break the loop? */
+    unsigned int stop: 1;  /* break the loop? */
 
     unsigned int nevents;  /* number of alive events */
 
@@ -97,6 +91,7 @@ struct event_queue {
     struct event *ev_post;  /* have to initialize the event source */
 #endif
 
+    EVQ_APP_EXTRA
     EVQ_EXTRA
 };
 

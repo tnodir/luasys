@@ -24,7 +24,7 @@ win32iocp_new_overlapped (struct event_queue *evq)
     } else {
 	const int n = evq->ov_buf_nevents;
 	const int buf_idx = evq->ov_buf_index;
-	const int nmax = (1 << (buf_idx + EVQ_BUF_IDX));
+	const int nmax = (1 << (buf_idx + WIN32OV_BUF_IDX));
 
 	ov = evq->ov_buffers[buf_idx];
 	if (ov) {
@@ -34,7 +34,7 @@ win32iocp_new_overlapped (struct event_queue *evq)
 		evq->ov_buf_index++;
 	    }
 	} else {
-	    if (buf_idx > EVQ_BUF_MAX - EVQ_BUF_IDX
+	    if (buf_idx >= WIN32OV_BUF_SIZE
 	     || !(ov = malloc(nmax * sizeof(struct win32overlapped))))
 		return NULL;
 	    evq->ov_buffers[buf_idx] = ov;

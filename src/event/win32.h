@@ -48,6 +48,10 @@ struct win32overlapped {
 	} iocp;								\
     } w;
 
+#define WIN32OV_BUF_IDX		6  /* initial buffer size on power of 2 */
+#define WIN32OV_BUF_MAX		24  /* maximum buffer size on power of 2 */
+#define WIN32OV_BUF_SIZE	(WIN32OV_BUF_MAX - WIN32OV_BUF_IDX + 1)
+
 #define EVQ_EXTRA							\
     HANDLE ack_event;							\
     struct event *win_msg;  /* window messages handler */		\
@@ -59,7 +63,7 @@ struct win32overlapped {
     int ov_buf_nevents;  /* number of used overlaps of cur. buffer */	\
     int ov_buf_index;  /* index of current buffer */			\
     struct win32overlapped *ov_free;  /* head of free overlaps */	\
-    struct win32overlapped *ov_buffers[EVQ_BUF_MAX - EVQ_BUF_IDX + 1];
+    struct win32overlapped *ov_buffers[WIN32OV_BUF_SIZE];
 
 #define event_get_evq(ev)	(ev)->wth->evq
 #define event_get_tq_head(ev)	(ev)->wth->tq

@@ -1,9 +1,22 @@
 /* Lua System: Event Queue */
 
-#define EVQ_TYPENAME	"sys.evq"
+#define EVQ_TYPENAME		"sys.event_queue"
+
+#define EVQ_APP_EXTRA
+
+
+#include "event/evq.c"
+
+
+/* Event Queue environ. table reserved indexes */
+#define EVQ_UDATA_IDX		1  /* table: event objects */
+#define EVQ_CALLBACK_IDX	2  /* table: callback functions */
+#define EVQ_BUF_IDX		6  /* initial buffer index */
+#define EVQ_BUF_MAX		24  /* maximum buffer index */
 
 #define levq_toevent(L,i) \
-    (lua_type(L, (i)) == LUA_TLIGHTUSERDATA ? lua_touserdata(L, (i)) : NULL)
+	(lua_type(L, (i)) == LUA_TLIGHTUSERDATA \
+	 ? lua_touserdata(L, (i)) : NULL)
 
 
 static const int sig_flags[] = {
@@ -52,9 +65,9 @@ levq_new (lua_State *L)
 
 	lua_newtable(L);  /* environ. */
 	lua_newtable(L);  /* {ev_id => obj_udata} */
-	lua_rawseti(L, -2, EVQ_OBJ_UDATA);
+	lua_rawseti(L, -2, EVQ_UDATA_IDX);
 	lua_newtable(L);  /* {ev_id => cb_func} */
-	lua_rawseti(L, -2, EVQ_CALLBACK);
+	lua_rawseti(L, -2, EVQ_CALLBACK_IDX);
 	lua_setfenv(L, -2);
 	return 1;
     }
@@ -77,7 +90,7 @@ levq_done (lua_State *L)
 
     lua_settop(L, ARG_LAST);
     lua_getfenv(L, 1);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_OBJ_UDATA);
+    lua_rawgeti(L, ARG_LAST+1, EVQ_UDATA_IDX);
 
     /* delete object events */
     lua_pushnil(L);
@@ -147,7 +160,7 @@ levq_new_event (lua_State *L, int idx, struct event_queue *evq)
 }
 
 /*
- * Arguments: ..., EVQ_ENVIRON (table), EVQ_OBJ_UDATA (table),
+ * Arguments: ..., EVQ_ENVIRON (table), EVQ_UDATA (table),
  *	EVQ_CALLBACK (table)
  */
 static void
@@ -200,8 +213,8 @@ levq_add (lua_State *L)
 
     lua_settop(L, ARG_LAST);
     lua_getfenv(L, 1);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_OBJ_UDATA);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_CALLBACK);
+    lua_rawgeti(L, ARG_LAST+1, EVQ_UDATA_IDX);
+    lua_rawgeti(L, ARG_LAST+1, EVQ_CALLBACK_IDX);
 
     ev = levq_new_event(L, ARG_LAST+1, evq);
     ev->fd = fdp ? *fdp : (fd_t) signo;
@@ -463,8 +476,8 @@ levq_del (lua_State *L)
 
     lua_settop(L, ARG_LAST);
     lua_getfenv(L, 1);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_OBJ_UDATA);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_CALLBACK);
+    lua_rawgeti(L, ARG_LAST+1, EVQ_UDATA_IDX);
+    lua_rawgeti(L, ARG_LAST+1, EVQ_CALLBACK_IDX);
 
 #ifdef EVQ_POST_INIT
     if (ev == evq->ev_post)
@@ -503,7 +516,7 @@ levq_callback (lua_State *L)
 
     lua_settop(L, ARG_LAST);
     lua_getfenv(L, 1);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_CALLBACK);
+    lua_rawgeti(L, ARG_LAST+1, EVQ_CALLBACK_IDX);
 
     if (top < ARG_LAST) {
 	lua_pop(L, 1);
@@ -595,8 +608,8 @@ levq_loop (lua_State *L)
 
     lua_settop(L, ARG_LAST);
     lua_getfenv(L, 1);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_OBJ_UDATA);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_CALLBACK);
+    lua_rawgeti(L, ARG_LAST+1, EVQ_UDATA_IDX);
+    lua_rawgeti(L, ARG_LAST+1, EVQ_CALLBACK_IDX);
 
 #ifdef EVQ_POST_INIT
     if (evq->ev_post) {
