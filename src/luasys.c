@@ -179,7 +179,6 @@ sys_xpcall (lua_State *L)
 }
 
 
-#include "event/evq.c"
 #include "isa/fcgi/sys_fcgi.c"
 #include "mem/sys_mem.c"
 #include "thread/sys_thread.c"
@@ -239,8 +238,8 @@ createmeta (lua_State *L)
 	{FD_TYPENAME,		fd_meth,	1},
 	{PERIOD_TYPENAME,	period_meth,	1},
 	{PID_TYPENAME,		pid_meth,	1},
-	{RAND_TYPENAME,		rand_meth,	0},
 	{LOG_TYPENAME,		log_meth,	0},
+	{RAND_TYPENAME,		rand_meth,	0},
     };
     int i;
 
