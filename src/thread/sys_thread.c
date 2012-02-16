@@ -189,15 +189,20 @@ thread_exit (struct sys_thread *td)
 }
 
 void
-sys_thread_yield (void)
+sys_thread_yield (const int check_thread)
 {
-    sys_vm_leave();
+    struct sys_thread *td = sys_thread_get();
+
+    if (td) sys_vm2_leave(td);
 #ifndef _WIN32
     sched_yield();
 #else
     Sleep(0);
 #endif
-    sys_vm_enter();
+    if (td) {
+	sys_vm2_enter(td);
+	if (check_thread) sys_thread_check(td);
+    }
 }
 
 void
@@ -763,7 +768,7 @@ thread_yield (lua_State *L)
 {
     (void) L;
 
-    sys_thread_yield();
+    sys_thread_yield(1);
     return 0;
 }
 
@@ -814,7 +819,7 @@ thread_interrupt (lua_State *L)
 
     td->state = THREAD_INTERRUPTED;
     if (td == sys_thread_get())
-	sys_thread_yield();
+	sys_thread_yield(1);
     else
 	thread_cancel_syncio(td->tid);
 

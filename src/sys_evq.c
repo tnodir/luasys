@@ -2,7 +2,14 @@
 
 #define EVQ_TYPENAME		"sys.event_queue"
 
-#define EVQ_APP_EXTRA
+struct evq_async_op {
+    struct evq_async_op *next;
+    lua_State * volatile L;
+    int status;  /* result status */
+};
+
+#define EVQ_APP_EXTRA							\
+    struct evq_async_op * volatile async;  /* asynchronous operations */
 
 
 #include "event/evq.c"
@@ -587,6 +594,32 @@ levq_timeout_manual (lua_State *L)
 }
 
 /*
+ * Arguments: evq_udata, function, [arguments (any) ...]
+ * Returns: [results (any) ...]
+ */
+static int
+levq_async (lua_State *L)
+{
+    struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
+    struct evq_async_op op;
+
+    luaL_checktype(L, 2, LUA_TFUNCTION);
+
+    op.L = L;
+    op.next = evq->async;
+    evq->async = &op;
+
+    if (evq_signal(evq, EVQ_SIGEVQ))
+	return sys_seterror(L, 0);
+
+    do sys_thread_yield(0); while (op.L);
+
+    if (op.status) lua_error(L);
+
+    return lua_gettop(L);
+}
+
+/*
  * Arguments: evq_udata, [timeout (milliseconds), once (boolean),
  *	fetch (boolean)]
  * Returns: [evq_udata | timeout (false)]
@@ -624,6 +657,20 @@ levq_loop (lua_State *L)
 	if (evq->stop) {
 	    evq->stop = 0;
 	    break;
+	}
+
+	/* process asynchronous operations */
+	if (evq->async) {
+	    struct evq_async_op *op = evq->async;
+
+	    evq->async = NULL;
+	    do {
+		lua_State *NL = op->L;
+		const int nargs = lua_gettop(NL) - 2;
+
+		op->L = NULL;
+		op->status = lua_pcall(NL, nargs, LUA_MULTRET, 0);
+	    } while ((op = op->next));
 	}
 
 	if (!evq->ev_ready) {
@@ -767,14 +814,10 @@ levq_notify (lua_State *L)
     if (!(ev->flags & EVENT_TIMER))
 	luaL_argerror(L, 2, "timer expected");
 
-    ev->next_object = evq->ev_notify;
-    evq->ev_notify = ev;
+    evq->ev_ready = evq_process_active(ev, evq->ev_ready, evq->now);
 
-    if (!evq_signal(evq, EVQ_SIGEVQ)) {
-	lua_settop(L, 1);
-	return 1;
-    }
-    return sys_seterror(L, 0);
+    lua_settop(L, 1);
+    return 1;
 }
 
 /*
@@ -822,6 +865,7 @@ static luaL_Reg evq_meth[] = {
     {"timeout",		levq_timeout},
     {"timeout_manual",	levq_timeout_manual},
     {"callback",	levq_callback},
+    {"async",		levq_async},
     {"loop",		levq_loop},
     {"stop",		levq_stop},
     {"now",		levq_now},

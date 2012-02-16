@@ -144,24 +144,6 @@ signal_del (struct event *ev)
 }
 
 static struct event *
-signal_process_active (struct event *ev, struct event *ev_ready,
-                       const msec_t now)
-{
-    ev->flags |= EVENT_READ_RES;
-    if (ev->flags & EVENT_ACTIVE)
-	return ev_ready;
-
-    ev->flags |= EVENT_ACTIVE;
-    if (ev->flags & EVENT_ONESHOT)
-	evq_del(ev, 1);
-    else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL))
-	timeout_reset(ev, now);
-
-    ev->next_ready = ev_ready;
-    return ev;
-}
-
-static struct event *
 signal_process_actives (struct event_queue *evq, const int signo,
                         struct event *ev_ready, const msec_t now)
 {
@@ -180,21 +162,7 @@ signal_process_actives (struct event_queue *evq, const int signo,
 
     for (ev = ev_next; ev; ev = ev_next) {
 	ev_next = ev->next_ready;
-	ev_ready = signal_process_active(ev, ev_ready, now);
-    }
-    return ev_ready;
-}
-
-static struct event *
-signal_process_notifies (struct event_queue *evq, struct event *ev_ready,
-                         const msec_t now)
-{
-    struct event *ev = evq->ev_notify, *ev_next;
-
-    evq->ev_notify = NULL;
-    for (; ev; ev = ev_next) {
-	ev_next = ev->next_object;
-	ev_ready = signal_process_active(ev, ev_ready, now);
+	ev_ready = evq_process_active(ev, ev_ready, now);
     }
     return ev_ready;
 }
@@ -205,10 +173,7 @@ signal_process_interrupt (struct event_queue *evq, unsigned int sig_ready,
 {
     int signo;
 
-    if (sig_ready & (1 << EVQ_SIGEVQ)) {
-	sig_ready &= ~(1 << EVQ_SIGEVQ);
-	ev_ready = signal_process_notifies(evq, ev_ready, now);
-    }
+    sig_ready &= ~(1 << EVQ_SIGEVQ);
 
     for (signo = 0; sig_ready; ++signo, sig_ready >>= 1) {
 	if (sig_ready & 1)

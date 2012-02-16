@@ -85,7 +85,6 @@ struct event_queue {
 
     struct event * volatile ev_ready;  /* head of ready events */
     struct event *ev_free;  /* head of free events */
-    struct event *ev_notify;  /* head of notified events */
 
 #ifdef EVQ_POST_INIT
     struct event *ev_post;  /* have to initialize the event source */
@@ -110,6 +109,10 @@ EVQ_API int evq_wait (struct event_queue *evq, msec_t timeout);
 EVQ_API int evq_set_timeout (struct event *ev, const msec_t msec);
 EVQ_API int evq_add_timer (struct event_queue *evq, struct event *ev,
                            const msec_t msec);
+
+EVQ_API struct event *evq_process_active (struct event *ev,
+                                          struct event *ev_ready,
+                                          const msec_t now);
 
 #ifndef _WIN32
 

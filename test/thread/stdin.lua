@@ -41,7 +41,7 @@ do
 	    local line = stdin:read()
 	    if #line <= 2 then
 		print("Worker:", "Notify controller")
-		evq:notify(controller)
+		evq:async(evq.notify, evq, controller)
 	    else
 		sys.stdout:write("Worker:\tInput: ", line)
 	    end

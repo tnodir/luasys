@@ -92,7 +92,7 @@ dpool_put (lua_State *L)
 	dp->td = td;
 	dp->nput = nput;
 	thread_event_signal(&dp->tev);
-	sys_thread_yield();
+	sys_thread_yield(0);
 	dp->td = NULL;
 	if (!dp->nput) return 0;  /* moved to thread */
 	dp->nput = 0;

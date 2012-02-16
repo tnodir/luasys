@@ -202,7 +202,7 @@ struct sys_thread *sys_thread_get (void);
 
 struct lua_State *sys_thread_tolua (struct sys_thread *);
 
-void sys_thread_yield (void);
+void sys_thread_yield (const int check_thread);
 
 void sys_thread_check (struct sys_thread *td);
 
