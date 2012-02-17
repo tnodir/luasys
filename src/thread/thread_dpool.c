@@ -81,10 +81,15 @@ dpool_put (lua_State *L)
 	    lua_call(L, 1 + nput, LUA_MULTRET);
 	    nput = lua_gettop(L) - 1;
 	    if (!nput) return 0;
-	} else do {
-	    if (thread_event_wait(&dp->tev, TIMEOUT_INFINITE))
-		return sys_seterror(L, 0);
-	} while (dp->n >= dp->max);
+	} else {
+	    do {
+		const int res = thread_event_wait(&dp->tev, td,
+		 TIMEOUT_INFINITE);
+
+		sys_thread_check(td);
+		if (res) return sys_seterror(L, 0);
+	    } while (dp->n >= dp->max);
+	}
     }
 
     /* Try directly move data between threads */
@@ -122,10 +127,13 @@ dpool_put (lua_State *L)
 static int
 dpool_get (lua_State *L)
 {
+    struct sys_thread *td = sys_thread_get();
     struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
     const msec_t timeout = lua_isnoneornil(L, 2)
      ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
     int nput;
+
+    if (!td) luaL_argerror(L, 0, "Threading not initialized");
 
     lua_settop(L, 1);
     lua_getfenv(L, 1);  /* storage */
@@ -166,9 +174,12 @@ dpool_get (lua_State *L)
 	/* wait signal */
 	{
 	    int res;
+
 	    dp->nwaits++;
-	    res = thread_event_wait(&dp->tev, timeout);
+	    res = thread_event_wait(&dp->tev, td, timeout);
 	    dp->nwaits--;
+
+	    sys_thread_check(td);
 	    if (res) {
 		if (res == 1) {
 		    lua_pushboolean(L, 0);

@@ -233,7 +233,7 @@ thread_cond_wait_value (thread_cond_t *condp, thread_critsect_t *csp,
 #ifdef _WIN32
 
 static int
-thread_handle_wait (HANDLE h, msec_t timeout)
+thread_handle_wait (HANDLE h, const msec_t timeout)
 {
     const int res = WaitForSingleObject(h, timeout);
 
@@ -278,18 +278,19 @@ thread_event_del (thread_event_t *tev)
 }
 
 static int
-thread_event_wait (thread_event_t *tev, msec_t timeout)
+thread_event_wait (thread_event_t *tev, struct sys_thread *td,
+                   const msec_t timeout)
 {
     int res;
 
-    sys_vm_leave();
+    sys_vm2_leave(td);
 #if defined(USE_PTHREAD_SYNC)
     res = thread_cond_wait_value(&tev->cond, &tev->cs,
      &tev->signalled, THREAD_EVENT_SIGNALLED, 1, timeout);
 #else
     res = thread_handle_wait(tev->cond, timeout);
 #endif
-    sys_vm_enter();
+    sys_vm2_enter(td);
     return res;
 }
 

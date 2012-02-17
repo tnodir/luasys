@@ -88,11 +88,6 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #define luai_writestringerror(s,p) \
 	(fprintf(stderr, (s), (p)), fflush(stderr))
 
-#define lua_pushunsigned(L,u)	lua_pushnumber((L), (lua_Number) (u))
-#define lua_tounsigned(L,n)	(unsigned int) lua_tonumber((L), (n))
-#define luaL_optunsigned(L,n,d) \
-	(unsigned int) luaL_optnumber((L), (n), (lua_Number) (d))
-
 #else
 #define luaL_register(L,n,l)	luaL_newlib((L), (l))
 #define lua_setfenv		lua_setuservalue

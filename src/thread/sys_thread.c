@@ -821,7 +821,7 @@ thread_interrupt (lua_State *L)
     if (td == sys_thread_get())
 	sys_thread_yield(1);
     else
-	thread_cancel_syncio(td->tid);
+	(void) thread_cancel_syncio(td->tid);
 
     return 0;
 }
@@ -843,7 +843,7 @@ thread_kill (lua_State *L)
     if (td == sys_thread_get())
 	thread_exit(td);
     else
-	thread_cancel_syncio(td->tid);
+	(void) thread_cancel_syncio(td->tid);
 
     return 0;
 }

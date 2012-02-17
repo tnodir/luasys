@@ -69,8 +69,10 @@ struct pipe_ref {
 static int
 pipe_new (lua_State *L)
 {
-    const unsigned int max_size = luaL_optunsigned(L, 1, PIPE_BUF_MAXSIZE);
-    const unsigned int min_size = luaL_optunsigned(L, 2, PIPE_BUF_MINSIZE);
+    const unsigned int max_size = (unsigned int)
+     luaL_optinteger(L, 1, PIPE_BUF_MAXSIZE);
+    const unsigned int min_size = (unsigned int)
+     luaL_optinteger(L, 2, PIPE_BUF_MINSIZE);
     struct pipe_ref *pr;
     struct pipe *pp;
 
@@ -294,13 +296,13 @@ pipe_msg_parse (lua_State *L, struct message *msg)
 
 static int
 pipe_cond_wait (thread_cond_t *condp, thread_critsect_t *csp,
-                const msec_t timeout)
+                struct sys_thread *td, const msec_t timeout)
 {
     int res;
 
-    sys_vm_leave();
+    sys_vm2_leave(td);
     res = thread_cond_wait_nolock(condp, csp, timeout);
-    sys_vm_enter();
+    sys_vm2_enter(td);
     return res;
 }
 
@@ -311,10 +313,13 @@ pipe_cond_wait (thread_cond_t *condp, thread_critsect_t *csp,
 static int
 pipe_put (lua_State *L)
 {
+    struct sys_thread *td = sys_thread_get();
     struct pipe_ref *pr = checkudata(L, 1, PIPE_TYPENAME);
     struct pipe *pp = pr->pipe;
     thread_critsect_t *csp = pipe_critsect_ptr(pp);
     struct message msg;
+
+    if (!td) luaL_argerror(L, 0, "Threading not initialized");
 
     pipe_msg_build(L, &msg, 2);  /* construct the message */
 
@@ -357,7 +362,7 @@ pipe_put (lua_State *L)
 		    int res;
 
 		    pp->signal_on_get++;
-		    res = pipe_cond_wait(&pp->get_cond, csp, pr->put_timeout);
+		    res = pipe_cond_wait(&pp->get_cond, csp, td, pr->put_timeout);
 
 		    if (--pp->signal_on_get) {
 			(void) thread_cond_signal(&pp->get_cond);
@@ -365,6 +370,7 @@ pipe_put (lua_State *L)
 		    if (!res) continue;
 		    thread_critsect_leave(csp);
 
+		    sys_thread_check(td);
 		    if (res == 1) {
 			lua_pushboolean(L, 0);
 			return 1;  /* timed out */
@@ -396,11 +402,14 @@ pipe_put (lua_State *L)
 static int
 pipe_get (lua_State *L)
 {
+    struct sys_thread *td = sys_thread_get();
     struct pipe *pp = lua_unboxpointer(L, 1, PIPE_TYPENAME);
     const msec_t timeout = lua_isnoneornil(L, 2)
      ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
     thread_critsect_t *csp = pipe_critsect_ptr(pp);
     struct message msg;
+
+    if (!td) luaL_argerror(L, 0, "Threading not initialized");
 
     /* read message from buffer */
     thread_critsect_enter(csp);
@@ -433,12 +442,13 @@ pipe_get (lua_State *L)
 	    int res;
 
 	    pp->signal_on_put++;
-	    res = pipe_cond_wait(&pp->put_cond, csp, timeout);
+	    res = pipe_cond_wait(&pp->put_cond, csp, td, timeout);
 	    pp->signal_on_put--;
 
 	    if (!res) continue;
 	    thread_critsect_leave(csp);
 
+	    sys_thread_check(td);
 	    if (res == 1) {
 		lua_pushboolean(L, 0);
 		return 1;  /* timed out */
@@ -471,7 +481,7 @@ pipe_count (lua_State *L)
     nmsg = pp->nmsg;
     thread_critsect_leave(csp);
 
-    lua_pushunsigned(L, nmsg);
+    lua_pushinteger(L, nmsg);
     return 1;
 }
 
