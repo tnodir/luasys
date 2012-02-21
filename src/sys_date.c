@@ -19,6 +19,8 @@ struct period {
     lua_Number cycle;
 };
 
+#include "win32/strptime.c"
+
 #endif
 
 
@@ -77,7 +79,7 @@ date_getfield (lua_State *L, const char *key, int value)
 
 /*
  * Arguments: [format (string) | date (table), time (number), is_UTC (boolean)]
- * Returns: [string | date (table)]
+ * Returns: [date (string) | date (table)]
  *
  * Note: date table & format
  *	{ year=%Y, month=%m, day=%d, hour=%H, min=%M, sec=%S,
@@ -89,36 +91,36 @@ sys_date (lua_State *L)
     time_t t = lua_isnumber(L, 2) ? (time_t) lua_tointeger(L, 2)
      : time(NULL);  /* current time */
     const int is_UTC = lua_isboolean(L, -1) && lua_toboolean(L, -1);
-    const struct tm *tsp;
+    const struct tm *tmp;
 #if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) \
 	|| (defined(_XOPEN_SOURCE) && _XOPEN_SOURCE) \
 	|| (defined(_BSD_SOURCE) && _BSD_SOURCE) \
 	|| (defined(_SVID_SOURCE) && _SVID_SOURCE) \
 	|| (defined(_POSIX_SOURCE) && _POSIX_SOURCE)
-    struct tm ts;
+    struct tm tm;
 
-    tsp = is_UTC ? gmtime_r(&t, &ts) : localtime_r(&t, &ts);
+    tmp = is_UTC ? gmtime_r(&t, &tm) : localtime_r(&t, &tm);
 #else
-    tsp = is_UTC ? gmtime(&t) : localtime(&t);
+    tmp = is_UTC ? gmtime(&t) : localtime(&t);
 #endif
-    if (tsp == NULL)  /* invalid date */
+    if (tmp == NULL)  /* invalid date */
 	return 0;
 
     if (lua_istable(L, 1)) {
 	lua_settop(L, 1);
-	date_setfield(L, "sec", tsp->tm_sec);
-	date_setfield(L, "min", tsp->tm_min);
-	date_setfield(L, "hour", tsp->tm_hour);
-	date_setfield(L, "day", tsp->tm_mday);
-	date_setfield(L, "month", tsp->tm_mon + 1);
-	date_setfield(L, "year", tsp->tm_year + 1900);
-	date_setfield(L, "wday", tsp->tm_wday);
-	date_setfield(L, "yday", tsp->tm_yday + 1);
-	date_setfield(L, "isdst", tsp->tm_isdst);
+	date_setfield(L, "sec", tmp->tm_sec);
+	date_setfield(L, "min", tmp->tm_min);
+	date_setfield(L, "hour", tmp->tm_hour);
+	date_setfield(L, "day", tmp->tm_mday);
+	date_setfield(L, "month", tmp->tm_mon + 1);
+	date_setfield(L, "year", tmp->tm_year + 1900);
+	date_setfield(L, "wday", tmp->tm_wday);
+	date_setfield(L, "yday", tmp->tm_yday + 1);
+	date_setfield(L, "isdst", tmp->tm_isdst);
     } else {
 	char buf[256];
 	const char *s = luaL_optstring(L, 1, "%c");
-	size_t len = strftime(buf, sizeof(buf), s, tsp);
+	size_t len = strftime(buf, sizeof(buf), s, tmp);
 
 	if (len)
 	    lua_pushlstring(L, buf, len);
@@ -130,6 +132,8 @@ sys_date (lua_State *L)
 
 /*
  * Arguments: [date (table)]
+ * |
+ * Arguments: [date (string), format (string)]
  * Returns: [time (number)]
  */
 static int
@@ -137,24 +141,37 @@ sys_time (lua_State *L)
 {
     time_t t;
 
-    if (lua_istable(L, 1)) {
-	struct tm ts;
-
-	lua_settop(L, 1);
-	ts.tm_sec = date_getfield(L, "sec", 0);
-	ts.tm_min = date_getfield(L, "min", 0);
-	ts.tm_hour = date_getfield(L, "hour", 0);
-	ts.tm_mday = date_getfield(L, "day", -2);
-	ts.tm_mon = date_getfield(L, "month", -2) - 1;
-	ts.tm_year = date_getfield(L, "year", -2) - 1900;
-	ts.tm_isdst = date_getfield(L, "isdst", -1);
-	t = mktime(&ts);
-	if (t == (time_t) -1)
-	    return sys_seterror(L, 0);
-    } else
+    if (lua_isnoneornil(L, 1))
 	t = time(NULL);  /* current time */
+    else {
+	struct tm tm;
+
+	if (lua_istable(L, 1)) {
+	    lua_settop(L, 1);
+	    tm.tm_sec = date_getfield(L, "sec", 0);
+	    tm.tm_min = date_getfield(L, "min", 0);
+	    tm.tm_hour = date_getfield(L, "hour", 0);
+	    tm.tm_mday = date_getfield(L, "day", -2);
+	    tm.tm_mon = date_getfield(L, "month", -2) - 1;
+	    tm.tm_year = date_getfield(L, "year", -2) - 1900;
+	    tm.tm_isdst = date_getfield(L, "isdst", -1);
+	} else {
+	    const char *s = luaL_checkstring(L, 1);
+	    const char *format = luaL_checkstring(L, 2);
+
+	    memset(&tm, 0, sizeof(struct tm));
+	    tm.tm_isdst = -1;
+	    if (!strptime(s, format, &tm))
+		goto err;
+	}
+	t = mktime(&tm);
+	if (t == (time_t) -1)
+	    goto err;
+    }
     lua_pushnumber(L, (lua_Number) t);
     return 1;
+ err:
+    return sys_seterror(L, 0);
 }
 
 /*

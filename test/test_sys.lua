@@ -99,3 +99,14 @@ do
 end
 
 
+print"-- sys.date & sys.time"
+do
+    local format = "%d.%m.%Y %H:%M:%S"
+    local now = assert(sys.time())
+    local date = assert(sys.date(format))
+    local time = assert(sys.time(date, format))
+    assert(now == time)
+    print("OK")
+end
+
+
