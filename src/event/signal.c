@@ -246,7 +246,8 @@ signal_process_actives (struct event_queue *evq, const int signo,
     }
     pthread_mutex_unlock(&g_Signal.cs);
 
-    for (ev = ev_next; ev; ev = ev_next) {
+    while (ev_next) {
+	ev = ev_next;
 	ev_next = ev->next_ready;
 	if (signo == EVQ_SIGCHLD && signal_process_child(ev))
 	    continue;

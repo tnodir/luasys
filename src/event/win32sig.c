@@ -160,7 +160,8 @@ signal_process_actives (struct event_queue *evq, const int signo,
     }
     LeaveCriticalSection(&g_Signal.cs);
 
-    for (ev = ev_next; ev; ev = ev_next) {
+    while (ev_next) {
+	ev = ev_next;
 	ev_next = ev->next_ready;
 	ev_ready = evq_process_active(ev, ev_ready, now);
     }
