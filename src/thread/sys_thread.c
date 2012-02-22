@@ -58,7 +58,7 @@ struct sys_thread {
 #endif
     thread_id_t tid;
     lua_Integer exit_status;
-#define THREAD_KILLED		1
+#define THREAD_TERMINATED	1
 #define THREAD_INTERRUPTED	2
     unsigned int volatile state;
 };
@@ -148,8 +148,8 @@ thread_exit (struct sys_thread *td)
     struct sys_vmthread *vmref = td->vmref;
     THREAD_FUNC_RES res;
 
-    if (td->state != THREAD_KILLED) {
-	td->state = THREAD_KILLED;
+    if (td->state != THREAD_TERMINATED) {
+	td->state = THREAD_TERMINATED;
 	td->exit_status = lua_tointeger(td->L, -1);
     }
     res = (THREAD_FUNC_RES) td->exit_status;
@@ -213,7 +213,7 @@ sys_thread_check (struct sys_thread *td)
     {
 	const unsigned int state = td->state;
 
-	if (state == THREAD_KILLED)
+	if (state == THREAD_TERMINATED)
 	    thread_exit(td);
 	else if (state == THREAD_INTERRUPTED) {
 	    lua_rawgetp(td->L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
@@ -831,14 +831,14 @@ thread_interrupt (lua_State *L)
  *	[success/failure (boolean) | status (number)]
  */
 static int
-thread_kill (lua_State *L)
+thread_terminate (lua_State *L)
 {
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
     const lua_Integer status = !lua_isboolean(L, 2) ? lua_tointeger(L, 2)
      : (lua_toboolean(L, 2) ? EXIT_SUCCESS : EXIT_FAILURE);
 
     td->exit_status = status;
-    td->state = THREAD_KILLED;
+    td->state = THREAD_TERMINATED;
 
     if (td == sys_thread_get())
 	thread_exit(td);
@@ -867,12 +867,13 @@ thread_wait (lua_State *L)
 	    return 1;
 	}
     } else {
-	if (td->state == THREAD_KILLED) goto result;
+	if (td->state == THREAD_TERMINATED)
+	    goto result;
 
 	sys_vm_leave();
 #ifndef _WIN32
 	res = thread_cond_wait_value(&td->cond, td->vmcsp,
-	 &td->state, THREAD_KILLED, 0, timeout);
+	 &td->state, THREAD_TERMINATED, 0, timeout);
 #else
 	res = thread_handle_wait(td->tid, timeout);
 #endif
@@ -912,7 +913,7 @@ thread_tostring (lua_State *L)
 static luaL_Reg thread_meth[] = {
     {"interrupted",	thread_interrupted},
     {"interrupt",	thread_interrupt},
-    {"kill",		thread_kill},
+    {"terminate",	thread_terminate},
     {"wait",		thread_wait},
     {"__tostring",	thread_tostring},
     {"__gc",		thread_done},
