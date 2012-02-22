@@ -576,6 +576,9 @@ sys_write (lua_State *L)
     fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
     ssize_t n = 0;  /* number of chars actually write */
     int i, nargs = lua_gettop(L);
+#ifdef _WIN32
+    DWORD is_con = GetConsoleMode(fd, &is_con);
+#endif
 
     for (i = 2; i <= nargs; ++i) {
 	struct sys_buffer sb;
@@ -591,7 +594,7 @@ sys_write (lua_State *L)
 	{
 	    DWORD l;
 	    nw = WriteFile(fd, sb.ptr.r, sb.size, &l, NULL)
-	     ? (int) l : -1;
+	     ? (int) (is_con ? sb.size : l) : -1;
 	}
 #endif
 	sys_vm_enter();

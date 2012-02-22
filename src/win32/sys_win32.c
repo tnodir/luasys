@@ -70,25 +70,6 @@ win32_get_mailslot_info (lua_State *L)
 }
 
 /*
- * Arguments: [File_API (string: "OEM", "ANSI")]
- * Returns: File_API (string)
- */
-static int
-win32_file_apis (lua_State *L)
-{
-    const char *api = lua_tostring(L, 1);
-
-    lua_pushstring(L, AreFileApisANSI() ? "ANSI" : "OEM");
-    if (api) {
-	if (*api == 'O')
-	    SetFileApisToOEM();
-	else
-	    SetFileApisToANSI();
-    }
-    return 1;
-}
-
-/*
  * Arguments: [frequency (hertz), duration (milliseconds)]
  */
 static int
@@ -113,10 +94,8 @@ win32_beep (lua_State *L)
     {"get_mailslot_info",	win32_get_mailslot_info}
 
 static luaL_Reg win32_lib[] = {
-    {"file_apis",	win32_file_apis},
     {"beep",		win32_beep},
     {"registry",	reg_new},
-    {"utf8_console",	utf8_console},
     {NULL, NULL}
 };
 

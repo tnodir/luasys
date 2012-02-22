@@ -140,21 +140,3 @@ filename_to_utf8 (const void *s)
     return is_WinNT ? utf16_to_utf8(s) : mbcs_to_utf8(s);
 }
 
-/*
- * Arguments: UTF-8 string
- * Returns: multibyte character string
- */
-static int
-utf8_console (lua_State *L)
-{
-    const char *s = luaL_checkstring(L, 1);
-    void *mbcs = utf8_to_mbcs(s);
-
-    if (!mbcs)
-	return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
-
-    lua_pushstring(L, mbcs);
-    free(mbcs);
-    return 1;
-}
-
