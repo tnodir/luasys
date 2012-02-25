@@ -58,8 +58,9 @@ struct sys_thread {
 #endif
     thread_id_t tid;
     lua_Integer exit_status;
-#define THREAD_TERMINATED	1
-#define THREAD_INTERRUPTED	2
+#define THREAD_SET_TERMINATE	1
+#define THREAD_TERMINATED	2
+#define THREAD_INTERRUPTED	4
     unsigned int volatile state;
 };
 
@@ -213,9 +214,10 @@ sys_thread_check (struct sys_thread *td)
     {
 	const unsigned int state = td->state;
 
-	if (state == THREAD_TERMINATED)
+	if (state == THREAD_SET_TERMINATE) {
+	    td->state = THREAD_TERMINATED;
 	    thread_exit(td);
-	else if (state == THREAD_INTERRUPTED) {
+	} else if (state == THREAD_INTERRUPTED) {
 	    lua_rawgetp(td->L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
 	    lua_rawgeti(td->L, -1, THREAD_EINTR_IDX);
 	    lua_error(td->L);
@@ -807,7 +809,7 @@ thread_interrupted (lua_State *L)
  * Arguments: thread_udata, [recover/interrupt (boolean)]
  */
 static int
-thread_interrupt (lua_State *L)
+thread_set_interrupt (lua_State *L)
 {
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
     const int recover = lua_toboolean(L, 2);
@@ -831,14 +833,14 @@ thread_interrupt (lua_State *L)
  *	[success/failure (boolean) | status (number)]
  */
 static int
-thread_terminate (lua_State *L)
+thread_set_terminate (lua_State *L)
 {
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
     const lua_Integer status = !lua_isboolean(L, 2) ? lua_tointeger(L, 2)
      : (lua_toboolean(L, 2) ? EXIT_SUCCESS : EXIT_FAILURE);
 
     td->exit_status = status;
-    td->state = THREAD_TERMINATED;
+    td->state = THREAD_SET_TERMINATE;
 
     if (td == sys_thread_get())
 	thread_exit(td);
@@ -912,8 +914,8 @@ thread_tostring (lua_State *L)
 
 static luaL_Reg thread_meth[] = {
     {"interrupted",	thread_interrupted},
-    {"interrupt",	thread_interrupt},
-    {"terminate",	thread_terminate},
+    {"interrupt",	thread_set_interrupt},
+    {"terminate",	thread_set_terminate},
     {"wait",		thread_wait},
     {"__tostring",	thread_tostring},
     {"__gc",		thread_done},
