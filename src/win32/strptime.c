@@ -321,7 +321,6 @@ literal:
 			continue;
 
 		case 'Z':
-			_tzset();
 			if (strncmp((const char *)bp, gmt, 3) == 0) {
 				tm->tm_isdst = 0;
 #ifdef TM_GMTOFF
@@ -332,6 +331,8 @@ literal:
 #endif
 				bp += 3;
 			} else {
+#if defined(_TM_DEFINED) && !defined(_WIN32_WCE)
+				_tzset();
 				ep = find_string(bp, &i,
 					       	 (const char * const *)tzname,
 					       	  NULL, 2);
@@ -345,6 +346,7 @@ literal:
 #endif
 				}
 				bp = ep;
+#endif
 			}
 			continue;
 
