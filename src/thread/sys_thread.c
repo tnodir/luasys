@@ -265,7 +265,7 @@ sys_vm_leave (void)
 }
 
 int
-sys_isintr (void)
+sys_eintr (void)
 {
 #ifndef _WIN32
     if (SYS_ERRNO == EINTR) {
@@ -273,6 +273,19 @@ sys_isintr (void)
 	return !(td && td->state);
     }
 #endif
+    return 0;
+}
+
+int
+sys_eagain (const int res)
+{
+#ifndef _WIN32
+    if (res || SYS_ERRNO == EAGAIN || SYS_ERRNO == EWOULDBLOCK) {
+#else
+    if (SYS_ERRNO == WSAEWOULDBLOCK) {
+#endif
+	return 1;
+    }
     return 0;
 }
 
@@ -756,7 +769,7 @@ thread_sleep (lua_State *L)
 	req.tv_nsec = (msec % 1000) * 1000000;
 
 	do res = nanosleep(&req, rem);
-	while (res == -1 && sys_isintr() && not_intr);
+	while (res == -1 && sys_eintr() && not_intr);
     }
 #else
     Sleep(msec);

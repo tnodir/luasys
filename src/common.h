@@ -39,7 +39,6 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #endif
 
 #define SYS_ERRNO	GetLastError()
-#define SYS_EAGAIN(e)	((e) == WSAEWOULDBLOCK)
 
 #else
 
@@ -52,7 +51,6 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #include <sched.h>
 
 #define SYS_ERRNO	errno
-#define SYS_EAGAIN(e)	((e) == EAGAIN || (e) == EWOULDBLOCK)
 
 #define SYS_SIGINTR	SIGUSR2
 
@@ -211,7 +209,8 @@ struct sys_thread *sys_thread_new (struct sys_thread *td,
                                    const int insert);
 void sys_thread_del (struct sys_thread *td);
 
-int sys_isintr (void);
+int sys_eintr (void);
+int sys_eagain (const int res);
 
 
 /*

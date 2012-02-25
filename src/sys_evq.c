@@ -670,7 +670,8 @@ levq_loop (lua_State *L)
 
 		op->L = NULL;
 		op->status = lua_pcall(NL, nargs, LUA_MULTRET, 0);
-	    } while ((op = op->next));
+		op = op->next;
+	    } while (op);
 	}
 
 	if (!evq->ev_ready) {

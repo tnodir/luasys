@@ -80,7 +80,7 @@ rand_next (lua_State *L)
 
     sys_vm_leave();
     do nr = read(fd, (char *) buf, len);
-    while (nr == -1 && sys_isintr());
+    while (nr == -1 && sys_eintr());
     sys_vm_enter();
 
     if (nr == len) {

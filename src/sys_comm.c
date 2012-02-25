@@ -367,7 +367,7 @@ comm_wait (lua_State *L)
 	while ((res = !ioctl(fd, TIOCMGET, &status)) && !(status & flags))
 	    usleep(10000);  /* 10 msec polling */
 #endif
-    } while (!res && sys_isintr());
+    } while (!res && sys_eintr());
 #else
     res = SetCommMask(fd, flags) && WaitCommEvent(fd, &status, NULL);
 #endif

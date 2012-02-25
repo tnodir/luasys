@@ -401,7 +401,7 @@ proc_wait (lua_State *L)
 
     sys_vm_leave();
 #ifndef _WIN32
-    while ((waitpid(pidp->id, &status, 0)) == -1 && sys_isintr())
+    while ((waitpid(pidp->id, &status, 0)) == -1 && sys_eintr())
 	continue;
     status = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 #else

@@ -171,7 +171,7 @@ sock_close (lua_State *L)
 	int res;
 
 	do res = close(*sdp);
-	while (res == -1 && sys_isintr());
+	while (res == -1 && sys_eintr());
 	lua_pushboolean(L, !res);
 #else
 	lua_pushboolean(L, !closesocket(*sdp));
@@ -402,7 +402,7 @@ sock_accept (lua_State *L)
     sys_vm_leave();
 #ifndef _WIN32
     do sd = accept(sd, sap, slp);
-    while (sd == -1 && sys_isintr());
+    while (sd == -1 && sys_eintr());
 #else
     sd = accept(sd, sap, slp);
 #endif
@@ -412,7 +412,7 @@ sock_accept (lua_State *L)
 	*sdp = sd;
 	lua_settop(L, 2);
 	return 1;
-    } else if (SYS_EAGAIN(SYS_ERRNO)) {
+    } else if (sys_eagain(0)) {
 	lua_pushboolean(L, 0);
 	return 1;
     }
@@ -433,7 +433,7 @@ sock_connect (lua_State *L)
     sys_vm_leave();
     do res = connect(sd, &sap->u.addr, sap->addrlen);
 #ifndef _WIN32
-    while (res == -1 && sys_isintr());
+    while (res == -1 && sys_eintr());
 #else
     while (0);
 #endif
@@ -443,7 +443,7 @@ sock_connect (lua_State *L)
 #if defined(__FreeBSD__)
      || SYS_ERRNO == EADDRINUSE
 #endif
-     || SYS_EAGAIN(SYS_ERRNO)) {
+     || sys_eagain(res)) {
 	if (res) lua_pushboolean(L, 0);
 	else lua_settop(L, 1);
 	return 1;
@@ -481,13 +481,13 @@ sock_send (lua_State *L)
     do nw = !to ? send(sd, sb.ptr.r, sb.size, flags)
      : sendto(sd, sb.ptr.r, sb.size, flags, &to->u.addr, to->addrlen);
 #ifndef _WIN32
-    while (nw == -1 && sys_isintr());
+    while (nw == -1 && sys_eintr());
 #else
     while (0);
 #endif
     sys_vm_enter();
     if (nw == -1) {
-	if (!SYS_EAGAIN(SYS_ERRNO))
+	if (!sys_eagain(0))
 	    return sys_seterror(L, 0);
 	nw = 0;
     } else {
@@ -549,7 +549,7 @@ sock_recv (lua_State *L)
 	if (td) sys_vm2_leave(td);
 #ifndef _WIN32
 	do nr = recvfrom(sd, sb.ptr.w, rlen, flags, sap, slp);
-	while (nr == -1 && sys_isintr());
+	while (nr == -1 && sys_eintr());
 #else
 	nr = recvfrom(sd, sb.ptr.w, rlen, flags, sap, slp);
 #endif
@@ -559,7 +559,7 @@ sock_recv (lua_State *L)
     } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
      && sys_buffer_write_next(L, &sb, buf, 0));
     if (nr <= 0 && len == n) {
-	if (!nr || !SYS_EAGAIN(SYS_ERRNO))
+	if (!nr || !sys_eagain(0))
 	    res = -1;
 	else lua_pushboolean(L, 0);
     } else {
@@ -652,7 +652,7 @@ sock_sendfile (lua_State *L)
 #ifndef _WIN32
 #if defined(__linux__)
     do res = sendfile(sd, fd, NULL, n ? n : ~((size_t) 0));
-    while (res == -1 && sys_isintr());
+    while (res == -1 && sys_eintr());
 #else
     {
 	off_t nw, off = lseek(fd, 0, SEEK_CUR);
@@ -663,7 +663,7 @@ sock_sendfile (lua_State *L)
 #else
 	do res = sendfile(fd, sd, off, n, NULL, &nw, 0);
 #endif
-	while (res == -1 && sys_isintr());
+	while (res == -1 && sys_eintr());
 	if (res != -1) {
 	    res = (size_t) nw;
 	    lseek(fd, nw, SEEK_CUR);
@@ -672,7 +672,7 @@ sock_sendfile (lua_State *L)
 #endif
     sys_vm_enter();
 
-    if (res != -1 || SYS_EAGAIN(SYS_ERRNO)) {
+    if (res != -1 || sys_eagain(0)) {
 	if (res == -1) {
 	    lua_pushboolean(L, 0);
 	    return 1;
@@ -712,7 +712,7 @@ sock_write (lua_State *L)
 	sys_vm_leave();
 #ifndef _WIN32
 	do nw = write(sd, sb.ptr.r, sb.size);
-	while (nw == -1 && sys_isintr());
+	while (nw == -1 && sys_eintr());
 #else
 	{
 	    WSABUF wsa_buf;
@@ -727,7 +727,7 @@ sock_write (lua_State *L)
 #endif
 	sys_vm_enter();
 	if (nw == -1) {
-	    if (n > 0 || SYS_EAGAIN(SYS_ERRNO)) break;
+	    if (n > 0 || sys_eagain(0)) break;
 	    return sys_seterror(L, 0);
 	}
 	n += nw;
@@ -763,7 +763,7 @@ sock_read (lua_State *L)
 	if (td) sys_vm2_leave(td);
 #ifndef _WIN32
 	do nr = read(sd, sb.ptr.w, rlen);
-	while (nr == -1 && sys_isintr());
+	while (nr == -1 && sys_eintr());
 #else
 	{
 	    WSABUF wsa_buf;
@@ -782,7 +782,7 @@ sock_read (lua_State *L)
     } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
      && sys_buffer_write_next(L, &sb, buf, 0));
     if (nr <= 0 && len == n) {
-	if (!nr || !SYS_EAGAIN(SYS_ERRNO))
+	if (!nr || !sys_eagain(0))
 	    res = -1;
 	else lua_pushboolean(L, 0);
     } else {
