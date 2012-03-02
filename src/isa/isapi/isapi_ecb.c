@@ -143,7 +143,7 @@ ecb_write (lua_State *L)
 {
     LPEXTENSION_CONTROL_BLOCK ecb = lua_unboxpointer(L, 1, ECB_TYPENAME);
     size_t n = 0;  /* number of chars actually write */
-    int i, nargs = lua_gettop(L);
+    int i, narg = lua_gettop(L);
 
     if (ecb->dwHttpStatusCode & ECB_STATUS_HEADERS_SEND) {
 	ecb->dwHttpStatusCode ^= ECB_STATUS_HEADERS_SEND;
@@ -157,10 +157,10 @@ ecb_write (lua_State *L)
 	lua_concat(L, 3);
 
 	lua_insert(L, 2);
-	++nargs;
+	++narg;
     }
 
-    for (i = 2; i <= nargs; ++i) {
+    for (i = 2; i <= narg; ++i) {
 	struct sys_buffer sb;
 	int nw;
 
@@ -182,7 +182,7 @@ ecb_write (lua_State *L)
 	sys_buffer_read_next(&sb, nw);
 	if ((size_t) nw < sb.size) break;
     }
-    lua_pushboolean(L, (i > nargs));
+    lua_pushboolean(L, (i > narg));
     lua_pushinteger(L, n);
     return 2;
 }

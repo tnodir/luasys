@@ -71,10 +71,10 @@ static int
 membuf_write (lua_State *L)
 {
     struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-    int nargs, i;
+    int narg, i;
 
-    nargs = lua_gettop(L);
-    for (i = 2; i <= nargs; ++i) {
+    narg = lua_gettop(L);
+    for (i = 2; i <= narg; ++i) {
 	size_t len = lua_rawlen(L, i);
 	if (len && !membuf_addlstring(L, mb, lua_tostring(L, i), len))
 	    return 0;
@@ -187,20 +187,20 @@ membuf_input (lua_State *L)
 static void
 stream_read (lua_State *L, size_t l, const int bufio)
 {
-    int nargs = 1;
+    int narg = 1;
 
     lua_pushvalue(L, -2);
     lua_pushvalue(L, -2);
 
     if (bufio) {
 	lua_pushvalue(L, 1);
-	++nargs;
+	++narg;
     }
     if (l != (size_t) -1) {
 	lua_pushinteger(L, l);
-	++nargs;
+	++narg;
     }
-    lua_call(L, nargs, 1);
+    lua_call(L, narg, 1);
 }
 
 static int

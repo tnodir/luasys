@@ -267,11 +267,11 @@ sock_sockopt (lua_State *L)
     const int optflag = opt_flags[optname];
     int optval[4];
     socklen_t optlen = sizeof(int);
-    const int nargs = lua_gettop(L);
+    const int narg = lua_gettop(L);
 
-    if (nargs > OPT_START) {
+    if (narg > OPT_START) {
 	optval[0] = lua_tointeger(L, OPT_START + 1);
-	if (nargs > OPT_START + 1) {
+	if (narg > OPT_START + 1) {
 	    optval[1] = lua_tointeger(L, OPT_START + 2);
 	    optlen *= 2;
 	}
@@ -412,7 +412,11 @@ sock_accept (lua_State *L)
 	*sdp = sd;
 	lua_settop(L, 2);
 	return 1;
-    } else if (sys_eagain(0)) {
+    } else if (SYS_EAGAIN(SYS_ERRNO)) {
+	int res;
+	if (sys_sched_eagain(L, sock_accept, EVQ_ASYNC_ACCEPT, &res))
+	    return (res > 0) ? lua_yield(L, res)
+	     : 2;  /* nil, error_message */
 	lua_pushboolean(L, 0);
 	return 1;
     }
@@ -443,9 +447,13 @@ sock_connect (lua_State *L)
 #if defined(__FreeBSD__)
      || SYS_ERRNO == EADDRINUSE
 #endif
-     || sys_eagain(res)) {
-	if (res) lua_pushboolean(L, 0);
-	else lua_settop(L, 1);
+     || SYS_EAGAIN(SYS_ERRNO)) {
+	if (res) {
+	    if (sys_sched_eagain(L, sock_connect, EVQ_ASYNC_CONNECT, &res))
+		return (res > 0) ? lua_yield(L, res)
+		 : 2;  /* nil, error_message */
+	    lua_pushboolean(L, 0);
+	} else lua_settop(L, 1);
 	return 1;
     }
     return sys_seterror(L, 0);
@@ -487,8 +495,12 @@ sock_send (lua_State *L)
 #endif
     sys_vm_enter();
     if (nw == -1) {
-	if (!sys_eagain(0))
-	    return sys_seterror(L, 0);
+	if (SYS_EAGAIN(SYS_ERRNO)) {
+	    int res;
+	    if (sys_sched_eagain(L, sock_send, EVQ_ASYNC_WRITE, &res))
+		return (res > 0) ? lua_yield(L, res)
+		 : 2;  /* nil, error_message */
+	} else return sys_seterror(L, 0);
 	nw = 0;
     } else {
 	sys_buffer_read_next(&sb, nw);
@@ -559,9 +571,12 @@ sock_recv (lua_State *L)
     } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
      && sys_buffer_write_next(L, &sb, buf, 0));
     if (nr <= 0 && len == n) {
-	if (!nr || !sys_eagain(0))
-	    res = -1;
-	else lua_pushboolean(L, 0);
+	if (nr && SYS_EAGAIN(SYS_ERRNO)) {
+	    if (sys_sched_eagain(L, sock_recv, EVQ_ASYNC_READ, &res))
+		return (res > 0) ? lua_yield(L, res)
+		 : 2;  /* nil, error_message */
+	    lua_pushboolean(L, 0);
+	} else res = -1;
     } else {
 	if (!sys_buffer_write_done(L, &sb, buf, nr))
 	    lua_pushinteger(L, len - n);
@@ -672,8 +687,11 @@ sock_sendfile (lua_State *L)
 #endif
     sys_vm_enter();
 
-    if (res != -1 || sys_eagain(0)) {
+    if (res != -1 || SYS_EAGAIN(SYS_ERRNO)) {
 	if (res == -1) {
+	    if (sys_sched_eagain(L, sock_sendfile, EVQ_ASYNC_WRITE, &res))
+		return (res > 0) ? lua_yield(L, res)
+		 : 2;  /* nil, error_message */
 	    lua_pushboolean(L, 0);
 	    return 1;
 	}
@@ -701,9 +719,9 @@ sock_write (lua_State *L)
 {
     sd_t sd = (sd_t) lua_unboxinteger(L, 1, SD_TYPENAME);
     ssize_t n = 0;  /* number of chars actually write */
-    int i, nargs = lua_gettop(L);
+    int i, narg = lua_gettop(L);
 
-    for (i = 2; i <= nargs; ++i) {
+    for (i = 2; i <= narg; ++i) {
 	struct sys_buffer sb;
 	int nw;
 
@@ -727,14 +745,21 @@ sock_write (lua_State *L)
 #endif
 	sys_vm_enter();
 	if (nw == -1) {
-	    if (n > 0 || sys_eagain(0)) break;
+	    if (n > 0) break;
+	    if (SYS_EAGAIN(SYS_ERRNO)) {
+		int res;
+		if (sys_sched_eagain(L, sock_write, EVQ_ASYNC_WRITE, &res))
+		    return (res > 0) ? lua_yield(L, res)
+		     : 2;  /* nil, error_message */
+		break;
+	    }
 	    return sys_seterror(L, 0);
 	}
 	n += nw;
 	sys_buffer_read_next(&sb, nw);
 	if ((size_t) nw < sb.size) break;
     }
-    lua_pushboolean(L, (i > nargs));
+    lua_pushboolean(L, (i > narg));
     lua_pushinteger(L, n);
     return 2;
 }
@@ -782,9 +807,12 @@ sock_read (lua_State *L)
     } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
      && sys_buffer_write_next(L, &sb, buf, 0));
     if (nr <= 0 && len == n) {
-	if (!nr || !sys_eagain(0))
-	    res = -1;
-	else lua_pushboolean(L, 0);
+	if (nr && SYS_EAGAIN(SYS_ERRNO)) {
+	    if (sys_sched_eagain(L, sock_read, EVQ_ASYNC_READ, &res))
+		return (res > 0) ? lua_yield(L, res)
+		 : 2;  /* nil, error_message */
+	    lua_pushboolean(L, 0);
+	} else res = -1;
     } else {
 	if (!sys_buffer_write_done(L, &sb, buf, nr))
 	    lua_pushinteger(L, len - n);

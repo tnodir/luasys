@@ -32,7 +32,7 @@ static int
 comm_init (lua_State *L)
 {
     const fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
-    const int nargs = lua_gettop(L);
+    const int narg = lua_gettop(L);
     int i;
 
 #ifndef _WIN32
@@ -46,7 +46,7 @@ comm_init (lua_State *L)
     if (!GetCommState(fd, &dcb)) goto err;
 #endif
 
-    for (i = 2; i <= nargs; ++i) {
+    for (i = 2; i <= narg; ++i) {
 #ifndef _WIN32
 	tcflag_t mask = 0, flag = 0;
 #endif
@@ -180,7 +180,7 @@ static int
 comm_control (lua_State *L)
 {
     const fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
-    const int nargs = lua_gettop(L);
+    const int narg = lua_gettop(L);
     int i;
 
 #ifndef _WIN32
@@ -198,7 +198,7 @@ comm_control (lua_State *L)
      = dcb.fRtsControl = dcb.fOutxCtsFlow = 0;
 #endif
 
-    for (i = 2; i <= nargs; ++i) {
+    for (i = 2; i <= narg; ++i) {
 	const char *s = lua_tostring(L, i);
 
 	if (!s) continue;
@@ -336,12 +336,12 @@ static int
 comm_wait (lua_State *L)
 {
     const fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
-    const int nargs = lua_gettop(L);
+    const int narg = lua_gettop(L);
     unsigned long status = 0;
     int flags = 0;
     int i, res;
 
-    for (i = 2; i <= nargs; ++i) {
+    for (i = 2; i <= narg; ++i) {
 	const char *s = lua_tostring(L, i);
 
 	if (!s) continue;
@@ -382,7 +382,7 @@ comm_wait (lua_State *L)
 	    lua_pushboolean(L, status & TIOCM_DSR);
 	if (flags & TIOCM_RNG)
 	    lua_pushboolean(L, status & TIOCM_RNG);
-	return nargs - 1;
+	return narg - 1;
     }
     return sys_seterror(L, 0);
 }

@@ -39,6 +39,7 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #endif
 
 #define SYS_ERRNO	GetLastError()
+#define SYS_EAGAIN(e)	((e) == WSAEWOULDBLOCK)
 
 #else
 
@@ -51,6 +52,7 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #include <sched.h>
 
 #define SYS_ERRNO	errno
+#define SYS_EAGAIN(e)	((e) == EAGAIN || (e) == EWOULDBLOCK)
 
 #define SYS_SIGINTR	SIGUSR2
 
@@ -210,7 +212,30 @@ struct sys_thread *sys_thread_new (struct sys_thread *td,
 void sys_thread_del (struct sys_thread *td);
 
 int sys_eintr (void);
-int sys_eagain (const int res);
+
+
+/*
+ * Event Queue
+ */
+
+#define EVQ_TYPENAME		"sys.event_queue"
+
+#define EVQ_ASYNC_READ		0x01
+#define EVQ_ASYNC_WRITE		0x02
+#define EVQ_ASYNC_CONNECT	0x04
+#define EVQ_ASYNC_ACCEPT	0x08
+
+void *sys_evq_add (lua_State *L, int async_flags);
+int sys_evq_del (lua_State *L, void *ev);
+
+
+/*
+ * Scheduler
+ */
+
+int sys_sched_eagain (lua_State *L, lua_CFunction func,
+                      int async_flags, int *nresult);
+int sys_sched_ready (lua_State *L, lua_State *co);
 
 
 /*

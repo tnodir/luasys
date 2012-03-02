@@ -119,14 +119,14 @@ static int
 sys_limit_nfiles (lua_State *L)
 {
 #ifndef _WIN32
-    const int nargs = lua_gettop(L);
+    const int narg = lua_gettop(L);
     struct rlimit rlim;
 
     rlim.rlim_max = 0;
     getrlimit(RLIMIT_NOFILE, &rlim);
     lua_pushinteger(L, rlim.rlim_max);
 
-    if (nargs != 0) {
+    if (narg != 0) {
 	const int n = lua_tointeger(L, 1);
 
 	rlim.rlim_cur = rlim.rlim_max = n;

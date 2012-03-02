@@ -8,7 +8,7 @@ local thread = sys.thread
 thread.init()
 
 
-local COUNT = 1000000
+local COUNT = 10000
 
 local period = sys.period()
 period:start()

@@ -575,12 +575,12 @@ sys_write (lua_State *L)
 {
     fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
     ssize_t n = 0;  /* number of chars actually write */
-    int i, nargs = lua_gettop(L);
+    int i, narg = lua_gettop(L);
 #ifdef _WIN32
     DWORD is_con = GetConsoleMode(fd, &is_con);
 #endif
 
-    for (i = 2; i <= nargs; ++i) {
+    for (i = 2; i <= narg; ++i) {
 	struct sys_buffer sb;
 	int nw;
 
@@ -599,14 +599,21 @@ sys_write (lua_State *L)
 #endif
 	sys_vm_enter();
 	if (nw == -1) {
-	    if (n > 0 || sys_eagain(0)) break;
+	    if (n > 0) break;
+	    if (SYS_EAGAIN(SYS_ERRNO)) {
+		int res;
+		if (sys_sched_eagain(L, sys_write, EVQ_ASYNC_WRITE, &res))
+		    return (res > 0) ? lua_yield(L, res)
+		     : 2;  /* nil, error_message */
+		break;
+	    }
 	    return sys_seterror(L, 0);
 	}
 	n += nw;
 	sys_buffer_read_next(&sb, nw);
 	if ((size_t) nw < sb.size) break;
     }
-    lua_pushboolean(L, (i > nargs));
+    lua_pushboolean(L, (i > narg));
     lua_pushinteger(L, n);
     return 2;
 }
@@ -649,9 +656,12 @@ sys_read (lua_State *L)
     } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
      && sys_buffer_write_next(L, &sb, buf, 0));
     if (nr <= 0 && len == n) {
-	if (!nr || !sys_eagain(0))
-	    res = -1;
-	else lua_pushboolean(L, 0);
+	if (nr && SYS_EAGAIN(SYS_ERRNO)) {
+	    if (sys_sched_eagain(L, sys_read, EVQ_ASYNC_READ, &res))
+		return (res > 0) ? lua_yield(L, res)
+		 : 2;  /* nil, error_message */
+	    lua_pushboolean(L, 0);
+	} else res = -1;
     } else {
 	if (!sys_buffer_write_done(L, &sb, buf, nr))
 	    lua_pushinteger(L, len - n);

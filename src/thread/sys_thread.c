@@ -52,26 +52,35 @@ struct sys_vmthread;
 struct sys_thread {
     thread_critsect_t *vmcsp;
     lua_State *L;
+
     struct sys_vmthread *vmtd, *vmref;
+
 #ifndef _WIN32
     thread_cond_t cond;
 #endif
     thread_id_t tid;
     lua_Integer exit_status;
+
 #define THREAD_SET_TERMINATE	1
 #define THREAD_TERMINATED	2
 #define THREAD_INTERRUPTED	4
     unsigned int volatile state;
+
+    void *sched; /* scheduler */
+    lua_State *sched_task;
 };
 
 /* Main VM-thread's data */
 struct sys_vmthread {
     struct sys_thread td;
+
     thread_critsect_t vmcs;
 #ifdef _WIN32
     thread_cond_t cond;
 #endif
+
     unsigned int volatile nref;
+
     int cpu;  /* bind to processor (inherited by sub-threads) */
     size_t stack_size;  /* for new threads */
 };
@@ -84,7 +93,7 @@ static thread_key_t g_TLSIndex = INVALID_TLS_INDEX;
 #define THREAD_KEY_ADDRESS	(&g_TLSIndex)
 
 /* Threads table indexes */
-#define THREAD_EINTR_IDX	1  /* Thread Interrupt Error */
+#define THREAD_TABLE_EINTR	1  /* Thread Interrupt Error */
 
 #define thread_getvm(td)	((struct sys_thread *) (td)->vmtd)
 #define thread_isvm(td)		((td) == thread_getvm(td))
@@ -219,7 +228,7 @@ sys_thread_check (struct sys_thread *td)
 	    thread_exit(td);
 	} else if (state == THREAD_INTERRUPTED) {
 	    lua_rawgetp(td->L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
-	    lua_rawgeti(td->L, -1, THREAD_EINTR_IDX);
+	    lua_rawgeti(td->L, -1, THREAD_TABLE_EINTR);
 	    lua_error(td->L);
 	}
     }
@@ -273,19 +282,6 @@ sys_eintr (void)
 	return !(td && td->state);
     }
 #endif
-    return 0;
-}
-
-int
-sys_eagain (const int res)
-{
-#ifndef _WIN32
-    if (res || SYS_ERRNO == EAGAIN || SYS_ERRNO == EWOULDBLOCK) {
-#else
-    if (SYS_ERRNO == WSAEWOULDBLOCK) {
-#endif
-	return 1;
-    }
     return 0;
 }
 
@@ -362,14 +358,14 @@ thread_openlibs (lua_State *L)
 #endif
 
 /*
- * Arguments: ..., thread, thread_udata
+ * Arguments: ..., coroutine, thread_udata
  */
 static void
 thread_settable (lua_State *L, struct sys_thread *td)
 {
     lua_rawgetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
 
-    lua_pushvalue(L, -3);  /* thread */
+    lua_pushvalue(L, -3);  /* coroutine */
     lua_rawsetp(L, -2, td->L);
 
     lua_pushvalue(L, -2); /* thread_udata */
@@ -714,7 +710,7 @@ thread_run (lua_State *L)
     luaL_checktype(L, 1, LUA_TFUNCTION);
 
     td = sys_thread_new(vmtd, 1);
-    if (!td->L) goto err;
+    if (!td) goto err;
 
     /* function and arguments */
     {
@@ -796,11 +792,11 @@ thread_interrupt_error (lua_State *L)
 {
     lua_settop(L, 1);
     lua_rawgetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
-    lua_rawgeti(L, -1, THREAD_EINTR_IDX);
+    lua_rawgeti(L, -1, THREAD_TABLE_EINTR);
 
     if (!lua_isnil(L, 1)) {
 	lua_pushvalue(L, 1);
-	lua_rawseti(L, 2, THREAD_EINTR_IDX);
+	lua_rawseti(L, 2, THREAD_TABLE_EINTR);
     }
     return 1;
 }
@@ -923,6 +919,7 @@ thread_tostring (lua_State *L)
 
 #include "thread_dpool.c"
 #include "thread_pipe.c"
+#include "thread_sched.c"
 
 
 static luaL_Reg thread_meth[] = {
@@ -946,6 +943,7 @@ static luaL_Reg thread_lib[] = {
     AFFIN_METHODS,
     DPOOL_METHODS,
     PIPE_METHODS,
+    SCHED_METHODS,
     {NULL, NULL}
 };
 
@@ -960,6 +958,7 @@ thread_createmeta (lua_State *L)
 	{THREAD_TYPENAME,	thread_meth},
 	{DPOOL_TYPENAME,	dpool_meth},
 	{PIPE_TYPENAME,		pipe_meth},
+	{SCHED_TYPENAME,	sched_meth},
     };
     int i;
 
@@ -982,7 +981,7 @@ thread_createmeta (lua_State *L)
     /* create threads table */
     lua_newtable(L);
     lua_pushlightuserdata(L, THREAD_KEY_ADDRESS);  /* Thread Interrupt Error */
-    lua_rawseti(L, -2, THREAD_EINTR_IDX);
+    lua_rawseti(L, -2, THREAD_TABLE_EINTR);
     lua_rawsetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
 }
 
