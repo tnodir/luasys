@@ -79,7 +79,7 @@ static const u_char *find_string(const u_char *, int *, const char * const *,
 	const char * const *, int);
 
 
-static char *
+static const char *
 strptime(const char *buf, const char *fmt, struct tm *tm)
 {
 	unsigned char c;
@@ -495,7 +495,7 @@ literal:
 		}
 	}
 
-	return ((char *)bp);
+	return ((const char *)bp);
 }
 
 
@@ -539,8 +539,8 @@ strncasecmp(const char *s1, const char *s2, size_t n)
 		s2++;
 	}
  
-	return tolower(*(unsigned char *) s1)
-	    - tolower(*(unsigned char *) s2);
+	return tolower(*(const unsigned char *) s1)
+	    - tolower(*(const unsigned char *) s2);
 }
 
 static const u_char *
