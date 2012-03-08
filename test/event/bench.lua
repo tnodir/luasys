@@ -41,7 +41,7 @@ local function run_once(evq)
 	end
 	evid = evq:add_socket(fdi, "r", read_cb)
 	if not evid then
-	    error(errorMessage)
+	    error(SYS_ERR)
 	end
 	events[i], events_idx[evid] = evid, i
     end
@@ -83,7 +83,7 @@ local function main(npipes, nactives, nwrites)
     for i = 1, num_pipes do
 	local fdi, fdo = sock.handle(), sock.handle()
 	if not fdi:socket(fdo) then
-	    error(errorMessage)
+	    error(SYS_ERR)
 	end
 	pipes[i] = {fdi, fdo}
     end

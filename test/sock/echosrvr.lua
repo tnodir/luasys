@@ -44,7 +44,7 @@ do
 
     chan_insert = function(evq, fd, cb, timeout)
 	if not evq:add_socket(fd, 'r', cb, timeout) then
-	    error(errorMessage)
+	    error(SYS_ERR)
 	end
 	--fd:nonblocking(true)
 
@@ -97,7 +97,7 @@ local function accept(evq, evid, fd)
 	    stderr:write("Peer: ", sock.inet_ntop(addr), ":", port, "\n")
 	end
     else
-	stderr:write("accept: ", errorMessage, "\n")
+	stderr:write("accept: ", SYS_ERR, "\n")
     end
 end
 

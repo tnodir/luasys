@@ -20,7 +20,7 @@ while true do
 		break
 	elseif action == "install" then
 		if not win32.service.install(svc_name, FILENAME .. " service", true) then
-			error(errorMessage)
+			error(SYS_ERR)
 		end
 		-- Set Description
 		local r = win32.registry()
@@ -32,7 +32,7 @@ while true do
 	elseif action == "uninstall" then
 		local res, working = win32.service.uninstall(svc_name)
 		if not res then
-			error(working and "Stop the service first." or errorMessage)
+			error(working and "Stop the service first." or SYS_ERR)
 		end
 	else
 		return print("Usage: lua.exe beep_svc.lua (un)install")

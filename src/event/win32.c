@@ -273,7 +273,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 
     if (wait_res == WAIT_TIMEOUT) {
 	if (ev_ready) goto end;
-	if (!wth->tq)
+	if (!wth->tq && !evq->sig_ready)
 	    return EVQ_TIMEOUT;
     }
     if (wait_res == (DWORD) (WAIT_OBJECT_0 + n + 1)) {
@@ -401,8 +401,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	    ev_ready = ev;
 	}
     }
-    if (!ev_ready)
-	return (wait_res == WAIT_TIMEOUT) ? EVQ_TIMEOUT : 0;
+    if (!ev_ready) return 0;
  end:
     evq->ev_ready = ev_ready;
     return 0;

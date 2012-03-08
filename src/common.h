@@ -145,6 +145,30 @@ typedef int	sd_t;
 
 
 /*
+ * Error Reporting
+ */
+
+#define SYS_ERROR_MESSAGE	"SYS_ERR"
+
+int sys_seterror (lua_State *L, int err);
+
+
+/*
+ * Time
+ */
+
+typedef int	msec_t;
+
+#ifdef _WIN32
+#define get_milliseconds	timeGetTime
+#else
+msec_t get_milliseconds (void);
+#endif
+
+#define TIMEOUT_INFINITE	((msec_t) -1)
+
+
+/*
  * Buffer Management
  */
 
@@ -178,15 +202,6 @@ int sys_buffer_write_done (lua_State *L, struct sys_buffer *sb,
 
 
 /*
- * Error Reporting
- */
-
-#define SYS_ERROR_MESSAGE	"errorMessage"
-
-int sys_seterror (lua_State *L, int err);
-
-
-/*
  * Threading
  */
 
@@ -215,42 +230,21 @@ int sys_eintr (void);
 
 
 /*
- * Event Queue
+ * Event Queue & Scheduler
  */
 
-#define EVQ_TYPENAME		"sys.event_queue"
+#define EVQ_SCHED_OBJ		0
+#define EVQ_SCHED_TIMER		1
+#define EVQ_SCHED_PID		2
+#define EVQ_SCHED_DIRWATCH	3
+#define EVQ_SCHED_SIGNAL	4
+#define EVQ_SCHED_SOCKET	5
 
-#define EVQ_ASYNC_READ		0x01
-#define EVQ_ASYNC_WRITE		0x02
-#define EVQ_ASYNC_CONNECT	0x04
-#define EVQ_ASYNC_ACCEPT	0x08
+int sys_evq_sched_add (lua_State *L, int evq_idx, int type);
+int sys_evq_sched_del (lua_State *L, void *ev);
 
-void *sys_evq_add (lua_State *L, int async_flags);
-int sys_evq_del (lua_State *L, void *ev);
-
-
-/*
- * Scheduler
- */
-
-int sys_sched_eagain (lua_State *L, lua_CFunction func,
-                      int async_flags, int *nresult);
-int sys_sched_ready (lua_State *L, lua_State *co);
-
-
-/*
- * Time
- */
-
-typedef int	msec_t;
-
-#ifdef _WIN32
-#define get_milliseconds	timeGetTime
-#else
-msec_t get_milliseconds (void);
-#endif
-
-#define TIMEOUT_INFINITE	((msec_t) -1)
+void sys_sched_event_added (lua_State *co, void *ev);
+void sys_sched_event_ready (lua_State *co, void *ev);
 
 
 #ifdef _WIN32

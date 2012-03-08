@@ -66,8 +66,7 @@ struct sys_thread {
 #define THREAD_INTERRUPTED	4
     unsigned int volatile state;
 
-    void *sched; /* scheduler */
-    lua_State *sched_task;
+    lua_State *sched_coro;  /* running task coroutine */
 };
 
 /* Main VM-thread's data */

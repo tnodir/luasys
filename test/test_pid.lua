@@ -30,7 +30,7 @@ do
 
 		local args = {"-l", "sys", "-e", subprocess}
 		if not sys.spawn("lua", args, pid, nil, fdo, nil) then
-			error(errorMessage)
+			error(SYS_ERR)
 		end
 		fdo:close()
 	end
@@ -40,7 +40,7 @@ do
 		if timeout then
 			print("Timeout:", timeout)
 			if not pid:kill() then
-				print("Kill:", errorMessage)
+				print("Kill:", SYS_ERR)
 			end
 		else
 			print("Status:", err or 0)

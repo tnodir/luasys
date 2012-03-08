@@ -36,7 +36,7 @@ local function run_once(evq)
     for i = 1, num_pipes do
 	local fdi, fdo = sock.handle(), sock.handle()
 	if not fdi:socket(fdo) then
-	    error(errorMessage)
+	    error(SYS_ERR)
 	end
 	pipes[i] = {fdi, fdo}
     end
@@ -51,7 +51,7 @@ local function run_once(evq)
 	local fdi = pipes[i][1]
 	evid = evq:add_socket(fdi, "r", read_cb, timeout)
 	if not evid then
-	    error(errorMessage)
+	    error(SYS_ERR)
 	end
 	events[i], events_idx[evid] = evid, i
     end

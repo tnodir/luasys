@@ -53,7 +53,7 @@ for i = 1, nclnt do
 
     local evid = evq:add_socket(fd, 'w', ev_cb)
     if not evid then
-	error(errorMessage)
+	error(SYS_ERR)
     end
     askt[evid] = fd
 end

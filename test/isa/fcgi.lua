@@ -28,7 +28,7 @@ do
     local stderr = sys.stderr
 
     log = function(title, msg)
-	stderr:write(title, ": ", msg or errorMessage, "\n")
+	stderr:write(title, ": ", msg or SYS_ERR, "\n")
     end
 end
 

@@ -593,20 +593,23 @@ sys_write (lua_State *L)
 #else
 	{
 	    DWORD l;
-	    nw = WriteFile(fd, sb.ptr.r, sb.size, &l, NULL)
-	     ? (int) (is_con ? sb.size : l) : -1;
+	    if (is_con) {
+		const UINT old_cp = GetConsoleOutputCP();
+
+		SetConsoleOutputCP(65001);  /* CP_UTF8 */
+		nw = WriteFile(fd, sb.ptr.r, sb.size, &l, NULL)
+		 ? (int) sb.size : -1;
+		SetConsoleOutputCP(old_cp);
+	    } else {
+		nw = WriteFile(fd, sb.ptr.r, sb.size, &l, NULL)
+		 ? (int) l : -1;
+	    }
 	}
 #endif
 	sys_vm_enter();
 	if (nw == -1) {
-	    if (n > 0) break;
-	    if (SYS_EAGAIN(SYS_ERRNO)) {
-		int res;
-		if (sys_sched_eagain(L, sys_write, EVQ_ASYNC_WRITE, &res))
-		    return (res > 0) ? lua_yield(L, res)
-		     : 2;  /* nil, error_message */
+	    if (n > 0 || SYS_EAGAIN(SYS_ERRNO))
 		break;
-	    }
 	    return sys_seterror(L, 0);
 	}
 	n += nw;
@@ -656,12 +659,9 @@ sys_read (lua_State *L)
     } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
      && sys_buffer_write_next(L, &sb, buf, 0));
     if (nr <= 0 && len == n) {
-	if (nr && SYS_EAGAIN(SYS_ERRNO)) {
-	    if (sys_sched_eagain(L, sys_read, EVQ_ASYNC_READ, &res))
-		return (res > 0) ? lua_yield(L, res)
-		 : 2;  /* nil, error_message */
+	if (nr && SYS_EAGAIN(SYS_ERRNO))
 	    lua_pushboolean(L, 0);
-	} else res = -1;
+	else res = -1;
     } else {
 	if (!sys_buffer_write_done(L, &sb, buf, nr))
 	    lua_pushinteger(L, len - n);
