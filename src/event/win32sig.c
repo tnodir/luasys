@@ -3,7 +3,7 @@
 /* Global signal events */
 static struct {
     CRITICAL_SECTION cs;
-    int volatile ignore;  /* ignored signals */
+    unsigned int volatile ignore;  /* ignored signals */
     struct event *events[EVQ_NSIG];
 } g_Signal;
 static int volatile g_SignalInit = 0;
