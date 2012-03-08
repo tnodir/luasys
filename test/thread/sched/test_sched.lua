@@ -1,59 +1,46 @@
 #!/usr/bin/env lua
 
-local sys = require"sys"
+local sys = require("sys")
+local sock = require"sys.sock"
 
 local thread = sys.thread
 assert(thread.init())
 
 
-local DEBUG = true
-local NWORKERS = 3
-local NTASKS = 3
-
 -- Scheduler
-local sched
+local sched, sched_stop
 do
-	local function on_pool(co, err)
-		if not co then return end
-		print("task end", co, err or "")
-	end
-
-	local evq = assert(sys.event_queue())
-	sched = assert(thread.scheduler(evq,
-		DEBUG and on_pool or nil))
-end
-
--- Put tasks to scheduler
-do
-	local function process()
-		if DEBUG then
-			print("task", coroutine.running())
+	local function controller()
+		if sched_stop and sched:empty() then
+			sched:stop()
 		end
-		coroutine.yield()
 	end
 
-	for i = 1, NTASKS do
-		assert(sched:put(process))
-	end
+	sched = assert(thread.scheduler(controller))
+
+	-- Workers
+	assert(thread.run(sched.loop, sched))
 end
 
-print("<Enter> to start...")
-sys.stdin:read()
 
--- Scheduler workers
+print("-- Suspend/Resume")
 do
-	local function loop()
-		print("worker", (thread.self()))
-		local _, err = sched:loop(100)
-		if err then error(err) end
-		print("worker end", (thread.self()))
+	local msg = "test"
+
+	local function test()
+		local s = sched:suspend()
+		assert(s == msg, msg .. " expected, got " .. tostring(s))
 	end
 
-	for i = 1, NWORKERS do
-		assert(thread.run(loop))
-	end
+	local co = assert(sched:put(test))
+
+	thread.sleep(100)
+	sched:resume(co, msg)
 end
 
--- Wait Threads termination
-assert(thread.self():wait())
+
+sched_stop = true
+
+assert(sched:loop())
+print("OK")
 

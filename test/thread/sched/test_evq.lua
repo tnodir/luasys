@@ -48,7 +48,7 @@ do
 		local R, W, T, EOF = sched:wait_socket(evq, fd, "r")
 		assert(R)
 		local s = assert(fd:read())
-		assert(s == msg, msg .. " expected, got " .. s)
+		assert(s == msg, msg .. " expected, got " .. tostring(s))
 	end
 
 	local fdi, fdo = sock.handle(), sock.handle()
