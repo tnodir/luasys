@@ -125,16 +125,9 @@ sched_task_del (lua_State *L, struct scheduler *sched,
     lua_State *NL = sched->L;
     lua_State *co = task->co;
 
-    if (task->ev) {
-	void *ev = task->ev;
-	task->ev = NULL;
+    lua_assert(!task->ev);
 
-	sys_evq_sched_del(L, ev);
-
-	sched_tasklist_del(sched, &sched->wait_task_id, task);
-    } else {
-	sched_tasklist_del(sched, &sched->run_task_id, task);
-    }
+    sched_tasklist_del(sched, &sched->run_task_id, task);
     sched_tasklist_add(sched, &sched->free_task_id, task);
 
     if (sched->use_pool) {
@@ -215,6 +208,11 @@ sched_close (lua_State *L)
     struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
 
     thread_event_del(&sched->tev);
+
+    if (sched->buffer) {
+	free(sched->buffer);
+	sched->buffer = NULL;
+    }
     return 0;
 }
 
@@ -274,13 +272,21 @@ sched_kill (lua_State *L)
 {
     struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
     lua_State *co = lua_tothread(L, 2);
-    struct sched_task *task;
+    struct sched_task *task = sched_coro_to_task(sched, co);
 
-    task = sched_coro_to_task(sched, co);
     if (task) {
 	task->flags |= SCHED_TASK_KILLED;
-    }
 
+	if (task->ev) {
+	    void *ev = task->ev;
+	    task->ev = NULL;
+
+	    sys_evq_sched_del(L, ev);
+
+	    sched_tasklist_del(sched, &sched->wait_task_id, task);
+	    sched_tasklist_add(sched, &sched->run_task_id, task);
+	}
+    }
     lua_settop(L, 1);
     return 1;
 }
