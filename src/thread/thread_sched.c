@@ -26,12 +26,16 @@ struct scheduler {
     int wait_task_id;  /* event waiting tasks */
     int free_task_id;  /* free tasks */
 
+    unsigned int volatile yield_tick;
+    int volatile cur_task_id;  /* running task */
+
     struct sched_task *buffer;  /* tasks buffer */
     int buf_idx, buf_max;  /* tasks buffer current and maximum indexes */
 
     unsigned int use_pool:	1;  /* on_pool callback exists */
     unsigned int stop:		1;  /* stop looping */
 
+    thread_critsect_t cs;  /* guard access to preemt tasks */
     thread_event_t tev;  /* notification */
 };
 
@@ -196,7 +200,8 @@ sched_new (lua_State *L)
 	lua_xmove(L, NL, 1);
     }
 
-    if (!thread_event_new(&sched->tev)) {
+    if (!thread_critsect_new(&sched->cs)
+     && !thread_event_new(&sched->tev)) {
 	return 1;
     }
     return sys_seterror(L, 0);
@@ -210,6 +215,7 @@ sched_close (lua_State *L)
 {
     struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
 
+    thread_critsect_del(&sched->cs);
     thread_event_del(&sched->tev);
 
     if (sched->buffer) {
@@ -310,6 +316,7 @@ sched_loop (lua_State *L)
     const msec_t timeout = lua_isnoneornil(L, 2)
      ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
     const int until_empty = lua_toboolean(L, 3);
+    thread_critsect_t *csp = &sched->cs;
 
     if (!td) luaL_argerror(L, 0, "Threading not initialized");
 
@@ -347,6 +354,7 @@ sched_loop (lua_State *L)
 	}
 	task = sched_id_to_task(sched, task_id);
 	sched->run_task_id = task->next_id;
+	sched->yield_tick++;
 
 	co = task->co;
 	narg = lua_gettop(co);
@@ -356,10 +364,18 @@ sched_loop (lua_State *L)
 	    --narg;  /* - function */
 	}
 
+	thread_critsect_enter(csp);
+	sched->cur_task_id = task_id;
+	thread_critsect_leave(csp);
+
 	old_co = td->sched_coro;
 	td->sched_coro = co;
 	res = lua_resume(co, L, narg);  /* call coroutine */
 	td->sched_coro = old_co;
+
+	thread_critsect_enter(csp);
+	sched->cur_task_id = -1;
+	thread_critsect_leave(csp);
 
 	task = sched_id_to_task(sched, task_id);  /* buffer may realloc'ed */
 
@@ -548,6 +564,54 @@ sched_wait_socket (lua_State *L)
     return res ? res : lua_yield(L, 2);
 }
 
+
+static void
+sched_preempt_tasks_hook (lua_State *L, lua_Debug *ar)
+{
+    (void) ar;
+
+    lua_sethook(L, NULL, 0, 0);
+    lua_yield(L, 0);
+    sys_thread_yield(1);
+}
+
+/*
+ * Arguments: sched_udata, time_slice (milliseconds)
+ */
+static int
+sched_preempt_tasks (lua_State *L)
+{
+    struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
+    const int msec = lua_tointeger(L, 2);
+    thread_critsect_t *csp = &sched->cs;
+
+    sys_vm_leave();
+    while (!sched->stop) {
+	unsigned int old_tick = sched->yield_tick;
+
+	sys_thread_sleep(msec, 1);
+	{
+	    unsigned int tick = sched->yield_tick;
+
+	    if (old_tick == tick && !lua_gethook(L)) {
+		int task_id;
+		struct sched_task *task;
+
+		thread_critsect_enter(csp);
+		task_id = sched->cur_task_id;
+		if (task_id != -1
+		 && (task = sched_id_to_task(sched, task_id)))
+		    lua_sethook(task->co, sched_preempt_tasks_hook,
+		     LUA_MASKCALL | LUA_MASKRET | LUA_MASKCOUNT, 1);
+		thread_critsect_leave(csp);
+	    }
+	    old_tick = tick;
+	}
+    }
+    sys_vm_enter();
+    return 0;
+}
+
 /*
  * Arguments: sched_udata
  * Returns: string
@@ -620,6 +684,7 @@ static luaL_Reg sched_meth[] = {
     {"wait_dirwatch",	sched_wait_dirwatch},
     {"wait_signal",	sched_wait_signal},
     {"wait_socket",	sched_wait_socket},
+    {"preempt_tasks",	sched_preempt_tasks},
     {"__tostring",	sched_tostring},
     {"__gc",		sched_close},
     {NULL, NULL}

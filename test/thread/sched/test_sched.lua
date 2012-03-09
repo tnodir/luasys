@@ -1,5 +1,7 @@
 #!/usr/bin/env lua
 
+local coroutine = require("coroutine")
+
 local sys = require("sys")
 local sock = require"sys.sock"
 
@@ -36,6 +38,30 @@ do
 
 	thread.sleep(100)
 	sched:resume(co, msg)
+end
+
+
+print("-- Preemptive multi-tasking")
+do
+	assert(thread.run(sched.preempt_tasks, sched, 200))
+	thread.sleep(100)
+
+	local condition
+
+	local function test1()
+		local i = 0
+		while not condition do
+			i = i + 1
+		end
+	end
+
+	local function test2()
+		coroutine.yield()
+		condition = true
+	end
+
+	assert(sched:put(test1))
+	assert(sched:put(test2))
 end
 
 

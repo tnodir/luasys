@@ -799,18 +799,10 @@ thread_self (lua_State *L)
     return 2;
 }
 
-/*
- * Arguments: milliseconds (number), [don't interrupt (boolean)]
- */
-static int
-thread_sleep (lua_State *L)
-{
-    const int msec = lua_tointeger(L, 1);
-#ifndef _WIN32
-    const int not_intr = lua_toboolean(L, 2);
-#endif
 
-    sys_vm_leave();
+static void
+sys_thread_sleep (const int msec, const int not_intr)
+{
 #ifndef _WIN32
     {
 	struct timespec req;
@@ -824,8 +816,23 @@ thread_sleep (lua_State *L)
 	while (res == -1 && sys_eintr() && not_intr);
     }
 #else
+    (void) not_intr;
+
     Sleep(msec);
 #endif
+}
+
+/*
+ * Arguments: milliseconds (number), [don't interrupt (boolean)]
+ */
+static int
+thread_sleep (lua_State *L)
+{
+    const int msec = lua_tointeger(L, 1);
+    const int not_intr = lua_toboolean(L, 2);
+
+    sys_vm_leave();
+    sys_thread_sleep(msec, not_intr);
     sys_vm_enter();
     return 0;
 }
