@@ -36,6 +36,9 @@ struct scheduler {
 };
 
 
+#define sched_is_empty(sched) \
+	(sched->run_task_id == -1 && sched->wait_task_id == -1)
+
 #define sched_id_to_task(sched,task_id) \
 	(&(sched)->buffer[task_id])
 
@@ -296,7 +299,7 @@ sched_kill (lua_State *L)
 
 
 /*
- * Arguments: sched_udata, [timeout (milliseconds), once (boolean)]
+ * Arguments: sched_udata, [timeout (milliseconds), until_empty (boolean)]
  * Returns: [sched_udata | timedout (false)]
  */
 static int
@@ -306,7 +309,7 @@ sched_loop (lua_State *L)
     struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
     const msec_t timeout = lua_isnoneornil(L, 2)
      ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
-    const int once = lua_toboolean(L, 3);
+    const int until_empty = lua_toboolean(L, 3);
 
     if (!td) luaL_argerror(L, 0, "Threading not initialized");
 
@@ -327,6 +330,10 @@ sched_loop (lua_State *L)
 	}
 
 	if (task_id == -1) {
+	    if (until_empty && sched_is_empty(sched)) {
+		thread_event_signal(&sched->tev);
+		break;
+	    }
 	    res = thread_event_wait(&sched->tev, td, timeout);
 	    sys_thread_check(td);
 	    if (res) {
@@ -370,7 +377,6 @@ sched_loop (lua_State *L)
 	    }
 	    sched_task_del(L, sched, task, res);
 	    if (res) lua_error(L);
-	    if (once) break;
 	}
     }
 
@@ -401,8 +407,7 @@ sched_empty (lua_State *L)
 {
     struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
 
-    lua_pushboolean(L, (sched->run_task_id == -1
-     && sched->wait_task_id == -1));
+    lua_pushboolean(L, sched_is_empty(sched));
     return 1;
 }
 

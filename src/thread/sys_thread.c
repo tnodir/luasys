@@ -53,7 +53,8 @@ struct sys_thread {
     thread_critsect_t *vmcsp;
     lua_State *L;
 
-    struct sys_vmthread *vmtd, *vmref;
+    struct sys_vmthread *vmtd;
+    struct sys_thread *reftd;  /* parent or fake-child VM-thread */
 
 #ifndef _WIN32
     thread_cond_t cond;
@@ -94,8 +95,12 @@ static thread_key_t g_TLSIndex = INVALID_TLS_INDEX;
 /* Threads table indexes */
 #define THREAD_TABLE_EINTR	1  /* Thread Interrupt Error */
 
-#define thread_getvm(td)	((struct sys_thread *) (td)->vmtd)
+#define thread_getvm(td)	(&(td)->vmtd->td)
 #define thread_isvm(td)		((td) == thread_getvm(td))
+
+#define thread_unfake(td) \
+	(!thread_isvm(td) && (td)->reftd != thread_getvm(td) \
+	 ? (td)->reftd : (td))
 
 static void thread_createmeta (lua_State *L);
 
@@ -154,16 +159,17 @@ thread_waitvm (struct sys_vmthread *vmtd, msec_t timeout)
 static THREAD_FUNC_RES
 thread_exit (struct sys_thread *td)
 {
-    struct sys_vmthread *vmref = td->vmref;
-    THREAD_FUNC_RES res;
+    struct sys_thread *reftd = td->reftd;
+    const int is_vm = thread_isvm(td);
+    lua_Integer res;
 
     if (td->state != THREAD_TERMINATED) {
 	td->state = THREAD_TERMINATED;
 	td->exit_status = lua_tointeger(td->L, -1);
     }
-    res = (THREAD_FUNC_RES) td->exit_status;
+    res = td->exit_status;
 
-    if (thread_isvm(td)) {
+    if (is_vm) {
 	thread_waitvm(td->vmtd, TIMEOUT_INFINITE);
 	lua_close(td->L);
     } else {
@@ -172,13 +178,26 @@ thread_exit (struct sys_thread *td)
 #ifndef _WIN32
 	pthread_cond_broadcast(&td->cond);
 #endif
-	sys_thread_del(td);  /* td is garbage from here */
+	/* stop collector to prevent self-deadlock on GC */
+	lua_gc(vmtd->L, LUA_GCSTOP, 0);
+	sys_thread_del(td);
+	lua_gc(vmtd->L, LUA_GCRESTART, 0);
 	sys_vm2_leave(vmtd);
     }
 
     /* decrease VM-thread's reference count */
-    if (vmref) {
-	sys_vm2_enter(&vmref->td);
+    if (reftd) {
+	struct sys_vmthread *vmref = reftd->vmtd;
+
+	sys_vm2_enter(reftd);
+	if (is_vm) {
+	    reftd->state = THREAD_TERMINATED;
+	    reftd->exit_status = res;
+#ifndef _WIN32
+	    pthread_cond_broadcast(&reftd->cond);
+#endif
+	    sys_thread_del(reftd);
+	}
 	if (!--vmref->nref) {
 #ifndef _WIN32
 	    (void) thread_cond_signal(&vmref->td.cond);
@@ -186,15 +205,15 @@ thread_exit (struct sys_thread *td)
 	    (void) thread_cond_signal(&vmref->cond);
 #endif
 	}
-	sys_vm2_leave(&vmref->td);
+	sys_vm2_leave(reftd);
     }
 
 #ifndef _WIN32
-    pthread_exit(res);
+    pthread_exit((THREAD_FUNC_RES) res);
 #else
-    _endthreadex(res);
+    _endthreadex((THREAD_FUNC_RES) res);
 #endif
-    return res;
+    return 0;
 }
 
 void
@@ -363,40 +382,45 @@ static void
 thread_settable (lua_State *L, struct sys_thread *td)
 {
     lua_rawgetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
+    lua_insert(L, -3);
 
-    lua_pushvalue(L, -3);  /* coroutine */
-    lua_rawsetp(L, -2, td->L);
+    lua_rawsetp(L, -3, td); /* thread_udata */
+    lua_rawsetp(L, -2, td->L);  /* coroutine */
 
-    lua_pushvalue(L, -2); /* thread_udata */
-    lua_rawsetp(L, -2, td);
-
-    lua_pop(L, 3);
+    lua_pop(L, 1);
 }
 
 static struct sys_thread *
-sys_new_vmthread (lua_State *L, struct sys_vmthread *vmref)
+thread_newvm (lua_State *L, struct sys_thread *reftd)
 {
     struct sys_vmthread *vmtd;
+    lua_State *NL;
 
-    if (!L) {
-	L = luaL_newstate();
-	if (!L) return NULL;
+    if (L) {
+	NL = lua_newthread(L);
+	if (!NL) return NULL;
+    } else {
+	NL = luaL_newstate();
+	if (!NL) return NULL;
 
+	L = NL;
 	thread_openlibs(L);
 	thread_createmeta(L);
+
+	lua_pushthread(L);
     }
-    lua_pushthread(L);
 
     vmtd = lua_newuserdata(L, sizeof(struct sys_vmthread));
     memset(vmtd, 0, sizeof(struct sys_vmthread));
-    vmtd->td.L = L;
+    vmtd->td.L = NL;
     vmtd->td.vmtd = vmtd;
     luaL_getmetatable(L, THREAD_TYPENAME);
     lua_setmetatable(L, -2);
 
-    if (vmref) {
-	vmref->nref++;
-	vmtd->td.vmref = vmref;
+    if (reftd) {
+	struct sys_vmthread *vmref = reftd->vmtd;
+
+	vmtd->td.reftd = reftd;
 	vmtd->cpu = vmref->cpu;
 	vmtd->stack_size = vmref->stack_size;
     }
@@ -420,33 +444,40 @@ sys_new_vmthread (lua_State *L, struct sys_vmthread *vmref)
  * Returns: [thread_udata]
  */
 struct sys_thread *
-sys_thread_new (struct sys_thread *vmtd, const int insert)
+sys_thread_new (lua_State *L, struct sys_thread *vmtd,
+                struct sys_thread *vmtd2, const int push_udata)
 {
-    lua_State *NL, *L = vmtd->L;
+    struct sys_vmthread *vmref = vmtd->vmtd;
     struct sys_thread *td;
+    lua_State *NL;
 
-    NL = lua_newthread(L);
-    if (!NL) return NULL;
+    if (vmtd2) {
+	NL = vmref->td.L;
+	lua_pushnil(L);
+    } else {
+	NL = lua_newthread(L);
+	if (!NL) return NULL;
+    }
 
     td = lua_newuserdata(L, sizeof(struct sys_thread));
     memset(td, 0, sizeof(struct sys_thread));
     td->vmcsp = vmtd->vmcsp;
     td->L = NL;
-    td->vmtd = vmtd->vmtd;
+    td->vmtd = vmref;
     luaL_getmetatable(L, THREAD_TYPENAME);
     lua_setmetatable(L, -2);
 
-    td->vmref = vmtd->vmtd;
-    td->vmref->nref++;
+    td->reftd = vmtd2 ? vmtd2 : &vmref->td;
+    vmref->nref++;
 
 #ifndef _WIN32
     if (thread_cond_new(&td->cond))
 	return NULL;
 #endif
 
-    if (insert) {
+    if (push_udata) {
 	lua_pushvalue(L, -1);
-	lua_insert(L, 1);  /* thread_udata */
+	lua_insert(L, -3);  /* thread_udata */
     }
 
     thread_settable(L, td);  /* save thread to avoid GC */
@@ -458,9 +489,10 @@ sys_thread_del (struct sys_thread *td)
 {
     lua_State *L = td->L;
 
+    lua_rawgetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
     lua_pushnil(L);
-    lua_pushnil(L);
-    thread_settable(L, td);  /* let to GC the thread */
+    lua_rawsetp(L, -2, td); /* thread_udata */
+    lua_pop(L, 1);
 }
 
 /*
@@ -472,19 +504,34 @@ thread_done (lua_State *L)
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
 
     if (td->L) {
-	td->L = NULL;
-
 	if (thread_isvm(td)) {
 	    thread_critsect_del(td->vmcsp);
 #ifdef _WIN32
 	    thread_cond_del(&td->vmtd->cond);
 #endif
+	} else {
+	    sys_vm2_leave(td);
+#ifndef _WIN32
+	    {
+		THREAD_FUNC_RES v;
+		pthread_join(td->tid, &v);
+	    }
+#else
+	    WaitForSingleObject(td->tid, INFINITE);
+	    CloseHandle(td->tid);
+#endif
+	    sys_vm2_enter(td);
 	}
 #ifndef _WIN32
 	thread_cond_del(&td->cond);
-#else
-	CloseHandle(td->tid);
 #endif
+
+	lua_rawgetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
+	lua_pushnil(L);
+	lua_rawsetp(L, -2, td->L); /* coroutine */
+	lua_pop(L, 1);
+
+	td->L = NULL;
     }
     return 0;
 }
@@ -515,7 +562,7 @@ thread_init (lua_State *L)
     /* VM Mutex */
     td = sys_thread_get();
     if (!td) {
-	td = sys_new_vmthread(L, NULL);
+	td = thread_newvm(L, NULL);
 	if (!td) goto err;
 
 	sys_thread_set(td);
@@ -570,8 +617,7 @@ thread_create (struct sys_thread *td, const int is_affin)
 
     if ((res = pthread_attr_init(&attr)))
 	goto err;
-    if ((res = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED))
-     || (res = pthread_attr_setstacksize(&attr, td->vmtd->stack_size))) {
+    if ((res = pthread_attr_setstacksize(&attr, td->vmtd->stack_size))) {
 	pthread_attr_destroy(&attr);
 	goto err;
     }
@@ -620,7 +666,7 @@ thread_create (struct sys_thread *td, const int is_affin)
 /*
  * Arguments: [bind_cpu (number)], filename (string) | function_dump (string),
  *	[arguments (string | number | boolean | ludata | share_object) ...]
- * Returns: [boolean]
+ * Returns: [thread_udata]
  */
 static int
 thread_runvm (lua_State *L)
@@ -628,18 +674,26 @@ thread_runvm (lua_State *L)
     const int is_affin = (lua_type(L, 1) == LUA_TNUMBER);
     const int cpu = is_affin ? lua_tointeger(L, 1) : 0;
     const char *path = luaL_checkstring(L, 2);
-    struct sys_thread *td = sys_thread_get();
+    struct sys_thread *vmtd = sys_thread_get();
+    struct sys_thread *td, *faketd;
     lua_State *NL;
 
 #undef ARG_LAST
 #define ARG_LAST	2
 
-    if (!td) luaL_argerror(L, 0, "Threading not initialized");
+    if (!vmtd) luaL_argerror(L, 0, "Threading not initialized");
 
-    td = sys_new_vmthread(NULL, td->vmtd);
+    td = thread_newvm(NULL, vmtd);
     if (!td) goto err;
 
-    if (is_affin) td->vmtd->cpu = cpu;
+    faketd = sys_thread_new(L, vmtd, td, 1);
+    if (!faketd) goto err;
+
+    lua_replace(L, 1);  /* fake thread_udata */
+
+    if (is_affin)
+	td->vmtd->cpu = cpu;
+
     NL = td->L;
 
     /* function */
@@ -688,7 +742,8 @@ thread_runvm (lua_State *L)
     }
 
     if (!thread_create(td, is_affin)) {
-	lua_pushboolean(L, 1);
+	faketd->tid = td->tid;
+	lua_settop(L, 1);
 	return 1;
     }
     lua_close(NL);
@@ -708,8 +763,10 @@ thread_run (lua_State *L)
     if (!vmtd) luaL_argerror(L, 0, "Threading not initialized");
     luaL_checktype(L, 1, LUA_TFUNCTION);
 
-    td = sys_thread_new(vmtd, 1);
+    td = sys_thread_new(L, vmtd, NULL, 1);
     if (!td) goto err;
+
+    lua_insert(L, 1);  /* thread_udata */
 
     /* function and arguments */
     {
@@ -809,6 +866,7 @@ thread_interrupted (lua_State *L)
 {
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
 
+    td = thread_unfake(td);
     lua_pushboolean(L, (td->state == THREAD_INTERRUPTED));
     return 1;
 }
@@ -822,6 +880,7 @@ thread_set_interrupt (lua_State *L)
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
     const int recover = lua_toboolean(L, 2);
 
+    td = thread_unfake(td);
     if (recover) {
 	td->state &= ~THREAD_INTERRUPTED;
 	return 0;
@@ -847,6 +906,7 @@ thread_set_terminate (lua_State *L)
     const lua_Integer status = !lua_isboolean(L, 2) ? lua_tointeger(L, 2)
      : (lua_toboolean(L, 2) ? EXIT_SUCCESS : EXIT_FAILURE);
 
+    td = thread_unfake(td);
     td->exit_status = status;
     td->state = THREAD_SET_TERMINATE;
 

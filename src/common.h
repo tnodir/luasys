@@ -222,8 +222,10 @@ void sys_vm2_leave (struct sys_thread *td);
 void sys_vm_enter (void);
 void sys_vm_leave (void);
 
-struct sys_thread *sys_thread_new (struct sys_thread *td,
-                                   const int insert);
+struct sys_thread *sys_thread_new (lua_State *L,
+                                   struct sys_thread *vmtd,
+                                   struct sys_thread *vmtd2,
+                                   const int push_udata);
 void sys_thread_del (struct sys_thread *td);
 
 int sys_eintr (void);

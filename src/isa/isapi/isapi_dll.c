@@ -136,7 +136,7 @@ lisapi_open (LPEXTENSION_CONTROL_BLOCK ecb)
 	ecbp = checkudata(L, -1, ECB_TYPENAME);
 	*ecbp = ecb;
     } else {
-	td = sys_thread_new(g_ISAPI.vmtd, 0);
+	td = sys_thread_new(g_ISAPI.L, g_ISAPI.vmtd, NULL, 0);
 	if (!td) return NULL;
 
 	L = sys_thread_tolua(td);

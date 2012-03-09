@@ -10,8 +10,8 @@ assert(thread.init())
 -- Scheduler
 local sched, sched_stop
 do
-	local function controller()
-		if sched_stop and sched:empty() then
+	local function controller(co)
+		if co and sched_stop and sched:empty() then
 			sched:stop()
 		end
 	end
