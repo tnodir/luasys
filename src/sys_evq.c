@@ -2,16 +2,17 @@
 
 #define EVQ_TYPENAME		"sys.event_queue"
 
-struct evq_async_op {
-    struct evq_async_op *next;
+/* Thread-safe synchronous operations */
+struct evq_sync_op {
+    struct evq_sync_op *next;
     lua_State * volatile L;
     int narg;  /* number of arguments */
     lua_CFunction cb;  /* callback after success operation */
     int status;  /* result status */
 };
 
-#define EVQ_APP_EXTRA							\
-    struct evq_async_op * volatile async;  /* asynchronous operations */
+#define EVQ_APP_EXTRA \
+    struct evq_sync_op * volatile sync_op;
 
 
 #include "event/evq.c"
@@ -613,18 +614,18 @@ levq_timeout_manual (lua_State *L)
  * Returns: [results (any) ...]
  */
 static int
-levq_async_call (lua_State *L, struct event_queue *evq,
-                 lua_CFunction cb, const int narg)
+levq_sync_call (lua_State *L, struct event_queue *evq,
+                lua_CFunction cb, const int narg)
 {
     const int top = lua_gettop(L) - narg - 1;
-    struct evq_async_op op;
+    struct evq_sync_op op;
 
     op.L = L;
-    op.next = evq->async;
+    op.next = evq->sync_op;
     op.narg = narg;
     op.cb = cb;
     op.status = 0;
-    evq->async = &op;
+    evq->sync_op = &op;
 
     if (evq_signal(evq, EVQ_SIGEVQ))
 	return sys_seterror(L, 0);
@@ -641,13 +642,13 @@ levq_async_call (lua_State *L, struct event_queue *evq,
  * Returns: [results (any) ...]
  */
 static int
-levq_async (lua_State *L)
+levq_sync (lua_State *L)
 {
     struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
 
     luaL_checktype(L, 2, LUA_TFUNCTION);
 
-    return levq_async_call(L, evq, NULL, lua_gettop(L) - 2);
+    return levq_sync_call(L, evq, NULL, lua_gettop(L) - 2);
 }
 
 /*
@@ -690,11 +691,11 @@ levq_loop (lua_State *L)
 	    break;
 	}
 
-	/* process asynchronous operations */
-	if (evq->async) {
-	    struct evq_async_op *op = evq->async;
+	/* process synchronous operations */
+	if (evq->sync_op) {
+	    struct evq_sync_op *op = evq->sync_op;
 
-	    evq->async = NULL;
+	    evq->sync_op = NULL;
 	    do {
 		lua_State *NL = op->L;
 
@@ -951,7 +952,7 @@ sys_evq_sched_add (lua_State *L, int evq_idx, int type)
     lua_pushcfunction(L, func);  /* function */
     lua_insert(L, evq_idx);
 
-    return levq_async_call(L, evq, levq_sched_add_cb,
+    return levq_sync_call(L, evq, levq_sched_add_cb,
      lua_gettop(L) - evq_idx);
 }
 
@@ -968,7 +969,7 @@ sys_evq_sched_del (lua_State *L, void *ev)
     lua_insert(L, -2);
     lua_pushlightuserdata(L, ev);  /* ev_ludata */
 
-    if (levq_async_call(L, evq, NULL, 2) == 1) {
+    if (levq_sync_call(L, evq, NULL, 2) == 1) {
 	lua_pop(L, 1);  /* pop evq_udata */
 	return 0;
     }
@@ -994,7 +995,7 @@ static luaL_Reg evq_meth[] = {
     {"timeout",		levq_timeout},
     {"timeout_manual",	levq_timeout_manual},
     {"callback",	levq_callback},
-    {"async",		levq_async},
+    {"sync",		levq_sync},
     {"loop",		levq_loop},
     {"stop",		levq_stop},
     {"now",		levq_now},
