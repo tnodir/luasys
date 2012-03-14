@@ -144,7 +144,7 @@ thread_cond_wait_nolock (thread_cond_t *condp, thread_critsect_t *csp,
     }
 #else
     if (!SleepConditionVariableSRW(condp, csp, timeout, 0)) {
-	return (GetLastError() == WAIT_TIMEOUT) ? 1 : -1;
+	return (GetLastError() == ERROR_TIMEOUT) ? 1 : -1;
     }
 #endif
     return 0;
@@ -187,7 +187,7 @@ thread_cond_wait_value (thread_cond_t *condp, thread_critsect_t *csp,
     if (!res && reset) *signalled = 0;
     thread_critsect_leave(csp);
 
-    if (res) return (GetLastError() == WAIT_TIMEOUT) ? 1 : -1;
+    if (res) return (GetLastError() == ERROR_TIMEOUT) ? 1 : -1;
 #endif
     return 0;
 }

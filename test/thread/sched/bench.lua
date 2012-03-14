@@ -24,11 +24,17 @@ end
 
 -- Put tasks to scheduler
 do
+	local sum = 0
+
 	local function process()
 		if DEBUG then
 			print("task", coroutine.running())
 		end
 		coroutine.yield()
+		sum = sum + 1
+		if sum == NTASKS then
+			print("ntasks:", NTASKS)
+		end
 	end
 
 	for i = 1, NTASKS do
@@ -42,10 +48,8 @@ sys.stdin:read()
 -- Scheduler workers
 do
 	local function loop()
-		print("worker", (thread.self()))
-		local _, err = sched:loop(100)
+		local _, err = sched:loop(nil, true)
 		if err then error(err) end
-		print("worker end", (thread.self()))
 	end
 
 	for i = 1, NWORKERS do
