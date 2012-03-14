@@ -57,6 +57,7 @@ struct event {
 #define EVENT_RPENDING		0x00010000  /* IOCP: read request not completed */
 #define EVENT_WPENDING		0x00020000  /* IOCP: write request not completed */
 #define EVENT_PENDING		(EVENT_RPENDING | EVENT_WPENDING)
+#define EVENT_AIO_SKIP		0x00040000  /* IOCP: skip notification */
 #define EVENT_MASK		0x000FFFFF
 /* triggered events (result of waiting) */
 #define EVENT_READ_RES		0x00100000

@@ -276,9 +276,13 @@ typedef BOOL (WINAPI *PGetQueuedCompletionStatusEx) (HANDLE handle,
 	LPOVERLAPPED_ENTRY entries, ULONG count, PULONG n,
 	DWORD timeout, BOOL alertable);
 
+typedef BOOL (WINAPI *PSetFileCompletionNotificationModes) (HANDLE handle,
+	UCHAR flags);
+
 extern PCancelSynchronousIo pCancelSynchronousIo;
 extern PCancelIoEx pCancelIoEx;
 extern PGetQueuedCompletionStatusEx pGetQueuedCompletionStatusEx;
+extern PSetFileCompletionNotificationModes pSetFileCompletionNotificationModes;
 
 extern int is_WinNT;
 

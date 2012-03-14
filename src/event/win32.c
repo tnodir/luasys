@@ -70,14 +70,15 @@ evq_add (struct event_queue *evq, struct event *ev)
     if ((ev_flags & (EVENT_SOCKET | EVENT_SOCKET_ACC_CONN)) == EVENT_SOCKET
      && evq->iocp.h
      && CreateIoCompletionPort((HANDLE) ev->fd, evq->iocp.h, (ULONG_PTR) ev, 0)) {
-	if (!win32iocp_set(ev, ev_flags)) {
-	    ev->flags |= EVENT_AIO;
-	    evq->iocp.n++;
-	    evq->nevents++;
-	    return 0;
-	}
-	if (ev->flags & EVENT_PENDING)
-	    win32iocp_cancel(ev, (EVENT_READ | EVENT_WRITE));
+	ev->flags |= EVENT_AIO;
+	evq->iocp.n++;
+	evq->nevents++;
+
+	if (pSetFileCompletionNotificationModes
+	 && pSetFileCompletionNotificationModes((HANDLE) ev->fd, 3))
+	    ev->flags |= EVENT_AIO_SKIP;
+
+	return win32iocp_set(ev, ev_flags);
     }
 
     while (wth->n >= NEVENT - 1)

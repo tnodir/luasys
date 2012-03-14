@@ -300,7 +300,7 @@ for port, host in pairs(bind) do
     assert(saddr:inet(port, sock.inet_pton(host)))
     assert(fd:bind(saddr))
     assert(fd:listen())
-    assert(evq:add_socket(fd, 'r', accept))
+    assert(evq:add_socket(fd, 'accept', accept))
 end
 
 -- Quit by Ctrl-C

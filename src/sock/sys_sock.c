@@ -854,6 +854,23 @@ sock_uninit (lua_State *L)
     return 0;
 }
 
+static void
+sock_checklfs (int family)
+{
+    SOCKET sd = socket(family, SOCK_STREAM, IPPROTO_IP);
+
+    if (sd != INVALID_SOCKET) {
+	WSAPROTOCOL_INFOW pi;
+	int l = sizeof(WSAPROTOCOL_INFOW);
+
+	if (!getsockopt(sd, SOL_SOCKET, SO_PROTOCOL_INFOW, (char *) &pi, &l)
+	 && !(pi.dwServiceFlags1 & XP1_IFS_HANDLES))
+	    pSetFileCompletionNotificationModes = NULL;
+
+	closesocket(sd);
+    }
+}
+
 /*
  * Arguments: ..., sock_lib (table)
  */
@@ -869,6 +886,10 @@ sock_init (lua_State *L)
 	WSACleanup();
 	return -1;
     }
+
+    /* Check non-IFS LSP-s */
+    sock_checklfs(AF_INET);
+    sock_checklfs(AF_INET6);
 
     lua_newuserdata(L, 0);
     lua_newtable(L);  /* metatable */
