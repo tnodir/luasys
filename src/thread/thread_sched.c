@@ -568,7 +568,6 @@ sched_preempt_tasks_hook (lua_State *L, lua_Debug *ar)
 
     lua_sethook(L, NULL, 0, 0);
     lua_yield(L, 0);
-    sys_thread_yield(1);
 }
 
 /*
@@ -595,8 +594,7 @@ sched_preempt_tasks (lua_State *L)
 	tick = sched->tick;
 
 	if (co && co == old_co && tick == old_tick && !lua_gethook(co)) {
-	    lua_sethook(co, sched_preempt_tasks_hook,
-	     LUA_MASKCALL | LUA_MASKRET | LUA_MASKCOUNT, 1);
+	    lua_sethook(co, sched_preempt_tasks_hook, LUA_MASKCOUNT, 1);
 	}
 	thread_critsect_leave(csp);
 
