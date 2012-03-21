@@ -51,7 +51,7 @@ struct event {
 #define EVENT_TIMEOUT_MANUAL	0x00000400  /* don't auto-reset timeout on event */
 #define EVENT_AIO		0x00000800
 #define EVENT_SOCKET_ACC_CONN	0x00001000  /* socket is listening or connecting */
-#define EVENT_CALLBACK		0x00002000  /* callback exists */
+#define EVENT_CALLBACK		0x00002000  /* callback exist */
 #define EVENT_CALLBACK_CORO	0x00004000  /* callback is coroutine */
 #define EVENT_CALLBACK_SCHED	0x00008000  /* callback is scheduler */
 #define EVENT_RPENDING		0x00010000  /* IOCP: read request not completed */

@@ -5,10 +5,11 @@
 /* Thread-safe synchronous operations */
 struct evq_sync_op {
     struct evq_sync_op *next;
-    lua_State * volatile L;
+    lua_State *L;
     int narg;  /* number of arguments */
-    lua_CFunction cb;  /* callback after success operation */
     int status;  /* result status */
+    lua_CFunction cb;  /* callback after success operation */
+    struct sys_thread *td;  /* called thread */
 };
 
 #define EVQ_APP_EXTRA \
@@ -617,20 +618,22 @@ static int
 levq_sync_call (lua_State *L, struct event_queue *evq,
                 lua_CFunction cb, const int narg)
 {
+    struct sys_thread *td = sys_thread_get();
     const int top = lua_gettop(L) - narg - 1;
     struct evq_sync_op op;
+
+    if (!td) luaL_argerror(L, 0, "Threading not initialized");
 
     op.L = L;
     op.next = evq->sync_op;
     op.narg = narg;
-    op.cb = cb;
     op.status = 0;
+    op.cb = cb;
+    op.td = td;
     evq->sync_op = &op;
 
-    if (evq_signal(evq, EVQ_SIGEVQ))
-	return sys_seterror(L, 0);
-
-    do sys_thread_yield(0); while (op.L);
+    evq_signal(evq, EVQ_SIGEVQ);
+    sys_thread_suspend(td);
 
     if (op.status) lua_error(L);
 
@@ -699,10 +702,10 @@ levq_loop (lua_State *L)
 	    do {
 		lua_State *NL = op->L;
 
-		op->L = NULL;
 		op->status = lua_pcall(NL, op->narg, LUA_MULTRET, 0);
 		if (op->cb && !op->status)
 		    op->cb(NL);
+		sys_thread_resume(op->td);
 		op = op->next;
 	    } while (op);
 	}

@@ -13,7 +13,7 @@ local evq = assert(sys.event_queue())
 local sched, sched_stop
 do
 	local function controller(co)
-		if co and sched_stop and sched:empty() then
+		if co and sched_stop and sched:size() == 0 then
 			sched:stop()
 			evq:stop()
 		end

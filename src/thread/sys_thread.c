@@ -47,6 +47,7 @@ typedef pthread_t		thread_id_t;
 #define THREAD_STACK_SIZE	(64 * 1024)
 
 struct sys_vmthread;
+struct sched_context;
 
 /* Thread's data */
 struct sys_thread {
@@ -57,15 +58,18 @@ struct sys_thread {
     struct sys_thread *reftd;  /* parent or fake-child VM-thread */
 
 #ifndef _WIN32
-    thread_cond_t cond;
+    thread_cond_t cond;  /* to wait termination and suspend */
+    unsigned int volatile suspended;
 #endif
     thread_id_t tid;
     lua_Integer exit_status;
 
-#define THREAD_SET_TERMINATE	1
-#define THREAD_TERMINATED	2
-#define THREAD_INTERRUPTED	4
-    unsigned int volatile state;
+#define SYS_THREAD_KILLED	1
+#define SYS_THREAD_TERMINATE	2
+#define SYS_THREAD_INTERRUPT	4
+    unsigned int volatile flags;
+
+    struct sched_context *sched_ctx;  /* running scheduler's context */
 };
 
 /* Main VM-thread's data */
@@ -99,6 +103,8 @@ static thread_key_t g_TLSIndex = INVALID_TLS_INDEX;
 #define thread_unfake(td) \
 	(!thread_isvm(td) && (td)->reftd != thread_getvm(td) \
 	 ? (td)->reftd : (td))
+
+static void sched_switch (struct sched_context *sched_ctx, const int enter);
 
 static void thread_createmeta (lua_State *L);
 
@@ -161,8 +167,8 @@ thread_exit (struct sys_thread *td)
     const int is_vm = thread_isvm(td);
     lua_Integer res;
 
-    if (td->state != THREAD_TERMINATED) {
-	td->state = THREAD_TERMINATED;
+    if (td->flags != SYS_THREAD_KILLED) {
+	td->flags = SYS_THREAD_KILLED;
 	td->exit_status = lua_tointeger(td->L, -1);
     }
     res = td->exit_status;
@@ -189,7 +195,7 @@ thread_exit (struct sys_thread *td)
 
 	sys_vm2_enter(reftd);
 	if (is_vm) {
-	    reftd->state = THREAD_TERMINATED;
+	    reftd->flags = SYS_THREAD_KILLED;
 	    reftd->exit_status = res;
 #ifndef _WIN32
 	    pthread_cond_broadcast(&reftd->cond);
@@ -215,15 +221,15 @@ thread_exit (struct sys_thread *td)
 }
 
 void
-sys_thread_yield (const int check_thread)
+sys_thread_switch (const int check_thread)
 {
     struct sys_thread *td = sys_thread_get();
 
     if (td) sys_vm2_leave(td);
 #ifndef _WIN32
-    sched_yield();
+    pthread_yield();
 #else
-    Sleep(0);
+    SwitchToThread();
 #endif
     if (td) {
 	sys_vm2_enter(td);
@@ -237,12 +243,14 @@ sys_thread_check (struct sys_thread *td)
     lua_assert(td);
 
     {
-	const unsigned int state = td->state;
+	const unsigned int flags = td->flags;
 
-	if (state == THREAD_SET_TERMINATE) {
-	    td->state = THREAD_TERMINATED;
+	if (flags == SYS_THREAD_TERMINATE) {
+	    td->sched_ctx = NULL;
+	    td->flags = SYS_THREAD_KILLED;
 	    thread_exit(td);
-	} else if (state == THREAD_INTERRUPTED) {
+	} else if (flags == SYS_THREAD_INTERRUPT) {
+	    td->sched_ctx = NULL;
 	    lua_rawgetp(td->L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
 	    lua_rawgeti(td->L, -1, THREAD_TABLE_EINTR);
 	    lua_error(td->L);
@@ -256,12 +264,16 @@ sys_vm2_enter (struct sys_thread *td)
     lua_assert(td);
 
     thread_critsect_enter(td->vmcsp);
+
+    if (td->sched_ctx) sched_switch(td->sched_ctx, 1);
 }
 
 void
 sys_vm2_leave (struct sys_thread *td)
 {
     lua_assert(td);
+
+    if (td->sched_ctx) sched_switch(td->sched_ctx, 0);
 
     thread_critsect_leave(td->vmcsp);
 }
@@ -275,7 +287,8 @@ sys_vm_enter (void)
 	if (td) {
 	    thread_critsect_enter(td->vmcsp);
 
-	    if (td->state) sys_thread_check(td);
+	    if (td->sched_ctx) sched_switch(td->sched_ctx, 1);
+	    if (td->flags) sys_thread_check(td);
 	}
     }
 }
@@ -285,8 +298,42 @@ sys_vm_leave (void)
 {
     if (g_TLSIndex != INVALID_TLS_INDEX) {
 	struct sys_thread *td = sys_thread_get();
-	if (td) thread_critsect_leave(td->vmcsp);
+
+	if (td) {
+	    if (td->sched_ctx) sched_switch(td->sched_ctx, 0);
+
+	    thread_critsect_leave(td->vmcsp);
+	}
     }
+}
+
+void
+sys_thread_suspend (struct sys_thread *td)
+{
+    lua_assert(td && td == sys_thread_get());
+
+    sys_vm2_leave(td);
+#ifndef _WIN32
+    td->suspended = 1;
+    (void) thread_cond_wait_value(&td->cond, td->vmcsp,
+     &td->suspended, 0, 0, TIMEOUT_INFINITE);
+#else
+    SuspendThread(td->tid);
+#endif
+    sys_vm2_enter(td);
+}
+
+void
+sys_thread_resume (struct sys_thread *td)
+{
+    lua_assert(td);
+
+#ifndef _WIN32
+    td->suspended = 0;
+    (void) thread_cond_signal(&td->cond);
+#else
+    ResumeThread(td->tid);
+#endif
 }
 
 int
@@ -295,7 +342,7 @@ sys_eintr (void)
 #ifndef _WIN32
     if (SYS_ERRNO == EINTR) {
 	struct sys_thread *td = sys_thread_get();
-	return !(td && td->state);
+	return !(td && td->flags);
     }
 #endif
     return 0;
@@ -836,11 +883,26 @@ thread_sleep (lua_State *L)
 }
 
 static int
+thread_switch (lua_State *L)
+{
+    (void) L;
+
+    sys_thread_switch(1);
+    return 0;
+}
+
+static int
 thread_yield (lua_State *L)
 {
     (void) L;
 
-    sys_thread_yield(1);
+    sys_vm_leave();
+#ifndef _WIN32
+    sched_yield();
+#else
+    Sleep(0);
+#endif
+    sys_vm_enter();
     return 0;
 }
 
@@ -872,7 +934,7 @@ thread_interrupted (lua_State *L)
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
 
     td = thread_unfake(td);
-    lua_pushboolean(L, (td->state == THREAD_INTERRUPTED));
+    lua_pushboolean(L, (td->flags == SYS_THREAD_INTERRUPT));
     return 1;
 }
 
@@ -887,13 +949,13 @@ thread_set_interrupt (lua_State *L)
 
     td = thread_unfake(td);
     if (recover) {
-	td->state &= ~THREAD_INTERRUPTED;
+	td->flags &= ~SYS_THREAD_INTERRUPT;
 	return 0;
     }
 
-    td->state = THREAD_INTERRUPTED;
+    td->flags = SYS_THREAD_INTERRUPT;
     if (td == sys_thread_get())
-	sys_thread_yield(1);
+	sys_thread_switch(1);
     else
 	(void) thread_cancel_syncio(td->tid);
 
@@ -913,7 +975,7 @@ thread_set_terminate (lua_State *L)
 
     td = thread_unfake(td);
     td->exit_status = status;
-    td->state = THREAD_SET_TERMINATE;
+    td->flags = SYS_THREAD_TERMINATE;
 
     if (td == sys_thread_get())
 	thread_exit(td);
@@ -942,13 +1004,13 @@ thread_wait (lua_State *L)
 	    return 1;
 	}
     } else {
-	if (td->state == THREAD_TERMINATED)
+	if (td->flags == SYS_THREAD_KILLED)
 	    goto result;
 
 	sys_vm_leave();
 #ifndef _WIN32
 	res = thread_cond_wait_value(&td->cond, td->vmcsp,
-	 &td->state, THREAD_TERMINATED, 0, timeout);
+	 &td->flags, SYS_THREAD_KILLED, 0, timeout);
 #else
 	res = thread_handle_wait(td->tid, timeout);
 #endif
@@ -1002,6 +1064,7 @@ static luaL_Reg thread_lib[] = {
     {"run",		thread_run},
     {"self",		thread_self},
     {"sleep",		thread_sleep},
+    {"switch",		thread_switch},
     {"yield",		thread_yield},
     {"interrupt_error",	thread_interrupt_error},
     AFFIN_METHODS,
