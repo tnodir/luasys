@@ -228,7 +228,7 @@ struct sys_thread *sys_thread_new (lua_State *L,
                                    const int push_udata);
 void sys_thread_del (struct sys_thread *td);
 
-void sys_thread_suspend (struct sys_thread *td);
+int sys_thread_suspend (struct sys_thread *td, const msec_t timeout);
 void sys_thread_resume (struct sys_thread *td);
 
 int sys_eintr (void);

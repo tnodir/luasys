@@ -57,12 +57,11 @@ struct sys_thread {
     struct sys_vmthread *vmtd;
     struct sys_thread *reftd;  /* parent or fake-child VM-thread */
 
-#ifndef _WIN32
-    thread_cond_t cond;  /* to wait termination and suspend */
-    unsigned int volatile suspended;
-#endif
     thread_id_t tid;
     lua_Integer exit_status;
+
+    thread_cond_t cond;  /* to wait termination and suspend/resume */
+    unsigned int volatile suspended;
 
 #define SYS_THREAD_KILLED	1
 #define SYS_THREAD_TERMINATE	2
@@ -77,9 +76,6 @@ struct sys_vmthread {
     struct sys_thread td;
 
     thread_critsect_t vmcs;
-#ifdef _WIN32
-    thread_cond_t cond;
-#endif
 
     unsigned int volatile nref;
 
@@ -139,16 +135,13 @@ sys_thread_tolua (struct sys_thread *td)
 
 
 static int
-thread_waitvm (struct sys_vmthread *vmtd, msec_t timeout)
+thread_waitvm (struct sys_vmthread *vmtd, const msec_t timeout)
 {
     int res = 0;
 
     if (vmtd->nref) {
-#ifndef _WIN32
 	thread_cond_t *condp = &vmtd->td.cond;
-#else
-	thread_cond_t *condp = &vmtd->cond;
-#endif
+
 	sys_vm2_leave(&vmtd->td);
 	res = thread_cond_wait_value(condp, &vmtd->vmcs,
 	 &vmtd->nref, 0, 0, timeout);
@@ -204,9 +197,9 @@ thread_exit (struct sys_thread *td)
 	}
 	if (!--vmref->nref) {
 #ifndef _WIN32
-	    (void) thread_cond_signal(&vmref->td.cond);
+	    pthread_cond_broadcast(&vmref->td.cond);
 #else
-	    (void) thread_cond_signal(&vmref->cond);
+	    (void) thread_cond_signal(&vmref->td.cond);
 #endif
 	}
 	sys_vm2_leave(reftd);
@@ -307,20 +300,19 @@ sys_vm_leave (void)
     }
 }
 
-void
-sys_thread_suspend (struct sys_thread *td)
+int
+sys_thread_suspend (struct sys_thread *td, const msec_t timeout)
 {
+    int res;
+
     lua_assert(td && td == sys_thread_get());
 
-    sys_vm2_leave(td);
-#ifndef _WIN32
     td->suspended = 1;
-    (void) thread_cond_wait_value(&td->cond, td->vmcsp,
-     &td->suspended, 0, 0, TIMEOUT_INFINITE);
-#else
-    SuspendThread(td->tid);
-#endif
+    sys_vm2_leave(td);
+    res = thread_cond_wait_value(&td->cond, td->vmcsp,
+     &td->suspended, 0, 0, timeout);
     sys_vm2_enter(td);
+    return res;
 }
 
 void
@@ -328,11 +320,11 @@ sys_thread_resume (struct sys_thread *td)
 {
     lua_assert(td);
 
-#ifndef _WIN32
     td->suspended = 0;
-    (void) thread_cond_signal(&td->cond);
+#ifndef _WIN32
+    pthread_cond_broadcast(&td->cond);
 #else
-    ResumeThread(td->tid);
+    (void) thread_cond_signal(&td->cond);
 #endif
 }
 
@@ -474,11 +466,7 @@ thread_newvm (lua_State *L, struct sys_thread *reftd)
 	return NULL;
     vmtd->td.vmcsp = &vmtd->vmcs;
 
-#ifndef _WIN32
     if (thread_cond_new(&vmtd->td.cond))
-#else
-    if (thread_cond_new(&vmtd->cond))
-#endif
 	return NULL;
 
     thread_settable(L, &vmtd->td);  /* save thread to avoid GC */
@@ -515,10 +503,8 @@ sys_thread_new (lua_State *L, struct sys_thread *vmtd,
     td->reftd = vmtd2 ? vmtd2 : &vmref->td;
     vmref->nref++;
 
-#ifndef _WIN32
     if (thread_cond_new(&td->cond))
 	return NULL;
-#endif
 
     if (push_udata) {
 	lua_pushvalue(L, -1);
@@ -551,9 +537,6 @@ thread_done (lua_State *L)
     if (td->L) {
 	if (thread_isvm(td)) {
 	    thread_critsect_del(td->vmcsp);
-#ifdef _WIN32
-	    thread_cond_del(&td->vmtd->cond);
-#endif
 	} else {
 	    sys_vm2_leave(td);
 #ifndef _WIN32
@@ -567,9 +550,7 @@ thread_done (lua_State *L)
 #endif
 	    sys_vm2_enter(td);
 	}
-#ifndef _WIN32
 	thread_cond_del(&td->cond);
-#endif
 
 	lua_rawgetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
 	lua_pushnil(L);
@@ -907,6 +888,41 @@ thread_yield (lua_State *L)
 }
 
 /*
+ * Arguments: [timeout (milliseconds)]
+ * Returns: [boolean]
+ */
+static int
+thread_suspend (lua_State *L)
+{
+    struct sys_thread *td = sys_thread_get();
+    const msec_t timeout = lua_isnoneornil(L, 1)
+     ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 1);
+    const int res = sys_thread_suspend(td, timeout);
+
+    if (res >= 0) {
+	if (res == 1) {
+	    lua_pushboolean(L, 0);
+	    return 1;  /* timed out */
+	}
+	lua_pushboolean(L, 1);
+	return 1;
+    }
+    return sys_seterror(L, 0);
+}
+
+/*
+ * Arguments: thread_udata
+ */
+static int
+thread_resume (lua_State *L)
+{
+    struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
+
+    sys_thread_resume(td);
+    return 0;
+}
+
+/*
  * Arguments: [object (any)]
  * Returns: old_object (any)
  */
@@ -1049,6 +1065,7 @@ thread_tostring (lua_State *L)
 
 
 static luaL_Reg thread_meth[] = {
+    {"resume",		thread_resume},
     {"interrupted",	thread_interrupted},
     {"interrupt",	thread_set_interrupt},
     {"terminate",	thread_set_terminate},
@@ -1066,6 +1083,7 @@ static luaL_Reg thread_lib[] = {
     {"sleep",		thread_sleep},
     {"switch",		thread_switch},
     {"yield",		thread_yield},
+    {"suspend",		thread_suspend},
     {"interrupt_error",	thread_interrupt_error},
     AFFIN_METHODS,
     DPOOL_METHODS,

@@ -633,7 +633,7 @@ levq_sync_call (lua_State *L, struct event_queue *evq,
     evq->sync_op = &op;
 
     evq_signal(evq, EVQ_SIGEVQ);
-    sys_thread_suspend(td);
+    sys_thread_suspend(td, TIMEOUT_INFINITE);
 
     if (op.status) lua_error(L);
 

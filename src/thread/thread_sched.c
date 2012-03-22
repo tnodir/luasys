@@ -2,11 +2,11 @@
 
 #define SCHED_TYPENAME	"sys.thread.scheduler"
 
-#define SCHED_BUF_MIN	32
+#define SCHED_BUF_MIN		32
 
 /* Scheduler coroutine reserved indexes */
 #define SCHED_CORO_ENV		1  /* environ. */
-#define SCHED_CORO_CBPOOL	2  /* callback: on_pool */
+#define SCHED_CORO_CBCOCTL	2  /* callback: coroutines controller */
 
 struct sched_task {
     lua_State *co;  /* coroutine */
@@ -34,8 +34,10 @@ struct scheduler {
     struct sched_task *buffer;  /* tasks buffer */
     int buf_idx, buf_max;  /* tasks buffer current and maximum indexes */
 
-    unsigned int use_pool:	1;  /* on_pool callback exist */
     unsigned int stop:		1;  /* stop looping */
+    unsigned int cb_coctl:	1;  /* coroutines controller exist */
+
+    unsigned int nwaiters;  /* number of waiting threads */
 
     thread_critsect_t cs;  /* guard access of context */
     thread_event_t tev;  /* notification */
@@ -145,8 +147,8 @@ sched_task_del (lua_State *L, struct scheduler *sched,
     sched_tasklist_add(sched, &sched->free_task_id, task);
     sched->ntasks--;
 
-    if (sched->use_pool) {
-	lua_pushvalue(sched->L, SCHED_CORO_CBPOOL);
+    if (sched->cb_coctl) {
+	lua_pushvalue(sched->L, SCHED_CORO_CBCOCTL);
 	lua_xmove(sched->L, L, 1);  /* function */
 	lua_pushthread(co);
 	lua_xmove(co, L, 1);  /* coroutine */
@@ -161,13 +163,13 @@ sched_task_del (lua_State *L, struct scheduler *sched,
     lua_rawseti(NL, SCHED_CORO_ENV,
      sched_task_to_id(sched, task));  /* task_id -> coro */
 
-    if (sched->use_pool) {
+    if (sched->cb_coctl) {
 	lua_call(L, (error ? 2 : 1), 0);
     }
 }
 
 /*
- * Arguments: [on_pool_callback (function)]
+ * Arguments: [coroutines_controller (function)]
  * Returns: [sched_udata]
  */
 static int
@@ -200,13 +202,10 @@ sched_new (lua_State *L)
     sched->L = NL;
     lua_rawsetp(L, -2, NL);  /* save coroutine to avoid GC */
 
-    if (lua_isfunction(L, 1)) {
-	lua_pushvalue(L, 1);  /* on_pool callback (SCHED_CORO_CBPOOL) */
-	lua_xmove(L, NL, 2);
-	sched->use_pool = 1;
-    } else {
-	lua_xmove(L, NL, 1);
-    }
+    sched->cb_coctl = lua_isfunction(L, 1);
+
+    lua_pushvalue(L, 1);  /* coroutines controller (SCHED_CORO_CBCOCTL) */
+    lua_xmove(L, NL, 2);
 
     if (!thread_critsect_new(&sched->cs)
      && !thread_event_new(&sched->tev)) {
@@ -246,8 +245,8 @@ sched_put (lua_State *L)
     struct sched_task *task;
     lua_State *co = NULL;
 
-    if (sched->use_pool) {
-	lua_pushvalue(sched->L, SCHED_CORO_CBPOOL);
+    if (sched->cb_coctl) {
+	lua_pushvalue(sched->L, SCHED_CORO_CBCOCTL);
 	lua_xmove(sched->L, L, 1);  /* function */
 	lua_call(L, 0, 1);
 	co = lua_tothread(L, -1);
@@ -266,6 +265,10 @@ sched_put (lua_State *L)
 
     memset(task, 0, sizeof(struct sched_task));
     task->co = co;
+
+    /* notify */
+    if (sched->active_task_id == -1)
+	thread_event_signal(&sched->tev);
 
     sched_tasklist_add(sched, &sched->active_task_id, task);
     sched->ntasks++;
@@ -362,6 +365,7 @@ sched_loop (lua_State *L)
 
     sched_ctx.sched = sched;
     sched_ctx.co = NULL;
+
     td->sched_ctx = &sched_ctx;
 
     thread_critsect_enter(csp);
@@ -386,11 +390,14 @@ sched_loop (lua_State *L)
 		thread_event_signal(&sched->tev);
 		break;
 	    }
+	    sched->nwaiters++;
 	    res = thread_event_wait(&sched->tev, td, timeout);
+	    sched->nwaiters--;
 	    sys_thread_check(td);
 	    if (res) {
-		err = (res == 1) ? SCHED_LOOP_TIMEOUT : SCHED_LOOP_SYSERROR;
-		goto end;
+		err = (res == 1) ? SCHED_LOOP_TIMEOUT
+		 : SCHED_LOOP_SYSERROR;
+		break;
 	    }
 	    continue;
 	}
@@ -417,7 +424,8 @@ sched_loop (lua_State *L)
 	sched_ctx.co = NULL;
 	thread_critsect_leave(csp);
 
-	task = sched_id_to_task(sched, task_id);  /* buffer may realloc'ed */
+	/* buffer may be realloc'ed */
+	task = sched_id_to_task(sched, task_id);
 
 	switch (res) {
 	case LUA_YIELD:
