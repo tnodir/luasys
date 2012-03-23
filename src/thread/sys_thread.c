@@ -100,6 +100,16 @@ static thread_key_t g_TLSIndex = INVALID_TLS_INDEX;
 	(!thread_isvm(td) && (td)->reftd != thread_getvm(td) \
 	 ? (td)->reftd : (td))
 
+#define sys_vm2_postenter(td) \
+    do { \
+	if ((td)->sched_ctx) sched_switch((td)->sched_ctx, 1); \
+    } while (0)
+
+#define sys_vm2_preleave(td) \
+    do { \
+	if ((td)->sched_ctx) sched_switch((td)->sched_ctx, 0); \
+    } while (0)
+
 static void sched_switch (struct sched_context *sched_ctx, const int enter);
 
 static void thread_createmeta (lua_State *L);
@@ -134,18 +144,47 @@ sys_thread_tolua (struct sys_thread *td)
 }
 
 
+#if defined(USE_PTHREAD_SYNC)
+
+static int
+thread_cond_wait_vm (thread_cond_t *condp, struct sys_thread *td,
+                     const msec_t timeout)
+{
+    int res;
+
+    sys_vm2_preleave(td);
+    res = thread_cond_wait_nolock(condp, td->vmcsp, timeout);
+    sys_vm2_postenter(td);
+
+    return res;
+}
+
+#else  /* Win32 */
+
+static int
+thread_cond_wait_vm (thread_cond_t *condp, struct sys_thread *td,
+                     const msec_t timeout)
+{
+    int res;
+
+    sys_vm2_leave(td);
+    res = WaitForSingleObject(*condp, timeout);
+    sys_vm2_enter(td);
+
+    return (res == WAIT_OBJECT_0) ? 0
+     : (res == WAIT_TIMEOUT) ? 1 : -1;
+}
+
+#endif  /* !defined(USE_PTHREAD_SYNC) */
+
+
 static int
 thread_waitvm (struct sys_vmthread *vmtd, const msec_t timeout)
 {
     int res = 0;
 
-    if (vmtd->nref) {
-	thread_cond_t *condp = &vmtd->td.cond;
-
-	sys_vm2_leave(&vmtd->td);
-	res = thread_cond_wait_value(condp, &vmtd->vmcs,
-	 &vmtd->nref, 0, 0, timeout);
-	sys_vm2_enter(&vmtd->td);
+    while (vmtd->nref && !res) {
+	res = thread_cond_wait_vm(&vmtd->td.cond, &vmtd->td, timeout);
     }
     return res;
 }
@@ -257,8 +296,7 @@ sys_vm2_enter (struct sys_thread *td)
     lua_assert(td);
 
     thread_critsect_enter(td->vmcsp);
-
-    if (td->sched_ctx) sched_switch(td->sched_ctx, 1);
+    sys_vm2_postenter(td);
 }
 
 void
@@ -266,8 +304,7 @@ sys_vm2_leave (struct sys_thread *td)
 {
     lua_assert(td);
 
-    if (td->sched_ctx) sched_switch(td->sched_ctx, 0);
-
+    sys_vm2_preleave(td);
     thread_critsect_leave(td->vmcsp);
 }
 
@@ -279,8 +316,8 @@ sys_vm_enter (void)
 
 	if (td) {
 	    thread_critsect_enter(td->vmcsp);
+	    sys_vm2_postenter(td);
 
-	    if (td->sched_ctx) sched_switch(td->sched_ctx, 1);
 	    if (td->flags) sys_thread_check(td);
 	}
     }
@@ -293,12 +330,12 @@ sys_vm_leave (void)
 	struct sys_thread *td = sys_thread_get();
 
 	if (td) {
-	    if (td->sched_ctx) sched_switch(td->sched_ctx, 0);
-
+	    sys_vm2_preleave(td);
 	    thread_critsect_leave(td->vmcsp);
 	}
     }
 }
+
 
 int
 sys_thread_suspend (struct sys_thread *td, const msec_t timeout)
@@ -308,10 +345,9 @@ sys_thread_suspend (struct sys_thread *td, const msec_t timeout)
     lua_assert(td && td == sys_thread_get());
 
     td->suspended = 1;
-    sys_vm2_leave(td);
-    res = thread_cond_wait_value(&td->cond, td->vmcsp,
-     &td->suspended, 0, 0, timeout);
-    sys_vm2_enter(td);
+    do {
+	res = thread_cond_wait_vm(&td->cond, td, timeout);
+    } while (td->suspended && !res);
     return res;
 }
 
@@ -1023,14 +1059,16 @@ thread_wait (lua_State *L)
 	if (td->flags == SYS_THREAD_KILLED)
 	    goto result;
 
-	sys_vm_leave();
 #ifndef _WIN32
-	res = thread_cond_wait_value(&td->cond, td->vmcsp,
-	 &td->flags, SYS_THREAD_KILLED, 0, timeout);
+	do {
+	    res = thread_cond_wait_vm(&td->cond, td, timeout);
+	    sys_thread_check(td);
+	} while (td->flags != SYS_THREAD_KILLED && !res);
 #else
+	sys_vm_leave();
 	res = thread_handle_wait(td->tid, timeout);
-#endif
 	sys_vm_enter();
+#endif
     }
 
     if (res >= 0) {

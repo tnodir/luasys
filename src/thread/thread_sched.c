@@ -37,10 +37,14 @@ struct scheduler {
     unsigned int stop:		1;  /* stop looping */
     unsigned int cb_coctl:	1;  /* coroutines controller exist */
 
-    unsigned int nwaiters;  /* number of waiting threads */
+    unsigned short min_workers;  /* minimum number of running threads */
+    unsigned short max_waiters;  /* maximum number of waiting threads */
+
+    unsigned short nworkers;  /* number of running threads */
+    unsigned short nwaiters;  /* number of waiting threads */
 
     thread_critsect_t cs;  /* guard access of context */
-    thread_event_t tev;  /* notification */
+    thread_cond_t cond;  /* notification */
 };
 
 struct sched_context {
@@ -199,6 +203,9 @@ sched_new (lua_State *L)
      = sched->wait_task_id
      = sched->free_task_id = -1;
 
+    sched->min_workers
+     = sched->max_waiters = -1;
+
     sched->L = NL;
     lua_rawsetp(L, -2, NL);  /* save coroutine to avoid GC */
 
@@ -208,7 +215,7 @@ sched_new (lua_State *L)
     lua_xmove(L, NL, 2);
 
     if (!thread_critsect_new(&sched->cs)
-     && !thread_event_new(&sched->tev)) {
+     && !thread_cond_new(&sched->cond)) {
 	return 1;
     }
     return sys_seterror(L, 0);
@@ -223,7 +230,7 @@ sched_close (lua_State *L)
     struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
 
     thread_critsect_del(&sched->cs);
-    thread_event_del(&sched->tev);
+    thread_cond_del(&sched->cond);
 
     if (sched->buffer) {
 	free(sched->buffer);
@@ -267,8 +274,8 @@ sched_put (lua_State *L)
     task->co = co;
 
     /* notify */
-    if (sched->active_task_id == -1)
-	thread_event_signal(&sched->tev);
+    if (sched->active_task_id == -1 && !sched->nworkers)
+	(void) thread_cond_signal(&sched->cond);
 
     sched_tasklist_add(sched, &sched->active_task_id, task);
     sched->ntasks++;
@@ -377,21 +384,27 @@ sched_loop (lua_State *L)
     for (; ; ) {
 	struct sched_task *task;
 	lua_State *co;
-	const int task_id = sched->active_task_id;
-	int res, narg;
+	int res, narg, task_id;
 
 	if (sched->stop) {
-	    thread_event_signal(&sched->tev);
+	    (void) thread_cond_signal(&sched->cond);
 	    break;
 	}
 
+	if (sched->nworkers > sched->min_workers)
+	    goto wait;
+
+	task_id = sched->active_task_id;
 	if (task_id == -1) {
 	    if (until_empty && sched_is_empty(sched)) {
-		thread_event_signal(&sched->tev);
+		(void) thread_cond_signal(&sched->cond);
 		break;
 	    }
+ wait:
+	    if (sched->nwaiters == sched->max_waiters)
+		break;
 	    sched->nwaiters++;
-	    res = thread_event_wait(&sched->tev, td, timeout);
+	    res = thread_cond_wait_vm(&sched->cond, td, timeout);
 	    sched->nwaiters--;
 	    sys_thread_check(td);
 	    if (res) {
@@ -418,7 +431,9 @@ sched_loop (lua_State *L)
 	sched->tick++;
 	thread_critsect_leave(csp);
 
+	sched->nworkers++;
 	res = lua_resume(co, L, narg);  /* call coroutine */
+	sched->nworkers--;
 
 	thread_critsect_enter(csp);
 	sched_ctx.co = NULL;
@@ -477,7 +492,7 @@ sched_stop (lua_State *L)
     const int state = lua_isnoneornil(L, 2) || lua_toboolean(L, 2);
 
     sched->stop = state;
-    thread_event_signal(&sched->tev);
+    (void) thread_cond_signal(&sched->cond);
     return 0;
 }
 
@@ -724,8 +739,8 @@ sys_sched_event_ready (lua_State *co, void *ev)
 
     if (lua_status(co) == LUA_YIELD) {
 	/* notify */
-	if (sched->active_task_id == -1)
-	    thread_event_signal(&sched->tev);
+	if (sched->active_task_id == -1 && !sched->nworkers)
+	    (void) thread_cond_signal(&sched->cond);
 
 	sched_tasklist_add(sched, &sched->active_task_id, task);
 
