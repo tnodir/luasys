@@ -102,15 +102,16 @@ static thread_key_t g_TLSIndex = INVALID_TLS_INDEX;
 
 #define sys_vm2_postenter(td) \
     do { \
-	if ((td)->sched_ctx) sched_switch((td)->sched_ctx, 1); \
+	if ((td)->sched_ctx) sched_vm_switch((td)->sched_ctx, 1); \
     } while (0)
 
 #define sys_vm2_preleave(td) \
     do { \
-	if ((td)->sched_ctx) sched_switch((td)->sched_ctx, 0); \
+	if ((td)->sched_ctx) sched_vm_switch((td)->sched_ctx, 0); \
     } while (0)
 
-static void sched_switch (struct sched_context *sched_ctx, const int enter);
+static void sched_vm_switch (struct sched_context *sched_ctx,
+                             const int enter_vm);
 
 static void thread_createmeta (lua_State *L);
 
