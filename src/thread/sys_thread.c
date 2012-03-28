@@ -200,6 +200,8 @@ thread_exit (struct sys_thread *td)
     const int is_vm = thread_isvm(td);
     lua_Integer res;
 
+    td->sched_ctx = NULL;
+
     if (td->flags != SYS_THREAD_KILLED) {
 	td->flags = SYS_THREAD_KILLED;
 	td->exit_status = lua_tointeger(td->L, -1);
@@ -279,11 +281,9 @@ sys_thread_check (struct sys_thread *td)
 	const unsigned int flags = td->flags;
 
 	if (flags == SYS_THREAD_TERMINATE) {
-	    td->sched_ctx = NULL;
 	    td->flags = SYS_THREAD_KILLED;
 	    thread_exit(td);
 	} else if (flags == SYS_THREAD_INTERRUPT) {
-	    td->sched_ctx = NULL;
 	    lua_rawgetp(td->L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
 	    lua_rawgeti(td->L, -1, THREAD_TABLE_EINTR);
 	    lua_error(td->L);
