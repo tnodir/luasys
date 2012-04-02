@@ -76,15 +76,15 @@ win32iocp_process (struct event_queue *evq, struct event *ev_ready, msec_t now)
 		const DWORD err = (DWORD) ove->lpOverlapped->Internal;
 
 		ov = (struct win32overlapped *) ove->lpOverlapped;
-		ev = (struct event *) ove->lpCompletionKey;
 		status = !err;
 		cancelled = (err == STATUS_CANCELLED);
 	    }
 	} else {
+	    ULONG_PTR key;
 	    DWORD nr;
 
-	    status = GetQueuedCompletionStatus(iocph, &nr,
-	     (ULONG_PTR *) &ev, (OVERLAPPED **) &ov, 0L);
+	    status = GetQueuedCompletionStatus(iocph, &nr, &key,
+	     (OVERLAPPED **) &ov, 0L);
 	    if (!status) {
 		const DWORD err = GetLastError();
 
@@ -94,12 +94,13 @@ win32iocp_process (struct event_queue *evq, struct event *ev_ready, msec_t now)
 	    }
 	}
 
-	if (!ov || !ev) {
+	if (!ov) {
 	    if (pGetQueuedCompletionStatusEx) continue;
 	    break;  /* error */
 	}
 
-	cancelled = ov->u.ov.hEvent ? cancelled : 1;
+	ev = ov->ev;
+	cancelled = ev ? cancelled : 1;
 	win32iocp_del_overlapped(evq, ov);
 	if (cancelled)
 	    continue;
@@ -143,13 +144,13 @@ win32iocp_cancel (struct event *ev, unsigned int rw_flags)
     }
     if ((rw_flags & EVENT_READ) && ev->w.iocp.rov) {
 	if (pCancelIoEx) pCancelIoEx(ev->fd, (OVERLAPPED *) ev->w.iocp.rov);
-	ev->w.iocp.rov->u.ov.hEvent = NULL;
+	ev->w.iocp.rov->ev = NULL;
 	ev->w.iocp.rov = NULL;
 	ev->flags &= ~EVENT_RPENDING;
     }
     if ((rw_flags & EVENT_WRITE) && ev->w.iocp.wov) {
 	if (pCancelIoEx) pCancelIoEx(ev->fd, (OVERLAPPED *) ev->w.iocp.wov);
-	ev->w.iocp.wov->u.ov.hEvent = NULL;
+	ev->w.iocp.wov->ev = NULL;
 	ev->w.iocp.wov = NULL;
 	ev->flags &= ~EVENT_WPENDING;
     }
@@ -178,6 +179,7 @@ win32iocp_set (struct event *ev, const unsigned int rw_flags)
 	    win32iocp_del_overlapped(evq, ov);
 	    return -1;
 	}
+	ov->ev = ev;
 	ev->w.iocp.rov = ov;
 	ev->flags |= EVENT_RPENDING;  /* IOCP read request is installed */
     }
@@ -195,6 +197,7 @@ win32iocp_set (struct event *ev, const unsigned int rw_flags)
 	    win32iocp_del_overlapped(evq, ov);
 	    return -1;
 	}
+	ov->ev = ev;
 	ev->w.iocp.wov = ov;
 	ev->flags |= EVENT_WPENDING;  /* IOCP write request is installed */
     }

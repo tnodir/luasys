@@ -88,6 +88,9 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #define luai_writestringerror(s,p) \
 	(fprintf(stderr, (s), (p)), fflush(stderr))
 
+#define lua_absindex(L,idx) \
+	((idx) < 0 && (idx) > -99 ? lua_gettop(L) + (idx) : (idx))
+
 #else
 #define luaL_register(L,n,l)	luaL_newlib((L), (l))
 #define lua_setfenv		lua_setuservalue
@@ -238,15 +241,17 @@ int sys_eintr (void);
  * Event Queue & Scheduler
  */
 
-#define EVQ_SCHED_OBJ		0
-#define EVQ_SCHED_TIMER		1
-#define EVQ_SCHED_PID		2
-#define EVQ_SCHED_DIRWATCH	3
-#define EVQ_SCHED_SIGNAL	4
-#define EVQ_SCHED_SOCKET	5
+enum {
+    EVQ_SCHED_OBJ = 0,
+    EVQ_SCHED_TIMER,
+    EVQ_SCHED_PID,
+    EVQ_SCHED_DIRWATCH,
+    EVQ_SCHED_SIGNAL,
+    EVQ_SCHED_SOCKET
+};
 
-int sys_evq_sched_add (lua_State *L, int evq_idx, int type);
-int sys_evq_sched_del (lua_State *L, void *ev);
+int sys_evq_sched_add (lua_State *L, const int evq_idx, const int type);
+int sys_evq_sched_del (lua_State *L, void *ev, const int ev_added);
 
 void sys_sched_event_added (lua_State *co, void *ev);
 void sys_sched_event_ready (lua_State *co, void *ev);

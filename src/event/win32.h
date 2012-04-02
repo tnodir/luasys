@@ -37,6 +37,7 @@ struct win32overlapped {
 	struct win32overlapped *next_free;
 	OVERLAPPED ov;
     } u;
+    struct event *ev;
 };
 
 #define EVENT_EXTRA							\
@@ -75,7 +76,7 @@ struct win32overlapped {
 
 #define evq_post_init(ev)						\
     do {								\
-	if (((ev)->flags & (EVENT_AIO | EVENT_PENDING)) == EVENT_AIO)	\
+	if (((ev)->flags & (EVENT_AIO | EVENT_PENDING | EVENT_ACTIVE)) == EVENT_AIO) \
 	    win32iocp_set((ev), (ev)->flags);				\
 	else if ((ev)->flags & EVENT_DIRWATCH)				\
 	    FindNextChangeNotification((ev)->fd);			\

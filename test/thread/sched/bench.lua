@@ -48,7 +48,7 @@ sys.stdin:read()
 -- Scheduler workers
 do
 	local function loop()
-		local _, err = sched:loop(nil, true)
+		local _, err = sched:loop(0)
 		if err then error(err) end
 	end
 

@@ -68,8 +68,11 @@ evq_add (struct event_queue *evq, struct event *ev)
     }
 
     if ((ev_flags & (EVENT_SOCKET | EVENT_SOCKET_ACC_CONN)) == EVENT_SOCKET
-     && evq->iocp.h
-     && CreateIoCompletionPort((HANDLE) ev->fd, evq->iocp.h, (ULONG_PTR) ev, 0)) {
+     && evq->iocp.h) {
+	if (!CreateIoCompletionPort((HANDLE) ev->fd, evq->iocp.h, 0, 0)
+	 && GetLastError() != ERROR_INVALID_PARAMETER)  /* already assosiated */
+	    return -1;
+
 	ev->flags |= EVENT_AIO;
 	evq->iocp.n++;
 	evq->nevents++;
@@ -78,7 +81,8 @@ evq_add (struct event_queue *evq, struct event *ev)
 	 && pSetFileCompletionNotificationModes((HANDLE) ev->fd, 3))
 	    ev->flags |= EVENT_AIO_SKIP;
 
-	return win32iocp_set(ev, ev_flags);
+	win32iocp_set(ev, ev_flags);
+	return 0;
     }
 
     while (wth->n >= NEVENT - 1)
@@ -254,9 +258,10 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 	if (!iocp_is_empty(evq))
 	    ev_ready = win32iocp_process(evq, NULL, 0L);
 
-	if (ev_ready)
+	if (ev_ready) {
+	    evq->ev_ready = ev_ready;
 	    timeout = 0L;
-	else {
+	} else {
 	    /* head_signal is resetted by IOCP WSARecv/WSASend */
 	    EnterCriticalSection(head_cs);
 	    if (evq->sig_ready)
@@ -271,6 +276,8 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     sys_vm_enter();
 
     evq->now = get_milliseconds();
+
+    ev_ready = evq->ev_ready;
 
     if (wait_res == WAIT_TIMEOUT) {
 	if (ev_ready) goto end;
