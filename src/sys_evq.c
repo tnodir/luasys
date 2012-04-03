@@ -619,8 +619,11 @@ levq_timeout_manual (lua_State *L)
 
 
 static void
-levq_sync_process (struct event_queue *evq, struct evq_sync_op *op)
+levq_sync_process (lua_State *L, struct event_queue *evq,
+                   struct evq_sync_op *op)
 {
+    const int top = lua_gettop(L);
+
     do {
 	lua_State *NL = op->L;
 
@@ -628,14 +631,18 @@ levq_sync_process (struct event_queue *evq, struct evq_sync_op *op)
 	    struct event *ev;
 
 	    if (NL) {
-		const int top = lua_gettop(NL);
+		const int narg = lua_gettop(NL) - op->fn_idx;
 
-		lua_call(NL, top - op->fn_idx, LUA_MULTRET);
+		lua_xmove(NL, L, narg + 1);
+		lua_call(L, narg, LUA_MULTRET);
 
-		ev = lua_touserdata(NL, op->fn_idx);
+		ev = lua_touserdata(L, top + 1);
 		if (ev) {
 		    ev->flags |= EVENT_ONESHOT | EVENT_CALLBACK_SCHED;
-		    lua_pop(NL, 1);  /* pop ev_ludata */
+		    lua_pop(L, 1);  /* pop ev_ludata */
+		} else {
+		    /* error */
+		    lua_xmove(L, NL, lua_gettop(L) - top);
 		}
 		sys_sched_event_added(NL, ev);
 	    }
@@ -643,9 +650,9 @@ levq_sync_process (struct event_queue *evq, struct evq_sync_op *op)
 	    op = op->next;
 	    levq_free_event(evq, ev);
 	} else {
-	    const int top = lua_gettop(NL);
+	    const int narg = lua_gettop(NL) - op->fn_idx;
 
-	    op->status = lua_pcall(NL, top - op->fn_idx, LUA_MULTRET, 0);
+	    op->status = lua_pcall(NL, narg, LUA_MULTRET, 0);
 	    sys_thread_resume(op->td);
 	    op = op->next;
 	}
@@ -747,7 +754,7 @@ levq_loop (lua_State *L)
 	    struct evq_sync_op *op = evq->sync_op;
 
 	    evq->sync_op = NULL;
-	    levq_sync_process(evq, op);
+	    levq_sync_process(L, evq, op);
 	}
 
 	if (!evq->ev_ready) {

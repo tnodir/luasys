@@ -89,7 +89,7 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 	(fprintf(stderr, (s), (p)), fflush(stderr))
 
 #define lua_absindex(L,idx) \
-	((idx) < 0 && (idx) > -99 ? lua_gettop(L) + (idx) : (idx))
+	((idx) < 0 && (idx) > -99 ? lua_gettop(L) + (idx) + 1 : (idx))
 
 #else
 #define luaL_register(L,n,l)	luaL_newlib((L), (l))
