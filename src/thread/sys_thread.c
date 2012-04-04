@@ -573,6 +573,7 @@ thread_done (lua_State *L)
 
     if (td->L) {
 	if (thread_isvm(td)) {
+	    thread_critsect_leave(td->vmcsp);
 	    thread_critsect_del(td->vmcsp);
 	} else {
 	    sys_vm2_leave(td);
