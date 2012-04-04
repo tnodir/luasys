@@ -13,17 +13,21 @@ struct evq_sync_op {
 };
 
 #define EVQ_APP_EXTRA \
-    struct evq_sync_op * volatile sync_op;
+    struct evq_sync_op * volatile sync_op; \
+    lua_State *L;  /* storage */
 
 
 #include "event/evq.c"
 
 
 /* Event Queue environ. table reserved indexes */
-#define EVQ_ENV_UDATA		1  /* table: event objects */
-#define EVQ_ENV_CALLBACK	2  /* table: callback functions */
 #define EVQ_ENV_BUF_IDX		6  /* initial buffer index */
 #define EVQ_ENV_BUF_MAX		24  /* maximum buffer index */
+
+/* Event Queue coroutine reserved indexes */
+#define EVQ_CORO_ENV		1  /* environ. */
+#define EVQ_CORO_CALLBACK	2  /* table: callback functions */
+#define EVQ_CORO_UDATA		3  /* table: event objects */
 
 #define levq_toevent(L,i) \
 	(lua_type(L, (i)) == LUA_TLIGHTUSERDATA \
@@ -78,15 +82,24 @@ levq_new (lua_State *L)
     lua_assert(sizeof(struct event) >= sizeof(struct evq_sync_op));
 
     if (!evq_init(evq)) {
+	lua_State *NL;
+
 	luaL_getmetatable(L, EVQ_TYPENAME);
 	lua_setmetatable(L, -2);
 
-	lua_newtable(L);  /* environ. */
-	lua_newtable(L);  /* {ev_id => obj_udata} */
-	lua_rawseti(L, -2, EVQ_ENV_UDATA);
-	lua_newtable(L);  /* {ev_id => cb_func} */
-	lua_rawseti(L, -2, EVQ_ENV_CALLBACK);
-	lua_setfenv(L, -2);
+	lua_newtable(L);  /* environ. (EVQ_CORO_ENV) */
+	lua_pushvalue(L, -1);
+	lua_setfenv(L, -3);
+
+	NL = lua_newthread(L);
+	if (!NL) return 0;
+
+	evq->L = NL;
+	lua_rawsetp(L, -2, NL);  /* save coroutine to avoid GC */
+
+	lua_newtable(L);  /* {ev_id => cb_func} (EVQ_CORO_CALLBACK) */
+	lua_newtable(L);  /* {ev_id => obj_udata} (EVQ_CORO_UDATA) */
+	lua_xmove(L, NL, 3);
 	return 1;
     }
     return sys_seterror(L, 0);
@@ -100,36 +113,33 @@ levq_done (lua_State *L)
 {
     struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
     struct event *buffers[EVQ_ENV_BUF_MAX + 1];  /* cache */
+    lua_State *NL = evq->L;
 
     memset(buffers, 0, sizeof(buffers));
 
 #undef ARG_LAST
 #define ARG_LAST	1
 
-    lua_settop(L, ARG_LAST);
-    lua_getfenv(L, 1);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_ENV_UDATA);
-
     /* delete object events */
-    lua_pushnil(L);
-    while (lua_next(L, -2)) {
-	const int ev_id = lua_tointeger(L, -2);
+    lua_pushnil(NL);
+    while (lua_next(NL, EVQ_CORO_UDATA)) {
+	const int ev_id = lua_tointeger(NL, -2);
 	const int buf_idx = getmaxbit(
 	 (ev_id | ((1 << EVQ_ENV_BUF_IDX) - 1)) + 1);
 	const int nmax = (1 << buf_idx);
 	struct event *ev = buffers[buf_idx];
 
 	if (!ev) {
-	    lua_rawgeti(L, ARG_LAST+1, buf_idx);
-	    ev = lua_touserdata(L, -1);
-	    lua_pop(L, 1);  /* pop events buffer */
+	    lua_rawgeti(NL, EVQ_CORO_ENV, buf_idx - EVQ_ENV_BUF_IDX + 1);
+	    ev = lua_touserdata(NL, -1);
+	    lua_pop(NL, 1);  /* pop events buffer */
 	    buffers[buf_idx] = ev;
 	}
 	ev += ev_id - ((nmax - 1) & ~((1 << EVQ_ENV_BUF_IDX) - 1));
 
 	if (!event_deleted(ev))
 	    evq_del(ev, 0);
-	lua_pop(L, 1);  /* pop value */
+	lua_pop(NL, 1);  /* pop value */
     }
 
     evq_done(evq);
@@ -137,11 +147,8 @@ levq_done (lua_State *L)
 }
 
 
-/*
- * Arguments: ..., EVQ_ENVIRON (table)
- */
 static struct event *
-levq_new_event (lua_State *L, int idx, struct event_queue *evq)
+levq_new_event (struct event_queue *evq)
 {
     struct event *ev;
     int ev_id;
@@ -151,12 +158,12 @@ levq_new_event (lua_State *L, int idx, struct event_queue *evq)
 	evq->ev_free = ev->next_ready;
 	ev_id = ev->ev_id;
     } else {
+	lua_State *L = evq->L;
 	const int n = evq->buf_nevents;
 	const int buf_idx = evq->buf_index + EVQ_ENV_BUF_IDX;
 	const int nmax = (1 << buf_idx);
 
-	idx = lua_absindex(L, idx);
-	lua_rawgeti(L, idx, buf_idx);
+	lua_rawgeti(L, EVQ_CORO_ENV, buf_idx - EVQ_ENV_BUF_IDX + 1);
 	ev = lua_touserdata(L, -1);
 	lua_pop(L, 1);
 	if (ev) {
@@ -169,7 +176,7 @@ levq_new_event (lua_State *L, int idx, struct event_queue *evq)
 	    if (buf_idx > EVQ_ENV_BUF_MAX)
 		luaL_argerror(L, 1, "too many events");
 	    ev = lua_newuserdata(L, nmax * sizeof(struct event));
-	    lua_rawseti(L, idx, buf_idx);
+	    lua_rawseti(L, EVQ_CORO_ENV, buf_idx - EVQ_ENV_BUF_IDX + 1);
 	    evq->buf_nevents = 1;
 	}
 	ev_id = n + ((nmax - 1) & ~((1 << EVQ_ENV_BUF_IDX) - 1));
@@ -179,24 +186,20 @@ levq_new_event (lua_State *L, int idx, struct event_queue *evq)
     return ev;
 }
 
-/*
- * Arguments: ..., EVQ_ENVIRON (table), EVQ_UDATA (table),
- *	EVQ_CALLBACK (table)
- */
 static void
-levq_del_event (lua_State *L, int idx, struct event_queue *evq,
-                struct event *ev)
+levq_del_event (struct event_queue *evq, struct event *ev)
 {
+    lua_State *L = evq->L;
     const int ev_id = ev->ev_id;
 
     /* cb_fun */
     if (ev->flags & EVENT_CALLBACK) {
 	lua_pushnil(L);
-	lua_rawseti(L, idx + 2, ev_id);
+	lua_rawseti(L, EVQ_CORO_CALLBACK, ev_id);
     }
     /* obj_udata */
     lua_pushnil(L);
-    lua_rawseti(L, idx + 1, ev_id);
+    lua_rawseti(L, EVQ_CORO_UDATA, ev_id);
 
     levq_free_event(evq, ev);
 }
@@ -224,12 +227,7 @@ levq_add (lua_State *L)
 #undef ARG_LAST
 #define ARG_LAST	4
 
-    lua_settop(L, ARG_LAST);
-    lua_getfenv(L, 1);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_ENV_UDATA);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_ENV_CALLBACK);
-
-    ev = levq_new_event(L, ARG_LAST+1, evq);
+    ev = levq_new_event(evq);
 
     if (!(ev_flags & EVENT_TIMER)) {
 	fd_t *fdp = lua_touserdata(L, 2);
@@ -258,7 +256,7 @@ levq_add (lua_State *L)
 
     /* reserve place for timeout_queue */
     if (!evq->ev_free)
-	evq->ev_free = levq_new_event(L, ARG_LAST+1, evq);
+	evq->ev_free = levq_new_event(evq);
 
     if (ev_flags & EVENT_TIMER) {
 	res = evq_add_timer(evq, ev, timeout);
@@ -275,22 +273,24 @@ levq_add (lua_State *L)
 	}
     }
     if (!res) {
+	lua_State *NL = evq->L;
 	const int ev_id = ev->ev_id;
-
-	lua_pushlightuserdata(L, ev);
 
 	/* cb_fun */
 	if (ev_flags & EVENT_CALLBACK) {
-	    lua_pushvalue(L, 4);
-	    lua_rawseti(L, ARG_LAST+3, ev_id);
+	    lua_settop(L, 4);
+	    lua_xmove(L, NL, 1);
+	    lua_rawseti(NL, EVQ_CORO_CALLBACK, ev_id);
 	}
 	/* obj_udata */
-	lua_pushvalue(L, 2);
-	lua_rawseti(L, ARG_LAST+2, ev_id);
+	lua_settop(L, 2);
+	lua_xmove(L, NL, 1);
+	lua_rawseti(NL, EVQ_CORO_UDATA, ev_id);
 
+	lua_pushlightuserdata(L, ev);
 	return 1;
     }
-    levq_del_event(L, ARG_LAST+1, evq, ev);
+    levq_del_event(evq, ev);
     return sys_seterror(L, 0);
 }
 
@@ -505,11 +505,6 @@ levq_del (lua_State *L)
 #undef ARG_LAST
 #define ARG_LAST	1
 
-    lua_settop(L, ARG_LAST);
-    lua_getfenv(L, 1);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_ENV_UDATA);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_ENV_CALLBACK);
-
 #ifdef EVQ_POST_INIT
     if (ev == evq->ev_post)
 	evq->ev_post = NULL;
@@ -518,9 +513,9 @@ levq_del (lua_State *L)
     if (!event_deleted(ev))
 	res = evq_del(ev, reuse_fd);
 
-    if (!(ev->flags & (EVENT_ACTIVE | EVENT_DELETE))) {
-	levq_del_event(L, ARG_LAST+1, evq, ev);
-    }
+    if (!(ev->flags & (EVENT_ACTIVE | EVENT_DELETE)))
+	levq_del_event(evq, ev);
+
     ev->flags |= EVENT_DELETE;
 
     if (!res) {
@@ -537,21 +532,16 @@ levq_del (lua_State *L)
 static int
 levq_callback (lua_State *L)
 {
+    struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
     struct event *ev = levq_toevent(L, 2);
+    lua_State *NL = evq->L;
     const int top = lua_gettop(L);
 
     lua_assert(ev && !event_deleted(ev));
 
-#undef ARG_LAST
-#define ARG_LAST	3
-
-    lua_settop(L, ARG_LAST);
-    lua_getfenv(L, 1);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_ENV_CALLBACK);
-
-    if (top < ARG_LAST) {
-	lua_pop(L, 1);
-	lua_rawget(L, ARG_LAST+2);
+    if (top < 3) {
+	lua_rawgeti(NL, EVQ_CORO_CALLBACK, ev->ev_id);
+	lua_xmove(NL, L, 1);
     } else {
 	ev->flags &= ~(EVENT_CALLBACK | EVENT_CALLBACK_CORO);
 	if (!lua_isnoneornil(L, 3)) {
@@ -559,8 +549,9 @@ levq_callback (lua_State *L)
 	     | (lua_isthread(L, 3) ? EVENT_CALLBACK_CORO : 0);
 	}
 
-	lua_pushvalue(L, 3);
-	lua_rawseti(L, ARG_LAST+2, ev->ev_id);
+	lua_settop(L, 3);
+	lua_xmove(L, NL, 1);
+	lua_rawseti(NL, EVQ_CORO_CALLBACK, ev->ev_id);
 	lua_settop(L, 1);
     }
     return 1;
@@ -581,10 +572,8 @@ levq_timeout (lua_State *L)
     lua_assert(ev && !event_deleted(ev) && !(ev->flags & EVENT_WINMSG));
 
     /* reserve place for timeout_queue */
-    if (!evq->ev_free) {
-	lua_getfenv(L, 1);
-	evq->ev_free = levq_new_event(L, -1, evq);
-    }
+    if (!evq->ev_free)
+	evq->ev_free = levq_new_event(evq);
 
     if (!evq_set_timeout(ev, timeout)) {
 	lua_settop(L, 1);
@@ -730,9 +719,13 @@ levq_loop (lua_State *L)
 #define ARG_LAST	1
 
     lua_settop(L, ARG_LAST);
-    lua_getfenv(L, 1);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_ENV_UDATA);
-    lua_rawgeti(L, ARG_LAST+1, EVQ_ENV_CALLBACK);
+    {
+	lua_State *NL = evq->L;
+
+	lua_pushvalue(NL, EVQ_CORO_CALLBACK);
+	lua_pushvalue(NL, EVQ_CORO_UDATA);
+	lua_xmove(NL, L, 2);
+    }
 
 #ifdef EVQ_POST_INIT
     if (evq->ev_post) {
@@ -779,13 +772,13 @@ levq_loop (lua_State *L)
 
 	    if (ev_flags & EVENT_DELETE) {
 		/* postponed deletion of active event */
-		levq_del_event(L, ARG_LAST+1, evq, ev);
+		levq_del_event(evq, ev);
 	    } else {
 		if ((ev_flags & EVENT_CALLBACK) || fetch) {
 		    const int ev_id = ev->ev_id;
 
 		    /* callback function */
-		    lua_rawgeti(L, ARG_LAST+3, ev_id);
+		    lua_rawgeti(L, ARG_LAST+1, ev_id);
 		    /* arguments */
 		    if (!(ev_flags & EVENT_CALLBACK_SCHED)) {
 			lua_pushvalue(L, 1);  /* evq_udata */
@@ -807,14 +800,14 @@ levq_loop (lua_State *L)
 
 		if (event_deleted(ev))
 		    /* deletion of oneshot event */
-		    levq_del_event(L, ARG_LAST+1, evq, ev);
+		    levq_del_event(evq, ev);
 #ifdef EVQ_POST_INIT
 		else evq->ev_post = ev;
 #endif
 
 		if (ev_flags & EVENT_CALLBACK_SCHED) {
 		    /* callback function: coroutine */
-		    lua_State *co = lua_tothread(L, ARG_LAST+4);
+		    lua_State *co = lua_tothread(L, ARG_LAST+3);
 
 		    lua_xmove(L, co, 4);
 		    lua_pop(L, 1);  /* pop coroutine */
@@ -823,13 +816,13 @@ levq_loop (lua_State *L)
 
 		    if (!event_deleted(ev)) {
 			evq_del(ev, 1);
-			levq_del_event(L, ARG_LAST+1, evq, ev);
+			levq_del_event(evq, ev);
 #ifdef EVQ_POST_INIT
 			evq->ev_post = NULL;
 #endif
 		    }
 		} else if (ev_flags & EVENT_CALLBACK_CORO) {
-		    lua_State *co = lua_tothread(L, ARG_LAST+4);
+		    lua_State *co = lua_tothread(L, ARG_LAST+3);
 
 		    lua_xmove(L, co, 7);
 		    lua_pop(L, 1);  /* pop coroutine */
@@ -839,7 +832,7 @@ levq_loop (lua_State *L)
 			lua_settop(co, 0);
 			if (!event_deleted(ev)) {
 			    evq_del(ev, 0);
-			    levq_del_event(L, ARG_LAST+1, evq, ev);
+			    levq_del_event(evq, ev);
 #ifdef EVQ_POST_INIT
 			    evq->ev_post = NULL;
 #endif
@@ -960,12 +953,8 @@ int
 sys_evq_sched_add (lua_State *L, const int evq_idx, const int type)
 {
     struct event_queue *evq = checkudata(L, evq_idx, EVQ_TYPENAME);
-    struct event *ev;
+    struct event *ev = levq_new_event(evq);
     lua_CFunction func;
-
-    lua_getfenv(L, evq_idx);  /* environ. of evq_udata */
-    ev = levq_new_event(L, -1, evq);
-    lua_pop(L, 1);
 
     switch (type) {
     case EVQ_SCHED_TIMER:
