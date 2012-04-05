@@ -296,13 +296,13 @@ levq_add (lua_State *L)
 
 /*
  * Arguments: evq_udata, callback (function), timeout (milliseconds),
- *	[object (any)]
+ *	[one_shot (boolean), object (any)]
  * Returns: [ev_ludata]
  */
 static int
 levq_add_timer (lua_State *L)
 {
-    lua_settop(L, 4);
+    lua_settop(L, 5);
     lua_insert(L, 2);  /* obj_udata */
     lua_pushinteger(L, EVENT_READ | EVENT_TIMER);  /* event_flags */
     lua_insert(L, 3);
@@ -310,8 +310,8 @@ levq_add_timer (lua_State *L)
 }
 
 /*
- * Arguments: evq_udata, pid_udata,
- *	callback (function), [timeout (milliseconds)]
+ * Arguments: evq_udata, pid_udata, callback (function),
+ *	[timeout (milliseconds)]
  * Returns: [ev_ludata]
  */
 static int
@@ -328,13 +328,14 @@ levq_add_pid (lua_State *L)
 }
 
 /*
- * Arguments: evq_udata, obj_udata, callback (function)
+ * Arguments: evq_udata, obj_udata, callback (function),
+ *	[timeout (milliseconds), one_shot (boolean)]
  * Returns: [ev_ludata]
  */
 static int
 levq_add_winmsg (lua_State *L)
 {
-    lua_settop(L, 3);
+    lua_settop(L, 5);
     lua_pushinteger(L, EVENT_READ | EVENT_WINMSG);  /* event_flags */
     lua_insert(L, 3);
     return levq_add(L);
@@ -342,15 +343,15 @@ levq_add_winmsg (lua_State *L)
 
 /*
  * Arguments: evq_udata, path (string), callback (function),
- *	[modify (boolean)]
+ *	[timeout (milliseconds), one_shot (boolean), modify (boolean)]
  * Returns: [ev_ludata]
  */
 static int
 levq_add_dirwatch (lua_State *L)
 {
-    unsigned int filter = lua_toboolean(L, 4) ? EVQ_DIRWATCH_MODIFY : 0;
+    unsigned int filter = lua_toboolean(L, 6) ? EVQ_DIRWATCH_MODIFY : 0;
 
-    lua_settop(L, 3);
+    lua_settop(L, 5);
     lua_pushinteger(L, EVENT_READ | EVENT_DIRWATCH
      | (filter << EVENT_EOF_SHIFT_RES));  /* event_flags */
     lua_insert(L, 3);
@@ -798,9 +799,11 @@ levq_loop (lua_State *L)
 			lua_pushnil(L);
 		}
 
+		if ((ev_flags & EVENT_ONESHOT) && !event_deleted(ev))
+		    evq_del(ev, 1);
+
 		if (event_deleted(ev))
-		    /* deletion of oneshot event */
-		    levq_del_event(evq, ev);
+		    levq_del_event(evq, ev);  /* deletion of oneshot event */
 #ifdef EVQ_POST_INIT
 		else evq->ev_post = ev;
 #endif
@@ -813,14 +816,6 @@ levq_loop (lua_State *L)
 		    lua_pop(L, 1);  /* pop coroutine */
 
 		    sys_sched_event_ready(co, ev);
-
-		    if (!event_deleted(ev)) {
-			evq_del(ev, 1);
-			levq_del_event(evq, ev);
-#ifdef EVQ_POST_INIT
-			evq->ev_post = NULL;
-#endif
-		    }
 		} else if (ev_flags & EVENT_CALLBACK_CORO) {
 		    lua_State *co = lua_tothread(L, ARG_LAST+3);
 

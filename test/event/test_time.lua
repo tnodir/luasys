@@ -34,7 +34,7 @@ local function time_cb(evq, evid, idx)
 	    elseif evid then
 		evq:timeout(evid, msec)
 	    else
-		timers[j] = evq:add_timer(time_cb, msec, j)
+		timers[j] = evq:add_timer(time_cb, msec, nil, j)
 	    end
 	end
     end
@@ -44,7 +44,7 @@ do
     local evq = assert(sys.event_queue())
 
     for i = 1, NEVENT do
-	timers[i] = evq:add_timer(time_cb, rand_int(50) - 1, i)
+	timers[i] = evq:add_timer(time_cb, rand_int(50) - 1, nil, i)
     end
 
     evq:loop()

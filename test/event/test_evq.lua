@@ -3,6 +3,27 @@
 local sys = require("sys")
 
 
+print"-- Directory Watch"
+do
+    local evq = assert(sys.event_queue())
+
+    local filename = "test.txt"
+    local fd = sys.handle()
+
+    local function on_change(evq, evid, path, _, _, T)
+	fd:close()
+	sys.remove(filename)
+	assert(not T, "file change notification expected")
+    end
+
+    assert(evq:add_dirwatch(".", on_change, 100, true))
+    assert(fd:create(filename))
+
+    evq:loop()
+    print"OK"
+end
+
+
 print"-- Coroutines"
 do
     local evq = assert(sys.event_queue())
@@ -41,13 +62,14 @@ do
 	    assert(evq:ignore_signal("INT", false))
 	    print"SIGINT enabled. Please, press Ctrl-C..."
 	else
+	    assert(evq:del(evid))
 	    print"Thanks!"
 	end
     end
 
     local evq = assert(sys.event_queue())
 
-    assert(evq:add_signal("INT", on_signal, 3000, true))
+    assert(evq:add_signal("INT", on_signal, 3000))
     assert(evq:ignore_signal("INT", true))
 
     evq:loop(30000)
