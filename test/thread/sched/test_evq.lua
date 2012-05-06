@@ -31,9 +31,8 @@ do
 	local timeout = 100
 
 	local function yield_timeout()
-		local _, _, T = sched:wait_timer(evq, timeout)
-		assert(T == timeout,
-			timeout .. " msec expected, got " .. tostring(T))
+		local ev = sched:wait_timer(evq, timeout)
+		assert(ev == 't', timeout .. " msec timeout expected")
 	end
 
 	assert(sched:put(yield_timeout))
@@ -45,8 +44,8 @@ do
 	local msg = "test"
 
 	local function on_read(fd)
-		local R, W, T, EOF = sched:wait_socket(evq, fd, "r")
-		assert(R)
+		local ev = sched:wait_socket(evq, fd, "r")
+		assert(ev == 'r')
 		local s = assert(fd:read())
 		assert(s == msg, msg .. " expected, got " .. tostring(s))
 	end

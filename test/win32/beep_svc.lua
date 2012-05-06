@@ -68,8 +68,8 @@ if USE_FOREVER_LOOP then
 	end
 else
 	-- Event Queue
-	local function on_event(evq, evid, svc, _, _, timeout)
-		if timeout then
+	local function on_event(evq, evid, svc, ev)
+		if ev == 't' then
 			win32.beep()
 		else
 			local res = svc:status()

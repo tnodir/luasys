@@ -9,19 +9,13 @@ local TIMEOUT = 2000  -- milliseconds
 local sd0, sd1 = sock.handle(), sock.handle()
 assert(sd0:socket(sd1))
 
-local function ev_cb(evq, evid, fd, R, W, T, EOF)
-    print(fd, R and "Read" or "", W and "Write" or "",
-	T and "Timeout" or "", EOF and "EOF" or "")
-
-    if R then
+local function ev_cb(evq, evid, fd, ev)
+    if ev == 'r' then
 	local line = fd:recv()
 	sys.stdout:write("Output:\t", line)
-    end
-    if W then
+    elseif ev == 'w' then
 	sys.stdout:write"Input:\t"
-	local line = sys.stdin:read()
-
-	fd:send(line)
+	fd:send(sys.stdin:read())
     end
     evq:del(evid)
     fd:close()

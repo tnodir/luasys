@@ -234,12 +234,12 @@ do
     end
 
     -- Process requests
-    process = function(evq, evid, fd, R, W, T, EOF)
+    process = function(evq, evid, fd, _, eof)
 	local chan = channels[fd]
 	local buffer_in = chan.buffer_in
 	local status
 
-	if not EOF and fd:read(buffer_in) then
+	if not eof and fd:read(buffer_in) then
 	    local request_id = fcgi_decode(buffer_in, chan)
 
 	    while request_id do

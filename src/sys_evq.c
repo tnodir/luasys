@@ -208,7 +208,7 @@ levq_del_event (struct event_queue *evq, struct event *ev)
 /*
  * Arguments: evq_udata,
  *	obj_udata | signal (number),
- *	events (string: "r", "w", "rw") | event_flags (number),
+ *	events (string: "r", "w") | event_flags (number),
  *	callback (function | coroutine),
  *	[timeout (milliseconds), one_shot (boolean)]
  * Returns: [ev_ludata]
@@ -238,9 +238,8 @@ levq_add (lua_State *L)
     if (!(ev_flags & (EVENT_READ | EVENT_WRITE))) {
 	const char *evstr = lua_tostring(L, 3);
 
-	ev_flags |= !evstr ? EVENT_READ
-	 : (evstr[0] == 'r') ? EVENT_READ
-	 | (evstr[1] ? EVENT_WRITE : 0) : EVENT_WRITE;
+	ev_flags |= (!evstr || evstr[0] == 'r')
+	 ? EVENT_READ : EVENT_WRITE;
     }
 
     switch (lua_type(L, 4)) {
@@ -414,7 +413,7 @@ levq_signal (lua_State *L)
 
 /*
  * Arguments: evq_udata, sd_udata,
- *	events (string: "r", "w", "rw", "accept", "connect"),
+ *	events (string: "r", "w", "accept", "connect"),
  *	callback (function), [timeout (milliseconds), one_shot (boolean)]
  * Returns: [ev_ludata]
  */
@@ -433,13 +432,10 @@ levq_add_socket (lua_State *L)
 	    ev_flags |= EVENT_SOCKET_ACC_CONN | EVENT_WRITE | EVENT_ONESHOT;
 	    break;
 	default:
-	    goto parse_rw;
+	    ev_flags |= (evstr[0] == 'r') ? EVENT_READ : EVENT_WRITE;
 	}
     } else {
- parse_rw:
-	ev_flags |= !evstr ? EVENT_READ
-	 : (evstr[0] == 'r') ? EVENT_READ
-	 | (evstr[1] ? EVENT_WRITE : 0) : EVENT_WRITE;
+	ev_flags |= EVENT_READ;
     }
     lua_settop(L, 6);
     lua_pushinteger(L, ev_flags);  /* event_flags */
@@ -448,7 +444,7 @@ levq_add_socket (lua_State *L)
 }
 
 /*
- * Arguments: evq_udata, ev_ludata, events (string: [-+] "r", "w", "rw")
+ * Arguments: evq_udata, ev_ludata, events (string: "r", "w")
  * Returns: [evq_udata]
  */
 static int
@@ -456,32 +452,15 @@ levq_mod_socket (lua_State *L)
 {
     struct event *ev = levq_toevent(L, 2);
     const char *evstr = luaL_checkstring(L, 3);
-    int change, flags;
+    const unsigned int rw_flags = (evstr[0] == 'r')
+     ? EVENT_READ : EVENT_WRITE;
 
-    lua_assert(ev && !event_deleted(ev) && (ev->flags & EVENT_SOCKET));
+    lua_assert(ev && !event_deleted(ev) && (ev->flags & EVENT_SOCKET)
+     && rw_flags != (ev->flags & (EVENT_READ | EVENT_WRITE)));
 
-    change = 0;
-    flags = ev->flags & (EVENT_READ | EVENT_WRITE);
-    for (; *evstr; ++evstr) {
-	if (*evstr == '+' || *evstr == '-')
-	    change = (*evstr == '+') ? 1 : -1;
-	else {
-	    int rw = (*evstr == 'r') ? EVENT_READ : EVENT_WRITE;
-	    switch (change) {
-	    case 0:
-		change = 1;
-		flags &= ~(EVENT_READ | EVENT_WRITE);
-	    case 1:
-		flags |= rw;
-		break;
-	    default:
-		flags &= ~rw;
-	    }
-	}
-    }
-    if (!evq_modify(ev, flags)) {
+    if (!evq_modify(ev, rw_flags)) {
 	ev->flags &= ~(EVENT_READ | EVENT_WRITE);
-	ev->flags |= flags;
+	ev->flags |= rw_flags;
 	lua_settop(L, 1);
 	return 1;
     }
@@ -704,8 +683,8 @@ levq_sync (lua_State *L)
  *	fetch (boolean)]
  * Returns: [evq_udata | timeout (false)]
  *	|
- * Returns: [ev_ludata, obj_udata, read (boolean), write (boolean),
- *	timeout (number), eof_status (number)]
+ * Returns: [ev_ludata, obj_udata, event (string: "r", "w", "t", "e"),
+ *	eof_status (number)]
  */
 static int
 levq_loop (lua_State *L)
@@ -786,17 +765,16 @@ levq_loop (lua_State *L)
 			lua_pushlightuserdata(L, ev);  /* ev_ludata */
 			lua_rawgeti(L, ARG_LAST+2, ev_id);  /* obj_udata */
 		    }
-		    lua_pushboolean(L, ev_flags & EVENT_READ_RES);
-		    lua_pushboolean(L, ev_flags & EVENT_WRITE_RES);
-		    if (ev_flags & EVENT_TIMEOUT_RES)
-			lua_pushnumber(L, ev->tq->msec);
-		    else
-			lua_pushnil(L);
-		    if (ev_flags & EVENT_EOF_MASK_RES)
+		    if (ev_flags & EVENT_EOF_MASK_RES) {
+			lua_pushliteral(L, "e");
 			lua_pushinteger(L,
 			 (int) ev_flags >> EVENT_EOF_SHIFT_RES);
-		    else
+		    } else {
+			lua_pushstring(L,
+			 (ev_flags & EVENT_TIMEOUT_RES) ? "t"
+			 : (ev_flags & EVENT_WRITE_RES) ? "w" : "r");
 			lua_pushnil(L);
+		    }
 		}
 
 		if ((ev_flags & EVENT_ONESHOT) && !event_deleted(ev))
@@ -812,17 +790,17 @@ levq_loop (lua_State *L)
 		    /* callback function: coroutine */
 		    lua_State *co = lua_tothread(L, ARG_LAST+3);
 
-		    lua_xmove(L, co, 4);
+		    lua_xmove(L, co, 2);
 		    lua_pop(L, 1);  /* pop coroutine */
 
 		    sys_sched_event_ready(co, ev);
 		} else if (ev_flags & EVENT_CALLBACK_CORO) {
 		    lua_State *co = lua_tothread(L, ARG_LAST+3);
 
-		    lua_xmove(L, co, 7);
+		    lua_xmove(L, co, 5);
 		    lua_pop(L, 1);  /* pop coroutine */
 
-		    switch (lua_resume(co, L, 7)) {
+		    switch (lua_resume(co, L, 5)) {
 		    case 0:
 			lua_settop(co, 0);
 			if (!event_deleted(ev)) {
@@ -841,9 +819,9 @@ levq_loop (lua_State *L)
 			lua_error(L);
 		    }
 		} else if (ev_flags & EVENT_CALLBACK)
-		    lua_call(L, 7, 0);
+		    lua_call(L, 5, 0);
 		else if (fetch)
-		    return 6;
+		    return 4;
 
 #ifdef EVQ_POST_INIT
 		if (evq->ev_post) {

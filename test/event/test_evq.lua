@@ -10,10 +10,10 @@ do
     local filename = "test.txt"
     local fd = sys.handle()
 
-    local function on_change(evq, evid, path, _, _, T)
+    local function on_change(evq, evid, path, ev)
 	fd:close()
 	sys.remove(filename)
-	assert(not T, "file change notification expected")
+	assert(ev ~= 't', "file change notification expected")
     end
 
     assert(evq:add_dirwatch(".", on_change, 100, true))
@@ -56,8 +56,8 @@ end
 
 print"-- Signal: wait SIGINT"
 do
-    local function on_signal(evq, evid, _, _, _, timeout)
-	if timeout then
+    local function on_signal(evq, evid, _, ev)
+	if ev == 't' then
 	    assert(evq:timeout(evid))
 	    assert(evq:ignore_signal("INT", false))
 	    print"SIGINT enabled. Please, press Ctrl-C..."

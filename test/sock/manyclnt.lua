@@ -12,9 +12,9 @@ local stdin, stdout, stderr = sys.stdin, sys.stdout, sys.stderr
 
 local askt, iskt = {}, 0
 
-local function ev_cb(evq, evid, fd, R)
+local function ev_cb(evq, evid, fd, ev)
     local s = tostring(fd)
-    if not R then
+    if ev ~= 'r' then
 	assert(fd:write(s))
 	assert(evq:mod_socket(evid, 'r'))
     else
@@ -26,7 +26,7 @@ local function ev_cb(evq, evid, fd, R)
 	end
 	if line ~= s then
 	    error("got: " .. tostring(line)
-		.. " expected: " .. s)
+		.. ", expected: " .. s)
 	end
 
 	iskt = iskt + 1

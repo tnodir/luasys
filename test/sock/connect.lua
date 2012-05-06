@@ -18,8 +18,8 @@ local res, err = fd:connect(sock.addr():inet(port, addr))
 if res == nil then error(err) end
 
 if not res then
-    local function on_connect(evq, evid, fd, R, W, timeout)
-	if timeout then error"Timeout" end
+    local function on_connect(evq, evid, fd, ev)
+	if ev == 't' then error"Timeout" end
 
 	local errno = fd:sockopt("error")
 	if errno ~= 0 then

@@ -589,8 +589,7 @@ sched_resume (lua_State *L)
 
 /*
  * Arguments: sched_udata, evq_udata, arguments ...
- * Returns: [read (boolean), write (boolean),
- *	timeout (number), eof_status (number)]
+ * Returns: [event (string: "r", "w", "t", "e"), eof_status (number)]
  */
 static int
 sched_event_add (lua_State *L, const int cb_idx, const int type)
@@ -630,7 +629,7 @@ sched_event_add (lua_State *L, const int cb_idx, const int type)
 
 /*
  * Arguments: sched_udata, evq_udata, obj_udata,
- *	events (string: "r", "w", "rw"),
+ *	events (string: "r", "w"),
  *	[timeout (milliseconds)]
  */
 static int
@@ -685,7 +684,7 @@ sched_wait_signal (lua_State *L)
 
 /*
  * Arguments: sched_udata, evq_udata, sd_udata,
- *	events (string: "r", "w", "rw", "accept", "connect"),
+ *	events (string: "r", "w", "accept", "connect"),
  *	[timeout (milliseconds)]
  */
 static int

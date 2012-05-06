@@ -35,10 +35,10 @@ do
 		fdo:close()
 	end
 
-	local function on_child(evq, evid, pid, _, _, timeout, err)
+	local function on_child(evq, evid, pid, ev, err)
 		evq:del(timer_id)
-		if timeout then
-			print("Timeout:", timeout)
+		if ev == 't' then
+			print("Timeout")
 			if not pid:kill() then
 				print("Kill:", SYS_ERR)
 			end

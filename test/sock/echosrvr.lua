@@ -66,7 +66,7 @@ do
     end
 end
 
-local function process(evq, evid, fd, _, _, _, eof)
+local function process(evq, evid, fd, _, eof)
     local line
     if not eof then
 	line = fd:read()

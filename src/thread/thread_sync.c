@@ -125,7 +125,7 @@ thread_cond_wait_nolock (thread_cond_t *condp, thread_critsect_t *csp,
                          const msec_t timeout)
 {
 #if !defined(_WIN32)
-    int res = 0;
+    int res;
 
     if (timeout == TIMEOUT_INFINITE) {
 	res = pthread_cond_wait(condp, csp);
