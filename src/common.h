@@ -163,9 +163,9 @@ int sys_seterror (lua_State *L, int err);
 typedef int	msec_t;
 
 #ifdef _WIN32
-#define get_milliseconds	timeGetTime
+#define sys_milliseconds	timeGetTime
 #else
-msec_t get_milliseconds (void);
+msec_t sys_milliseconds (void);
 #endif
 
 #define TIMEOUT_INFINITE	((msec_t) -1)

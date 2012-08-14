@@ -10,6 +10,10 @@
 #else
 #define SYS_MONOTONIC_CLOCKID CLOCK_MONOTONIC
 #endif
+#elif defined(__APPLE__) && defined(__MACH__)
+#define SYS_MONOTONIC_MACH
+#include <mach/mach.h>
+#include <mach/mach_time.h>
 #endif
 
 #else
@@ -25,13 +29,28 @@ struct period {
 
 
 #ifndef _WIN32
-msec_t
-get_milliseconds (void)
+#ifdef SYS_MONOTONIC_MACH
+static uint64_t
+sys_absolutetonanos (uint64_t elapsed)
 {
-#ifdef SYS_MONOTONIC_CLOCKID
+    static mach_timebase_info_data_t timebase;
+
+    if (timebase.denom == 0) {
+	(void) mach_timebase_info(&timebase);
+    }
+    return elapsed * timebase.numer / timebase.denom;
+}
+#endif
+
+msec_t
+sys_milliseconds (void)
+{
+#if defined(SYS_MONOTONIC_CLOCKID)
     struct timespec ts;
     clock_gettime(SYS_MONOTONIC_CLOCKID, &ts);
     return (ts.tv_sec * 1000 + ts.tv_nsec / 1000000L);
+#elif defined(SYS_MONOTONIC_MACH)
+    return sys_absolutetonanos(mach_absolute_time()) / 1000000L;
 #else
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -46,7 +65,7 @@ get_milliseconds (void)
 static int
 sys_msec (lua_State *L)
 {
-    lua_pushnumber(L, get_milliseconds());
+    lua_pushnumber(L, sys_milliseconds());
     return 1;
 }
 
@@ -196,6 +215,8 @@ sys_period (lua_State *L)
 #ifndef _WIN32
 #ifdef SYS_MONOTONIC_CLOCKID
     lua_newuserdata(L, sizeof(struct timespec));
+#elif defined(SYS_MONOTONIC_MACH)
+    lua_newuserdata(L, sizeof(uint64_t));
 #else
     lua_newuserdata(L, sizeof(struct timeval));
 #endif
@@ -221,8 +242,10 @@ period_start (lua_State *L)
     void *p = checkudata(L, 1, PERIOD_TYPENAME);
 
 #ifndef _WIN32
-#ifdef SYS_MONOTONIC_CLOCKID
+#if defined(SYS_MONOTONIC_CLOCKID)
     clock_gettime(SYS_MONOTONIC_CLOCKID, p);
+#elif defined(SYS_MONOTONIC_MACH)
+    *((uint64_t *) p) = mach_absolute_time();
 #else
     gettimeofday(p, NULL);
 #endif
@@ -242,7 +265,7 @@ period_get (lua_State *L)
     lua_Number usec;
 
 #ifndef _WIN32
-#ifdef SYS_MONOTONIC_CLOCKID
+#if defined(SYS_MONOTONIC_CLOCKID)
     struct timespec te, *ts = checkudata(L, 1, PERIOD_TYPENAME);
 
     clock_gettime(SYS_MONOTONIC_CLOCKID, &te);
@@ -254,6 +277,11 @@ period_get (lua_State *L)
 	te.tv_nsec += 1000000000L;
     }
     usec = (lua_Number) (te.tv_sec * 1000000000L + te.tv_nsec) / 1000;
+#elif defined(SYS_MONOTONIC_MACH)
+    const uint64_t *ts = checkudata(L, 1, PERIOD_TYPENAME);
+    const uint64_t elapsed = (int64_t) mach_absolute_time() - (int64_t) *ts;
+
+    usec = sys_absolutetonanos(elapsed) / 1000;
 #else
     struct timeval te, *ts = checkudata(L, 1, PERIOD_TYPENAME);
 

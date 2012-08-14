@@ -28,7 +28,7 @@ evq_init (struct event_queue *evq)
 	    goto err;
     }
 
-    evq->now = get_milliseconds();
+    evq->now = sys_milliseconds();
     return 0;
  err:
     evq_done(evq);
@@ -219,7 +219,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     sys_vm_enter();
 
     evq->nchanges = 0;
-    evq->now = get_milliseconds();
+    evq->now = sys_milliseconds();
 
     if (nready == -1)
 	return (errno == EINTR) ? 0 : EVQ_FAILED;

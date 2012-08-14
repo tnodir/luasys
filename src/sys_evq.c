@@ -865,7 +865,7 @@ levq_now (lua_State *L)
     const int reset = lua_toboolean(L, 2);
 
     if (reset)
-	evq->now = get_milliseconds();
+	evq->now = sys_milliseconds();
     lua_pushnumber(L, evq->now);
     return 1;
 }

@@ -31,7 +31,7 @@ evq_init (struct event_queue *evq)
 	evq->iocp.h = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
     }
 
-    evq->now = get_milliseconds();
+    evq->now = sys_milliseconds();
     return 0;
 }
 
@@ -275,7 +275,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
      (evq->win_msg ? QS_ALLEVENTS : 0));
     sys_vm_enter();
 
-    evq->now = get_milliseconds();
+    evq->now = sys_milliseconds();
 
     ev_ready = evq->ev_ready;
 

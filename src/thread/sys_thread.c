@@ -262,7 +262,7 @@ sys_thread_switch (const int check_thread)
 
     if (td) sys_vm2_leave(td);
 #ifndef _WIN32
-    pthread_yield();
+    sched_yield();
 #else
     SwitchToThread();
 #endif
@@ -673,7 +673,7 @@ thread_start (struct sys_thread *td)
 }
 
 static int
-thread_create (struct sys_thread *td, const int is_affin)
+sys_thread_create (struct sys_thread *td, const int is_affin)
 {
 #ifndef _WIN32
     pthread_attr_t attr;
@@ -805,7 +805,7 @@ thread_runvm (lua_State *L)
 	}
     }
 
-    if (!thread_create(td, is_affin)) {
+    if (!sys_thread_create(td, is_affin)) {
 	faketd->tid = td->tid;
 	lua_settop(L, 1);
 	return 1;
@@ -839,7 +839,7 @@ thread_run (lua_State *L)
 	lua_xmove(L, td->L, n);
     }
 
-    if (!thread_create(td, 0)) {
+    if (!sys_thread_create(td, 0)) {
 	return 1;
     }
     sys_thread_del(td);
@@ -902,7 +902,7 @@ thread_sleep (lua_State *L)
 }
 
 static int
-thread_switch (lua_State *L)
+thread_switch_wrap (lua_State *L)
 {
     (void) L;
 
@@ -930,7 +930,7 @@ thread_yield (lua_State *L)
  * Returns: [boolean]
  */
 static int
-thread_suspend (lua_State *L)
+thread_suspend_wrap (lua_State *L)
 {
     struct sys_thread *td = sys_thread_get();
     const msec_t timeout = lua_isnoneornil(L, 1)
@@ -952,7 +952,7 @@ thread_suspend (lua_State *L)
  * Arguments: thread_udata
  */
 static int
-thread_resume (lua_State *L)
+thread_resume_wrap (lua_State *L)
 {
     struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
 
@@ -1105,7 +1105,7 @@ thread_tostring (lua_State *L)
 
 
 static luaL_Reg thread_meth[] = {
-    {"resume",		thread_resume},
+    {"resume",		thread_resume_wrap},
     {"interrupted",	thread_interrupted},
     {"interrupt",	thread_set_interrupt},
     {"terminate",	thread_set_terminate},
@@ -1121,9 +1121,9 @@ static luaL_Reg thread_lib[] = {
     {"run",		thread_run},
     {"self",		thread_self},
     {"sleep",		thread_sleep},
-    {"switch",		thread_switch},
+    {"switch",		thread_switch_wrap},
     {"yield",		thread_yield},
-    {"suspend",		thread_suspend},
+    {"suspend",		thread_suspend_wrap},
     {"interrupt_error",	thread_interrupt_error},
     AFFIN_METHODS,
     DPOOL_METHODS,

@@ -124,7 +124,7 @@ win32iocp_process (struct event_queue *evq, struct event *ev_ready, msec_t now)
 	    evq_del(ev, 1);
 	else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL)) {
 	    if (now == 0L) {
-		now = evq->now = get_milliseconds();
+		now = evq->now = sys_milliseconds();
 	    }
 	    timeout_reset(ev, now);
 	}
