@@ -51,7 +51,7 @@ reg_mode2sam (lua_State *L, int idx)
     const char *mode = lua_tostring(L, idx);
     if (mode) {
 	if (mode[0] == 'w') return KEY_WRITE;
-	if (mode[1] == 'w') return KEY_ALL_ACCESS;
+	if (mode[0] == 'r' && mode[1] == 'w') return KEY_ALL_ACCESS;
     }
     return KEY_READ;
 }
@@ -166,7 +166,8 @@ static int
 reg_keys (lua_State *L)
 {
     if (lua_gettop(L) == 1) {  /* `for' start? */
-	/* return generator (this function), state (reg_udata), */
+	lua_pushcfunction(L, reg_keys);  /* return generator, */
+	lua_pushvalue(L, 1);  /* state (reg_udata), */
 	lua_pushinteger(L, 0);  /* and initial value */
 	return 3;
     } else {  /* `for' step */
