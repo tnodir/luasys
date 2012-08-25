@@ -57,7 +57,7 @@ sys_strerror (lua_State *L)
 	    return 1;
 	}
     }
-    lua_pushfstring(L, "System error %i", err);
+    lua_pushfstring(L, "System error %d", err);
 #endif
     return 1;
 }
