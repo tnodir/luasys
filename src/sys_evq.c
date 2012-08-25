@@ -28,6 +28,7 @@ struct evq_sync_op {
 #define EVQ_CORO_ENV		1  /* environ. */
 #define EVQ_CORO_CALLBACK	2  /* table: callback functions */
 #define EVQ_CORO_UDATA		3  /* table: event objects */
+#define EVQ_CORO_ONIDLE		4  /* function: on idle callback */
 
 #define levq_toevent(L,i) \
 	(lua_type(L, (i)) == LUA_TLIGHTUSERDATA \
@@ -100,6 +101,7 @@ levq_new (lua_State *L)
 	lua_newtable(L);  /* {ev_id => cb_func} (EVQ_CORO_CALLBACK) */
 	lua_newtable(L);  /* {ev_id => obj_udata} (EVQ_CORO_UDATA) */
 	lua_xmove(L, NL, 3);
+	lua_pushnil(NL);  /* on_idle function */
 	return 1;
     }
     return sys_seterror(L, 0);
@@ -694,6 +696,7 @@ levq_loop (lua_State *L)
      ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
     const int once = lua_toboolean(L, 3);
     const int fetch = lua_toboolean(L, 4);
+    int is_onidle;
 
 #undef ARG_LAST
 #define ARG_LAST	1
@@ -704,7 +707,10 @@ levq_loop (lua_State *L)
 
 	lua_pushvalue(NL, EVQ_CORO_CALLBACK);
 	lua_pushvalue(NL, EVQ_CORO_UDATA);
-	lua_xmove(NL, L, 2);
+	lua_pushvalue(NL, EVQ_CORO_ONIDLE);
+	lua_xmove(NL, L, 3);
+
+	is_onidle = lua_isfunction(L, ARG_LAST+3);
     }
 
 #ifdef EVQ_POST_INIT
@@ -728,6 +734,11 @@ levq_loop (lua_State *L)
 
 	    evq->sync_op = NULL;
 	    levq_sync_process(L, evq, op);
+	}
+
+	if (is_onidle) {
+	    lua_pushvalue(L, ARG_LAST+3);
+	    lua_call(L, 0, 0);
 	}
 
 	if (!evq->ev_ready) {
@@ -788,14 +799,14 @@ levq_loop (lua_State *L)
 
 		if (ev_flags & EVENT_CALLBACK_SCHED) {
 		    /* callback function: coroutine */
-		    lua_State *co = lua_tothread(L, ARG_LAST+3);
+		    lua_State *co = lua_tothread(L, ARG_LAST+4);
 
 		    lua_xmove(L, co, 2);
 		    lua_pop(L, 1);  /* pop coroutine */
 
 		    sys_sched_event_ready(co, ev);
 		} else if (ev_flags & EVENT_CALLBACK_CORO) {
-		    lua_State *co = lua_tothread(L, ARG_LAST+3);
+		    lua_State *co = lua_tothread(L, ARG_LAST+4);
 
 		    lua_xmove(L, co, 5);
 		    lua_pop(L, 1);  /* pop coroutine */
@@ -851,6 +862,20 @@ levq_stop (lua_State *L)
 
     evq->stop = state;
     evq_signal(evq, EVQ_SIGEVQ);
+    return 0;
+}
+
+/*
+ * Arguments: evq_udata, [on_idle (function)]
+ */
+static int
+levq_onidle (lua_State *L)
+{
+    struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
+
+    lua_settop(L, 2);
+    lua_xmove(L, evq->L, 1);
+    lua_replace(evq->L, EVQ_CORO_ONIDLE);
     return 0;
 }
 
@@ -1006,6 +1031,7 @@ static luaL_Reg evq_meth[] = {
     {"sync",		levq_sync},
     {"loop",		levq_loop},
     {"stop",		levq_stop},
+    {"on_idle",		levq_onidle},
     {"now",		levq_now},
     {"notify",		levq_notify},
     {"size",		levq_size},
