@@ -28,7 +28,7 @@ static PPdhCollectQueryData pPdhCollectQueryData;
 static PPdhGetFormattedCounterValue pPdhGetFormattedCounterValue;
 
 
-int
+static int
 getloadavg (double *loadavg)
 {
     PDH_VALUE value;
