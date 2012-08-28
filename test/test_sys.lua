@@ -110,3 +110,18 @@ do
 end
 
 
+print"-- sys.loadavg"
+do
+    local nprocs = sys.nprocs()
+    for i = 1, 5 do
+	local loadavg, is_per_cpu = assert(sys.loadavg())
+	if is_per_cpu then
+	    loadavg = loadavg / nprocs
+	end
+	print("loadavg:", loadavg)
+	sys.thread.sleep(100)
+    end
+    print("OK")
+end
+
+

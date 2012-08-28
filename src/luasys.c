@@ -14,6 +14,10 @@
 
 #define SYS_FILE_PERMISSIONS	0644  /* default file permissions */
 
+#else
+
+#include "win32/getloadavg.c"
+
 #endif
 
 
@@ -112,6 +116,31 @@ sys_nprocs (lua_State *L)
 }
 
 /*
+ * Returns: processors_load_average (number), is_per_cpu (boolean)
+ */
+static int
+sys_loadavg (lua_State *L)
+{
+    double loadavg;
+#ifndef _WIN32
+    const int res = 0;
+
+    if (getloadavg(&loadavg, 1) == 1) {
+	const int is_per_cpu = 1;
+#else
+    const int res = getloadavg(&loadavg);
+
+    if (!res) {
+	const int is_per_cpu = 0;
+#endif
+	lua_pushnumber(L, (lua_Number) loadavg);
+	lua_pushboolean(L, is_per_cpu);
+	return 2;
+    }
+    return sys_seterror(L, res);
+}
+
+/*
  * Arguments: [number_of_files (number)]
  * Returns: number_of_files (number)
  */
@@ -202,6 +231,7 @@ sys_xpcall (lua_State *L)
 static luaL_Reg sys_lib[] = {
     {"strerror",	sys_strerror},
     {"nprocs",		sys_nprocs},
+    {"loadavg",		sys_loadavg},
     {"limit_nfiles",	sys_limit_nfiles},
     {"toint",		sys_toint},
     {"xpcall",		sys_xpcall},
