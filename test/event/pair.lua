@@ -26,4 +26,4 @@ local evq = assert(sys.event_queue())
 evq:add_socket(sd0, 'r', ev_cb, TIMEOUT)
 evq:add_socket(sd1, 'w', ev_cb, TIMEOUT)
 
-evq:loop()
+evq:loop(nil, true)

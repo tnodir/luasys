@@ -46,7 +46,7 @@ local function run_once(evq)
 	events[i], events_idx[evid] = evid, i
     end
 
-    evq:loop(0, true)
+    evq:loop(0, true, true)
 
     fired = 0
     local space = math.floor(num_pipes / num_active)
@@ -62,7 +62,7 @@ local function run_once(evq)
     local xcount = 0
     period:start()
     repeat
-	evq:loop(0, true)
+	evq:loop(0, true, true)
 	xcount = xcount + 1
     until (count == fired)
     local res = period:get()

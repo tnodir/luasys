@@ -259,7 +259,8 @@ sched_vm_switch (struct sched_context *sched_ctx, const int enter_vm)
 }
 
 /*
- * Arguments: sched_udata, [timeout (milliseconds), once (boolean)]
+ * Arguments: sched_udata, [timeout (milliseconds),
+ *	stop_on_empty (boolean), once (boolean)]
  * Returns: [sched_udata | timedout (false)]
  */
 static int
@@ -269,7 +270,8 @@ sched_loop (lua_State *L)
     struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
     const msec_t timeout = lua_isnoneornil(L, 2)
      ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
-    const int once = lua_toboolean(L, 3);
+    const int stop_on_empty = lua_toboolean(L, 3);
+    const int once = lua_toboolean(L, 4);
     thread_critsect_t *csp = &sched->cs;
     struct sched_context sched_ctx;
 
@@ -303,6 +305,8 @@ sched_loop (lua_State *L)
 	}
 
 	if (task_id == -1) {
+	    if (stop_on_empty) break;
+
 	    sched->nwaiters++;
 	    res = thread_cond_wait_vm(&sched->cond, td, timeout);
 	    sched->nwaiters--;

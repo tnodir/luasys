@@ -19,7 +19,7 @@ do
     assert(evq:add_dirwatch(".", on_change, 100, true))
     assert(fd:create(filename))
 
-    evq:loop()
+    evq:loop(nil, true)
     print"OK"
 end
 
@@ -49,7 +49,7 @@ do
 	assert(coroutine.resume(co, co, i))
     end
 
-    evq:loop()
+    evq:loop(nil, true)
     print"OK"
 end
 
@@ -72,7 +72,7 @@ do
     assert(evq:add_signal("INT", on_signal, 3000))
     assert(evq:ignore_signal("INT", true))
 
-    evq:loop(30000)
+    evq:loop(30000, true)
     print"OK"
 end
 

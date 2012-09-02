@@ -34,6 +34,6 @@ pipe3 = create_socketpair()
 
 pipe1[2]:write("e")
 
-evq:loop()
+evq:loop(nil, true)
 
 print("OK")

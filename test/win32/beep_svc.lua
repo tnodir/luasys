@@ -87,7 +87,7 @@ else
 
 	local evq = assert(sys.event_queue())
 	evq:add(svc, 'r', on_event, TIMEOUT)
-	evq:loop()
+	evq:loop(nil, true)
 end
 
 svc:status"stopped"

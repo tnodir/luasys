@@ -681,8 +681,8 @@ levq_sync (lua_State *L)
 }
 
 /*
- * Arguments: evq_udata, [timeout (milliseconds), once (boolean),
- *	fetch (boolean)]
+ * Arguments: evq_udata, [timeout (milliseconds), stop_on_empty (boolean),
+ *	once (boolean), fetch (boolean)]
  * Returns: [evq_udata | timeout (false)]
  *	|
  * Returns: [ev_ludata, obj_udata, event (string: "r", "w", "t", "e"),
@@ -694,8 +694,9 @@ levq_loop (lua_State *L)
     struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
     const msec_t timeout = (lua_type(L, 2) != LUA_TNUMBER)
      ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
-    const int once = lua_toboolean(L, 3);
-    const int fetch = lua_toboolean(L, 4);
+    const int stop_on_empty = lua_toboolean(L, 3);
+    const int once = lua_toboolean(L, 4);
+    const int fetch = lua_toboolean(L, 5);
     int is_onidle;
 
 #undef ARG_LAST
@@ -720,7 +721,7 @@ levq_loop (lua_State *L)
     }
 #endif
 
-    while (!evq_is_empty(evq)) {
+    for (; ; ) {
 	struct event *ev;
 
 	if (evq->stop) {
@@ -736,14 +737,19 @@ levq_loop (lua_State *L)
 	    levq_sync_process(L, evq, op);
 	}
 
-	if (is_onidle) {
-	    lua_pushvalue(L, ARG_LAST+3);
-	    lua_call(L, 0, 0);
-	}
-
 	if (!evq->ev_ready) {
-	    const int res = evq_wait(evq, timeout);
+	    int res;
 
+	    /* call on_idle function */
+	    if (is_onidle) {
+		lua_pushvalue(L, ARG_LAST+3);
+		lua_call(L, 0, 0);
+	    }
+
+	    if (stop_on_empty && evq_is_empty(evq))
+		break;
+
+	    res = evq_wait(evq, timeout);
 	    if (res == EVQ_TIMEOUT) {
 		lua_pushboolean(L, 0);
 		return 1;

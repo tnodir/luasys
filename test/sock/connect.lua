@@ -31,7 +31,7 @@ if not res then
 
     assert(evq:add_socket(fd, "connect", on_connect, 5000))
 
-    evq:loop()
+    evq:loop(nil, true)
 end
 
 print("OK")

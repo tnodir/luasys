@@ -63,7 +63,7 @@ local function run_once(evq)
 
     local xcount = 0
     while true do
-	evq:loop(0)
+	evq:loop(0, true)
 	if fired < num_pipes then
 	    xcount = xcount + 1
 	else break end

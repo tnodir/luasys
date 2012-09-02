@@ -47,7 +47,7 @@ do
 	timers[i] = evq:add_timer(time_cb, rand_int(50) - 1, nil, i)
     end
 
-    evq:loop()
+    evq:loop(nil, true)
 
     print("called", called)
     return (called < NEVENT)

@@ -65,6 +65,6 @@ stdin:read()
 
 local start_time = sys.msec()
 
-evq:loop()
+evq:loop(nil, true)
 
 stdout:write("Sessions closed in ", sys.msec() - start_time, " msec\n")

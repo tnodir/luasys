@@ -62,7 +62,6 @@ end
 
 sched_stop = true
 
-assert(evq:add_signal("INT", evq.stop))
 assert(evq:loop())
 print("OK")
 

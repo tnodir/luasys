@@ -156,6 +156,3 @@ assert(evq:add_signal("INT", evq.stop))
 
 print("Loop...")
 evq:loop()
-
-sched:stop()
-

@@ -55,5 +55,5 @@ do
 	assert(evq:add_pid(pid, on_child, 1007))
 end
 
-evq:loop()
+evq:loop(nil, true)
 
