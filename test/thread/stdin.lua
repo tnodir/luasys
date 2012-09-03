@@ -65,4 +65,4 @@ do
     worker = assert(thread.run(start))
 end
 
-assert(evq:loop(nil, true))
+assert(evq:loop())

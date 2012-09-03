@@ -62,6 +62,6 @@ end
 
 sched_stop = true
 
-assert(evq:loop())
+assert(evq:loop(nil, true))
 print("OK")
 
