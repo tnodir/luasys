@@ -7,7 +7,7 @@ local thread = sys.thread
 
 thread.init()
 
-print"<Enter> to start..."
+print"<Enter> to start (You may set CPU affinity for process)..."
 sys.stdin:read()
 
 local COUNT = 1000000

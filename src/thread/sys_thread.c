@@ -728,7 +728,7 @@ sys_thread_create (struct sys_thread *td, const int is_affin)
 }
 
 /*
- * Arguments: [bind_cpu (number)], filename (string) | function_dump (string),
+ * Arguments: bind_cpu (number), filename (string) | function_dump (string),
  *	[arguments (string | number | boolean | ludata | share_object) ...]
  * Returns: [thread_udata]
  */
@@ -778,7 +778,11 @@ thread_runvm (lua_State *L)
 	for (i = ARG_LAST + 1; i <= top; ++i) {
 	    switch (lua_type(L, i)) {
 	    case LUA_TSTRING:
-		lua_pushstring(NL, lua_tostring(L, i));
+		{
+		    size_t len;
+		    const char *s = lua_tolstring(L, i, &len);
+		    lua_pushlstring(NL, s, len);
+		}
 		break;
 	    case LUA_TNUMBER:
 		lua_pushnumber(NL, lua_tonumber(L, i));
