@@ -378,76 +378,69 @@ sys_eintr (void)
 }
 
 
-#if LUA_VERSION_NUM < 502
+static const char *const stdlib_names[] = {
+    LUA_TABLIBNAME, LUA_IOLIBNAME, LUA_OSLIBNAME,
+    LUA_STRLIBNAME, LUA_MATHLIBNAME, LUA_DBLIBNAME,
+#if LUA_VERSION_NUM >= 502
+    LUA_COLIBNAME, LUA_BITLIBNAME,
+#endif
+    NULL
+};
+static const lua_CFunction stdlib_funcs[] = {
+    luaopen_table, luaopen_io, luaopen_os,
+    luaopen_string, luaopen_math, luaopen_debug,
+#if LUA_VERSION_NUM >= 502
+    luaopen_coroutine, luaopen_bit32
+#endif
+};
+
 static void
-thread_setfield (lua_State *L, const char *name, lua_CFunction f)
+thread_setfield (lua_State *L, const char *name, lua_CFunction func)
 {
-    lua_pushcfunction(L, f);
+    lua_pushcfunction(L, func);
     lua_setfield(L, -2, name);
 }
 
 static void
 thread_openlib (lua_State *L, const char *name, lua_CFunction func)
 {
+#if LUA_VERSION_NUM < 502
     lua_pushcfunction(L, func);
     lua_pushstring(L, name);
     lua_call(L, 1, 0);
+#else
+    luaL_requiref(L, name, func, 1);
+    lua_pop(L, 1);  /* remove lib */
+#endif
 }
 
 static void
-thread_openlibs (lua_State *L)
+thread_openlibs (lua_State *L, unsigned int loadlibs)
 {
+    const char *const *libnamep;
+    int i;
+
     thread_openlib(L, "_G", luaopen_base);
     thread_openlib(L, LUA_LOADLIBNAME, luaopen_package);
 
+#if LUA_VERSION_NUM < 502
     lua_getglobal(L, "package");
     lua_getfield(L, -1, "preload");
-    thread_setfield(L, LUA_TABLIBNAME, luaopen_table);
-    thread_setfield(L, LUA_IOLIBNAME, luaopen_io);
-    thread_setfield(L, LUA_OSLIBNAME, luaopen_os);
-    thread_setfield(L, LUA_STRLIBNAME, luaopen_string);
-    thread_setfield(L, LUA_MATHLIBNAME, luaopen_math);
-    thread_setfield(L, LUA_DBLIBNAME, luaopen_debug);
-    lua_pop(L, 2);
-}
+    lua_remove(L, -2);
 #else
-static const luaL_Reg loadedlibs[] = {
-    {"_G", luaopen_base},
-    {LUA_LOADLIBNAME, luaopen_package},
-    {NULL, NULL}
-};
-
-
-static const luaL_Reg preloadedlibs[] = {
-    {LUA_COLIBNAME, luaopen_coroutine},
-    {LUA_TABLIBNAME, luaopen_table},
-    {LUA_IOLIBNAME, luaopen_io},
-    {LUA_OSLIBNAME, luaopen_os},
-    {LUA_STRLIBNAME, luaopen_string},
-    {LUA_BITLIBNAME, luaopen_bit32},
-    {LUA_MATHLIBNAME, luaopen_math},
-    {LUA_DBLIBNAME, luaopen_debug},
-    {NULL, NULL}
-};
-
-static void
-thread_openlibs (lua_State *L)
-{
-    const luaL_Reg *lib;
-    /* call open functions from 'loadedlibs' and set results to global table */
-    for (lib = loadedlibs; lib->func; lib++) {
-	luaL_requiref(L, lib->name, lib->func, 1);
-	lua_pop(L, 1);  /* remove lib */
-    }
-    /* add open functions from 'preloadedlibs' into 'package.preload' table */
     luaL_getsubtable(L, LUA_REGISTRYINDEX, "_PRELOAD");
-    for (lib = preloadedlibs; lib->func; lib++) {
-	lua_pushcfunction(L, lib->func);
-	lua_setfield(L, -2, lib->name);
-    }
-    lua_pop(L, 1);  /* remove _PRELOAD table */
-}
 #endif
+    for (i = 0, libnamep = stdlib_names; *libnamep; ++i, ++libnamep) {
+	const char *name = *libnamep;
+	lua_CFunction func = stdlib_funcs[i];
+	if ((loadlibs & (1 << i)))
+	    thread_openlib(L, name, func);
+	else
+	    thread_setfield(L, name, func);
+    }
+    lua_pop(L, 1);  /* remove package.preload table */
+}
+
 
 /*
  * Arguments: ..., coroutine, thread_udata
@@ -465,7 +458,8 @@ thread_settable (lua_State *L, struct sys_thread *td)
 }
 
 static struct sys_thread *
-thread_newvm (lua_State *L, struct sys_thread *reftd)
+thread_newvm (lua_State *L, struct sys_thread *reftd,
+              unsigned int loadlibs)
 {
     struct sys_vmthread *vmtd;
     lua_State *NL;
@@ -478,7 +472,7 @@ thread_newvm (lua_State *L, struct sys_thread *reftd)
 	if (!NL) return NULL;
 
 	L = NL;
-	thread_openlibs(L);
+	thread_openlibs(L, loadlibs);
 	thread_createmeta(L);
 
 	lua_pushthread(L);
@@ -626,7 +620,7 @@ thread_init (lua_State *L)
     /* VM Mutex */
     td = sys_thread_get();
     if (!td) {
-	td = thread_newvm(L, NULL);
+	td = thread_newvm(L, NULL, 0);
 	if (!td) goto err;
 
 	sys_thread_set(td);
@@ -728,26 +722,55 @@ sys_thread_create (struct sys_thread *td, const int is_affin)
 }
 
 /*
- * Arguments: bind_cpu (number), filename (string) | function_dump (string),
+ * Arguments: options (table: {1..n: library names, "cpu": number}),
+ *	filename (string) | function_dump (string),
  *	[arguments (string | number | boolean | ludata | share_object) ...]
  * Returns: [thread_udata]
  */
 static int
 thread_runvm (lua_State *L)
 {
-    const int is_affin = (lua_type(L, 1) == LUA_TNUMBER);
-    const int cpu = is_affin ? lua_tointeger(L, 1) : 0;
     const char *path = luaL_checkstring(L, 2);
     struct sys_thread *vmtd = sys_thread_get();
     struct sys_thread *td, *faketd;
     lua_State *NL;
+    unsigned int loadlibs = ~0U;  /* load all standard libraries */
+    int is_affin = 0, cpu = 0;
 
 #undef ARG_LAST
 #define ARG_LAST	2
 
     if (!vmtd) luaL_argerror(L, 0, "Threading not initialized");
 
-    td = thread_newvm(NULL, vmtd);
+    /* options */
+    if (lua_istable(L, 1)) {
+	unsigned int libs = 0;
+	int i;
+
+	for (i = 1; ; ++i) {
+	    const char *s;
+	    lua_rawgeti(L, 1, i);
+	    s = lua_tostring(L, -1);
+	    if (!s || !*s) {
+		if (s) loadlibs = 0;  /* don't load any libraries */
+		lua_pop(L, 1);
+		break;
+	    }
+	    libs |= 1 << luaL_checkoption(L, -1, NULL, stdlib_names);
+	    lua_pop(L, 1);
+	}
+	if (libs) loadlibs = libs;
+
+	/* CPU affinity */
+	lua_getfield(L, 1, "cpu");
+	if (lua_type(L, -1) == LUA_TNUMBER) {
+	    cpu = lua_tointeger(L, -1);
+	    is_affin = 1;
+	}
+	lua_pop(L, 1);
+    }
+
+    td = thread_newvm(NULL, vmtd, loadlibs);
     if (!td) goto err;
 
     faketd = sys_thread_new(L, vmtd, td, 1);

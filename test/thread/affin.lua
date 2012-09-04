@@ -38,7 +38,7 @@ do
 	local func = string.dump(process)
 
 	for i = 1, NPROCS do
-		assert(thread.runvm(i, func, work_pipe,
+		assert(thread.runvm({cpu = i}, func, work_pipe,
 			(i - 1) * step + 1, step - 1))
 	end
 end
