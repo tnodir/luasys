@@ -19,6 +19,17 @@ do
 end
 
 
+print"-- String I/O"
+do
+	local buf = assert(mem.pointer():alloc())
+	buf:write("1234567")
+	assert("123" == buf:read(3))
+	assert("456" == buf:read(3))
+	assert("7" == buf:read(3))
+	print"OK"
+end
+
+
 print"-- Bits String"
 do
 	local bits = assert(mem.pointer(8):type"bitstring")

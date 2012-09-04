@@ -219,7 +219,7 @@ read_bytes (lua_State *L, struct membuf *mb, size_t l)
 	lua_pushlstring(L, p, l);
 	n -= l;
 	mb->offset = n;
-	if (n) memmove(p, p + 1, n);
+	if (n) memmove(p, p + l, n);
     } else
 	lua_pushnil(L);
     return 1;
