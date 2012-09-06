@@ -1,9 +1,32 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#ifdef _WIN32
+
+#define _WIN32_WINNT	0x0600
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <winsock2.h>
+#include <mmsystem.h>	/* timeGetTime */
+
+#else
+
 #define _GNU_SOURCE	/* pthread_*affinity_np */
 
 #define _FILE_OFFSET_BITS  64
+
+#include <sys/time.h>
+#include <unistd.h>
+#include <signal.h>
+#include <fcntl.h>
+
+#include <pthread.h>
+#include <sched.h>
+
+#endif
+
 
 #include <sys/types.h>
 #include <string.h>
@@ -12,15 +35,6 @@
 
 
 #ifdef _WIN32
-
-#define _WIN32_WINNT	0x0600
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#undef WIN32_LEAN_AND_MEAN
-
-#include <winsock2.h>
-#include <mmsystem.h>	/* timeGetTime */
 
 #if defined(_MSC_VER) || defined(__BORLANDC__)
 typedef SSIZE_T		ssize_t;
@@ -42,14 +56,6 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #define SYS_EAGAIN(e)	((e) == WSAEWOULDBLOCK)
 
 #else
-
-#include <sys/time.h>
-#include <unistd.h>
-#include <signal.h>
-#include <fcntl.h>
-
-#include <pthread.h>
-#include <sched.h>
 
 #define SYS_ERRNO	errno
 #define SYS_EAGAIN(e)	((e) == EAGAIN || (e) == EWOULDBLOCK)
@@ -267,7 +273,7 @@ void sys_sched_event_ready (lua_State *co, void *ev);
 #define STATUS_CANCELLED	((DWORD) 0xC0000120L)
 #endif
 
-#ifndef FILE_SKIP_SET_EVENT_ON_HANDLE
+#ifndef DeleteFileTransacted
 typedef struct _OVERLAPPED_ENTRY {
     ULONG_PTR lpCompletionKey;
     LPOVERLAPPED lpOverlapped;

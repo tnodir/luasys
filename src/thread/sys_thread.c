@@ -582,7 +582,7 @@ thread_done (lua_State *L)
 #endif
 	    sys_vm2_enter(td);
 	}
-	thread_cond_del(&td->cond);
+	(void) thread_cond_del(&td->cond);
 
 	lua_rawgetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
 	lua_pushnil(L);

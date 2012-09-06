@@ -142,15 +142,11 @@ svc_main (DWORD argc, char *argv[])
 }
 
 static DWORD WINAPI
-svc_start (const char *svc_name)
+svc_start (char *svc_name)
 {
-    char name[128];
     SERVICE_TABLE_ENTRY table[] = {{NULL, NULL}, {NULL, NULL}};
 
-    strncpy(name, svc_name, sizeof(name));
-    name[sizeof(name) - 1] = '\0';
-
-    table[0].lpServiceName = name;
+    table[0].lpServiceName = svc_name;
     table[0].lpServiceProc = svc_main;
 
     return !StartServiceCtrlDispatcher(table);
@@ -165,6 +161,7 @@ svc_handle (lua_State *L)
 {
     const char *svc_name = luaL_checkstring(L, 1);
     const int accept_pause_cont = lua_toboolean(L, 2);
+    char name_buf[128];
     HANDLE hThr;
     DWORD id;
 
@@ -182,8 +179,10 @@ svc_handle (lua_State *L)
 	g_Service.accept_pause_cont = accept_pause_cont;
     }
 
-    hThr = CreateThread(NULL, 4096, (svc_func_t) svc_start,
-     (void *) svc_name, 0, &id);
+    strncpy(name_buf, svc_name, sizeof(name_buf));
+    name_buf[sizeof(name_buf) - 1] = '\0';
+
+    hThr = CreateThread(NULL, 4096, (svc_func_t) svc_start, name_buf, 0, &id);
     if (hThr != NULL) {
 	CloseHandle(hThr);
 

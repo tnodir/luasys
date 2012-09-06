@@ -462,20 +462,18 @@ sock_inet_pton (lua_State *L)
     const int in_len = sock_addr_get_inlen(af);
 
     memset(&sa, 0, sizeof(struct sock_addr));
-    if (*src == '*')
-	goto end;
+    if (*src == '*') goto end;
+
 #ifndef _WIN32
-    if (inet_pton(af, src, inp) < 1)
-	goto err;
+    if (inet_pton(af, src, inp) == 1) {
 #else
     sa.addrlen = sizeof(sa);
-    if (WSAStringToAddress((char *) src, af, NULL, &sa.u.addr, &sa.addrlen))
-	goto err;
+    if (!WSAStringToAddressA(src, af, NULL, &sa.u.addr, &sa.addrlen)) {
 #endif
  end:
-    lua_pushlstring(L, inp, in_len);
-    return 1;
- err:
+	lua_pushlstring(L, inp, in_len);
+	return 1;
+    }
     return sys_seterror(L, 0);
 }
 

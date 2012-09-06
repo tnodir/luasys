@@ -161,9 +161,9 @@ pipe_close (lua_State *L)
 	thread_critsect_leave(csp);
 
 	if (!nref) {
-	    thread_critsect_del(&pp->cs);
-	    thread_cond_del(&pp->put_cond);
-	    thread_cond_del(&pp->get_cond);
+	    (void) thread_critsect_del(&pp->cs);
+	    (void) thread_cond_del(&pp->put_cond);
+	    (void) thread_cond_del(&pp->get_cond);
 
 	    /* deallocate buffers */
 	    if (pp->rbuf) {

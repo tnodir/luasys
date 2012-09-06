@@ -12,9 +12,6 @@
 
 typedef int		socklen_t;
 
-#define EINPROGRESS	WSAEINPROGRESS
-#define EALREADY	WSAEALREADY
-
 #else
 
 #include <sys/socket.h>
@@ -439,7 +436,12 @@ sock_connect (lua_State *L)
 #endif
     sys_vm_enter();
 
-    if (!res || SYS_ERRNO == EINPROGRESS || SYS_ERRNO == EALREADY
+    if (!res
+#ifndef _WIN32
+     || SYS_ERRNO == EINPROGRESS || SYS_ERRNO == EALREADY
+#else
+     || SYS_ERRNO == WSAEINPROGRESS || SYS_ERRNO == WSAEALREADY
+#endif
 #if defined(__FreeBSD__)
      || SYS_ERRNO == EADDRINUSE
 #endif

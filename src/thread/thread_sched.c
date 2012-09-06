@@ -236,8 +236,8 @@ sched_close (lua_State *L)
 {
     struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
 
-    thread_critsect_del(&sched->cs);
-    thread_cond_del(&sched->cond);
+    (void) thread_critsect_del(&sched->cs);
+    (void) thread_cond_del(&sched->cond);
 
     if (sched->buffer) {
 	free(sched->buffer);

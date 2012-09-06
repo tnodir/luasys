@@ -262,7 +262,9 @@ thread_event_new (thread_event_t *tev)
 #if defined(USE_PTHREAD_SYNC)
     if (!res) {
 	res = thread_critsect_new(&tev->cs);
-	if (res) thread_cond_del(&tev->cond);
+	if (res) {
+	    (void) thread_cond_del(&tev->cond);
+	}
     }
 #endif
     return res;

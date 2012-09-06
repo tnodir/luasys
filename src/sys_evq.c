@@ -234,7 +234,7 @@ levq_add (lua_State *L)
     if (!(ev_flags & EVENT_TIMER)) {
 	fd_t *fdp = lua_touserdata(L, 2);
 	ev->fd = fdp ? *fdp
-	 : (fd_t) lua_tointeger(L, 2);  /* signo */
+	 : (fd_t) (size_t) lua_tointeger(L, 2);  /* signo */
     }
 
     if (!(ev_flags & (EVENT_READ | EVENT_WRITE))) {

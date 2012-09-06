@@ -78,11 +78,11 @@ osx:
 
 mingw:
 	$(MAKE) all A="sys.lib" T="sys.dll" \
-	AR="$(CC) -shared -o" RANLIB="echo ranlib" \
+	AR="$(CC) -shared -o" RANLIB="strip --strip-unneeded" \
 	COPT="-O2 -DNDEBUG" RM="del" \
 	MYCFLAGS="-DLUA_BUILD_AS_DLL" \
-	MYLDFLAGS="-s -shared -L/MinGW32/lib" \
-	LIBS="$(LUA)/src/lua*.dll -lmsvcrt -lkernel32 -luser32 -lwinmm -lshell32 -ladvapi32 -lws2_32" \
+	MYLDFLAGS="-s -shared -L$(MINGW_HOME)/i686-w64-mingw32/lib" \
+	LIBS="$(LUA)/src/lua51.dll -lmsvcrt -lkernel32 -luser32 -lwinmm -lshell32 -ladvapi32 -lws2_32" \
 	OBJS="luasys.o sock/sys_sock.o isa/isapi/isapi_dll.o"
 
 clean:

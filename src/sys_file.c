@@ -768,11 +768,7 @@ sys_utime (lua_State *L)
 	GetSystemTimeAsFileTime(&ft);
     else {
 	FILETIME lft;
-#ifdef _MSC_VER
-	const int64_t fix = 11644473600;
-#else
-	const int64_t fix = 11644473600LL;
-#endif
+	const int64_t fix = (int64_t) 1684675 * (int64_t) 6912;
 	int64_t t64 = (modtime + fix) * 10000000;
 
 	lft.dwLowDateTime = INT64_LOW(t64);
