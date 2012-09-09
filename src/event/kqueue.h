@@ -8,16 +8,16 @@
 #define NEVENT		64
 
 #define EVENT_EXTRA							\
-    struct event_queue *evq;
+  struct event_queue *evq;
 
 #define EVQ_EXTRA							\
-    struct timeout_queue *tq;						\
-    pthread_mutex_t cs;							\
-    int volatile sig_ready;  /* triggered signals */			\
-    fd_t sig_fd[2];  /* pipe to interrupt the loop */			\
-    int kqueue_fd;  /* kqueue descriptor */				\
-    unsigned int nchanges;						\
-    struct kevent kev_list[NEVENT];
+  struct timeout_queue *tq;						\
+  pthread_mutex_t cs;							\
+  int volatile sig_ready;  /* triggered signals */			\
+  fd_t sig_fd[2];  /* pipe to interrupt the loop */			\
+  int kqueue_fd;  /* kqueue descriptor */				\
+  unsigned int nchanges;						\
+  struct kevent kev_list[NEVENT];
 
 #if defined (__NetBSD__)
 typedef intptr_t	kev_udata_t;

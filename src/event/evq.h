@@ -31,12 +31,12 @@ struct event_queue;
 #define EVQ_DIRWATCH_MODIFY	0x01
 
 struct event {
-    struct event *next_ready, *next_object;
+  struct event *next_ready, *next_object;
 
-    /* timeout */
-    struct event *prev, *next;
-    struct timeout_queue *tq;
-    msec_t timeout_at;
+  /* timeout */
+  struct event *prev, *next;
+  struct timeout_queue *tq;
+  msec_t timeout_at;
 
 #define EVENT_READ		0x00000001
 #define EVENT_WRITE		0x00000002
@@ -67,33 +67,33 @@ struct event {
 #define EVENT_EOF_RES		0x01000000
 #define EVENT_EOF_MASK_RES	0xFF000000
 #define EVENT_EOF_SHIFT_RES	24  /* last byte is error status */
-    unsigned int flags;
+  unsigned int flags;
 
-    int ev_id;
-    fd_t fd;
+  int ev_id;
+  fd_t fd;
 
-    EVENT_EXTRA
+  EVENT_EXTRA
 };
 
 struct event_queue {
-    unsigned int stop: 1;  /* break the loop? */
+  unsigned int stop: 1;  /* break the loop? */
 
-    unsigned int nevents;  /* number of alive events */
+  unsigned int nevents;  /* number of alive events */
 
-    int buf_nevents;  /* number of used events of current buffer */
-    int buf_index;  /* environ. index of current buffer */
+  int buf_nevents;  /* number of used events of current buffer */
+  int buf_index;  /* environ. index of current buffer */
 
-    msec_t now; /* current cached time */
+  msec_t now; /* current cached time */
 
-    struct event * volatile ev_ready;  /* head of ready events */
-    struct event *ev_free;  /* head of free events */
+  struct event * volatile ev_ready;  /* head of ready events */
+  struct event *ev_free;  /* head of free events */
 
 #ifdef EVQ_POST_INIT
-    struct event *ev_post;  /* have to initialize the event source */
+  struct event *ev_post;  /* have to initialize the event source */
 #endif
 
-    EVQ_APP_EXTRA
-    EVQ_EXTRA
+  EVQ_APP_EXTRA
+  EVQ_EXTRA
 };
 
 EVQ_API int evq_init (struct event_queue *evq);

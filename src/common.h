@@ -46,10 +46,10 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 
 #if (_WIN32_WINNT >= 0x0500)
 #define InitCriticalSection(cs) \
-	InitializeCriticalSectionAndSpinCount(cs, 3000)
+    InitializeCriticalSectionAndSpinCount(cs, 3000)
 #else
 #define InitCriticalSection(cs) \
-	(InitializeCriticalSection(cs), TRUE)
+    (InitializeCriticalSection(cs), TRUE)
 #endif
 
 #define SYS_ERRNO	GetLastError()
@@ -80,22 +80,22 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #define luaL_setfuncs(L,l,n)	luaL_register((L), NULL, (l))
 
 #define luaL_newlibtable(L,l) \
-	lua_createtable(L, 0, sizeof(l) / sizeof((l)[0]) - 1)
+    lua_createtable(L, 0, sizeof(l) / sizeof((l)[0]) - 1)
 #define luaL_newlib(L,l) \
-	(luaL_newlibtable((L), (l)), luaL_setfuncs((L), (l), 0))
+    (luaL_newlibtable((L), (l)), luaL_setfuncs((L), (l), 0))
 
 #define lua_rawgetp(L,idx,p) \
-	(lua_pushlightuserdata((L), (p)), \
-	 lua_rawget((L), (idx) - ((idx) < 0 && (idx) > -99 ? 1 : 0)))
+    (lua_pushlightuserdata((L), (p)), \
+     lua_rawget((L), (idx) - ((idx) < 0 && (idx) > -99 ? 1 : 0)))
 #define lua_rawsetp(L,idx,p) \
-	(lua_pushlightuserdata((L), (p)), lua_insert((L), -2), \
-	 lua_rawset((L), (idx) - ((idx) < 0 && (idx) > -99 ? 1 : 0)))
+    (lua_pushlightuserdata((L), (p)), lua_insert((L), -2), \
+     lua_rawset((L), (idx) - ((idx) < 0 && (idx) > -99 ? 1 : 0)))
 
 #define luai_writestringerror(s,p) \
-	(fprintf(stderr, (s), (p)), fflush(stderr))
+    (fprintf(stderr, (s), (p)), fflush(stderr))
 
 #define lua_absindex(L,idx) \
-	((idx) < 0 && (idx) > -99 ? lua_gettop(L) + (idx) + 1 : (idx))
+    ((idx) < 0 && (idx) > -99 ? lua_gettop(L) + (idx) + 1 : (idx))
 
 #else
 #define luaL_register(L,n,l)	luaL_newlib((L), (l))
@@ -111,15 +111,15 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #endif
 
 #define lua_boxpointer(L,u) \
-	(*(void **) (lua_newuserdata(L, sizeof(void *))) = (u))
+    (*(void **) (lua_newuserdata(L, sizeof(void *))) = (u))
 #define lua_unboxpointer(L,i,tname) \
-	(*(void **) (checkudata(L, i, tname)))
+    (*(void **) (checkudata(L, i, tname)))
 
 #define lua_boxinteger(L,n) \
-	(*(lua_Integer *) (lua_newuserdata(L, sizeof(lua_Integer))) \
-	 = (lua_Integer) (n))
+    (*(lua_Integer *) (lua_newuserdata(L, sizeof(lua_Integer))) \
+     = (lua_Integer) (n))
 #define lua_unboxinteger(L,i,tname) \
-	(*(lua_Integer *) (checkudata(L, i, tname)))
+    (*(lua_Integer *) (checkudata(L, i, tname)))
 
 
 /*
@@ -189,20 +189,18 @@ msec_t sys_milliseconds (void);
 struct membuf;
 
 struct sys_buffer {
-    union {
-	const char *r;  /* read from buffer */
-	char *w;  /* write to buffer */
-    } ptr;
-    size_t size;
-    struct membuf *mb;
+  union {
+    const char *r;  /* read from buffer */
+    char *w;  /* write to buffer */
+  } ptr;
+  size_t size;
+  struct membuf *mb;
 };
 
-int sys_buffer_read_init (lua_State *L, int idx,
-                          struct sys_buffer *sb);
+int sys_buffer_read_init (lua_State *L, int idx, struct sys_buffer *sb);
 void sys_buffer_read_next (struct sys_buffer *sb, const size_t n);
 
-void sys_buffer_write_init (lua_State *L, int idx,
-                            struct sys_buffer *sb,
+void sys_buffer_write_init (lua_State *L, int idx, struct sys_buffer *sb,
                             char *buf, const size_t buflen);
 int sys_buffer_write_next (lua_State *L, struct sys_buffer *sb,
                            char *buf, const size_t buflen);
@@ -248,12 +246,12 @@ int sys_eintr (void);
  */
 
 enum {
-    EVQ_SCHED_OBJ = 0,
-    EVQ_SCHED_TIMER,
-    EVQ_SCHED_PID,
-    EVQ_SCHED_DIRWATCH,
-    EVQ_SCHED_SIGNAL,
-    EVQ_SCHED_SOCKET
+  EVQ_SCHED_OBJ = 0,
+  EVQ_SCHED_TIMER,
+  EVQ_SCHED_PID,
+  EVQ_SCHED_DIRWATCH,
+  EVQ_SCHED_SIGNAL,
+  EVQ_SCHED_SOCKET
 };
 
 int sys_evq_sched_add (lua_State *L, const int evq_idx, const int type);
@@ -275,10 +273,10 @@ void sys_sched_event_ready (lua_State *co, void *ev);
 
 #ifndef DeleteFileTransacted
 typedef struct _OVERLAPPED_ENTRY {
-    ULONG_PTR lpCompletionKey;
-    LPOVERLAPPED lpOverlapped;
-    ULONG_PTR Internal;
-    DWORD dwNumberOfBytesTransferred;
+  ULONG_PTR lpCompletionKey;
+  LPOVERLAPPED lpOverlapped;
+  ULONG_PTR Internal;
+  DWORD dwNumberOfBytesTransferred;
 } OVERLAPPED_ENTRY, *LPOVERLAPPED_ENTRY;
 #endif
 
@@ -287,11 +285,11 @@ typedef BOOL (WINAPI *PCancelSynchronousIo) (HANDLE hThread);
 typedef BOOL (WINAPI *PCancelIoEx) (HANDLE hThread, LPOVERLAPPED overlapped);
 
 typedef BOOL (WINAPI *PGetQueuedCompletionStatusEx) (HANDLE handle,
-	LPOVERLAPPED_ENTRY entries, ULONG count, PULONG n,
-	DWORD timeout, BOOL alertable);
+    LPOVERLAPPED_ENTRY entries, ULONG count, PULONG n,
+    DWORD timeout, BOOL alertable);
 
 typedef BOOL (WINAPI *PSetFileCompletionNotificationModes) (HANDLE handle,
-	UCHAR flags);
+    UCHAR flags);
 
 extern PCancelSynchronousIo pCancelSynchronousIo;
 extern PCancelIoEx pCancelIoEx;

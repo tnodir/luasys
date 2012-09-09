@@ -8,16 +8,16 @@
 #define NEVENT		64
 
 #define EVENT_EXTRA							\
-    struct event_queue *evq;						\
-    unsigned int index;
+  struct event_queue *evq;						\
+  unsigned int index;
 
 #define EVQ_EXTRA							\
-    struct timeout_queue *tq;						\
-    pthread_mutex_t cs;							\
-    int volatile sig_ready;  /* triggered signals */			\
-    fd_t sig_fd[2];  /* pipe to interrupt the loop */			\
-    unsigned int npolls, max_polls;					\
-    struct event **events;						\
-    struct pollfd *fdset;
+  struct timeout_queue *tq;						\
+  pthread_mutex_t cs;							\
+  int volatile sig_ready;  /* triggered signals */			\
+  fd_t sig_fd[2];  /* pipe to interrupt the loop */			\
+  unsigned int npolls, max_polls;					\
+  struct event **events;						\
+  struct pollfd *fdset;
 
 #endif

@@ -9,9 +9,9 @@
 #define MIN_TIMEOUT	10  /* milliseconds */
 
 struct timeout_queue {
-    struct timeout_queue *tq_prev, *tq_next;
-    struct event *ev_head, *ev_tail;
-    msec_t msec;
+  struct timeout_queue *tq_prev, *tq_next;
+  struct event *ev_head, *ev_tail;
+  msec_t msec;
 };
 
 #endif

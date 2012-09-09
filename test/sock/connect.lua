@@ -18,20 +18,20 @@ local res, err = fd:connect(sock.addr():inet(port, addr))
 if res == nil then error(err) end
 
 if not res then
-    local function on_connect(evq, evid, fd, ev)
-	if ev == 't' then error"Timeout" end
+  local function on_connect(evq, evid, fd, ev)
+    if ev == 't' then error"Timeout" end
 
-	local errno = fd:sockopt("error")
-	if errno ~= 0 then
-	    error(sys.strerror(errno))
-	end
+    local errno = fd:sockopt("error")
+    if errno ~= 0 then
+      error(sys.strerror(errno))
     end
+  end
 
-    local evq = assert(sys.event_queue())
+  local evq = assert(sys.event_queue())
 
-    assert(evq:add_socket(fd, "connect", on_connect, 5000))
+  assert(evq:add_socket(fd, "connect", on_connect, 5000))
 
-    evq:loop()
+  evq:loop()
 end
 
 print("OK")

@@ -15,7 +15,7 @@ assert(saddr:inet(port, sock.inet_pton(host)))
 
 fd:nonblocking(true)
 if fd:send("get time", saddr) then
-    local data = assert(fd:recv(MAX_MSG_LEN, saddr))
-    port, host = saddr:inet()
-    print(sock.inet_ntop(host) .. ":" .. port .. "> " .. data)
+  local data = assert(fd:recv(MAX_MSG_LEN, saddr))
+  port, host = saddr:inet()
+  print(sock.inet_ntop(host) .. ":" .. port .. "> " .. data)
 end

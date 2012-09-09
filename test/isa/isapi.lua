@@ -4,12 +4,12 @@ local root = ...
 
 -- Set C-modules placement
 do
-    local cpath = root:gsub([[^\\%?\]], "")
+  local cpath = root:gsub([[^\\%?\]], "")
 
-    package.cpath = package.cpath
-	.. cpath .. "\\?.dll;"
-	.. cpath .. "\\?51.dll;"
-	.. cpath .. "\\lua5.1.dll;"
+  package.cpath = package.cpath
+    .. cpath .. "\\?.dll;"
+    .. cpath .. "\\?51.dll;"
+    .. cpath .. "\\lua5.1.dll;"
 end
 
 
@@ -19,10 +19,10 @@ sys.thread.init()
 
 
 local function process(ecb)
-    local path = ecb:getvar"PATH_TRANSLATED"
-    local chunk, err = loadfile(path)
-    if err then error(err) end
-    chunk(ecb)
+  local path = ecb:getvar"PATH_TRANSLATED"
+  local chunk, err = loadfile(path)
+  if err then error(err) end
+  chunk(ecb)
 end
 
 return process

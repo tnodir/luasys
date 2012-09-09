@@ -16,5 +16,5 @@ assert(fd:bind(sock.addr():inet(MCAST_PORT)))
 assert(fd:membership(sock.inet_pton(MCAST_ADDR)))
 
 while true do
-	sys.stdout:write(fd:recv())
+    sys.stdout:write(fd:recv())
 end

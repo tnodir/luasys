@@ -3,21 +3,21 @@
 #define DPOOL_TYPENAME	"sys.thread.data_pool"
 
 struct data_pool {
-    unsigned int volatile n;  /* count of data in storage */
+  unsigned int volatile n;  /* count of data in storage */
 
-    int volatile nwaits;  /* number of blocked readers */
-    int volatile nput; /* number of items to put as new data */
-    struct sys_thread * volatile td;  /* data writer */
+  int volatile nwaits;  /* number of blocked readers */
+  int volatile nput; /* number of items to put as new data */
+  struct sys_thread * volatile td;  /* data writer */
 
-    unsigned int idx, top;  /* storage indexes */
-    unsigned int max;  /* maximum watermark of data */
+  unsigned int idx, top;  /* storage indexes */
+  unsigned int max;  /* maximum watermark of data */
 
 #define DPOOL_PUTONFULL		1
 #define DPOOL_GETONEMPTY	2
 #define DPOOL_OPEN		8
-    unsigned int flags;
+  unsigned int flags;
 
-    thread_event_t tev;  /* synchronization */
+  thread_event_t tev;  /* synchronization */
 };
 
 
@@ -27,20 +27,20 @@ struct data_pool {
 static int
 dpool_new (lua_State *L)
 {
-    struct data_pool *dp = lua_newuserdata(L, sizeof(struct data_pool));
-    memset(dp, 0, sizeof(struct data_pool));
-    dp->max = (unsigned int) -1;
+  struct data_pool *dp = lua_newuserdata(L, sizeof(struct data_pool));
+  memset(dp, 0, sizeof(struct data_pool));
+  dp->max = (unsigned int) -1;
 
-    if (!thread_event_new(&dp->tev)) {
-	dp->flags |= DPOOL_OPEN;
-	luaL_getmetatable(L, DPOOL_TYPENAME);
-	lua_setmetatable(L, -2);
+  if (!thread_event_new(&dp->tev)) {
+    dp->flags |= DPOOL_OPEN;
+    luaL_getmetatable(L, DPOOL_TYPENAME);
+    lua_setmetatable(L, -2);
 
-	lua_newtable(L);  /* data and callbacks storage */
-	lua_setfenv(L, -2);
-	return 1;
-    }
-    return sys_seterror(L, 0);
+    lua_newtable(L);  /* data and callbacks storage */
+    lua_setfenv(L, -2);
+    return 1;
+  }
+  return sys_seterror(L, 0);
 }
 
 /*
@@ -49,13 +49,13 @@ dpool_new (lua_State *L)
 static int
 dpool_close (lua_State *L)
 {
-    struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
+  struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
 
-    if (dp->flags & DPOOL_OPEN) {
-	dp->flags ^= DPOOL_OPEN;
-	thread_event_del(&dp->tev);
-    }
-    return 0;
+  if (dp->flags & DPOOL_OPEN) {
+    dp->flags ^= DPOOL_OPEN;
+    thread_event_del(&dp->tev);
+  }
+  return 0;
 }
 
 /*
@@ -64,60 +64,60 @@ dpool_close (lua_State *L)
 static int
 dpool_put (lua_State *L)
 {
-    struct sys_thread *td = sys_thread_get();
-    struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
-    int nput = lua_gettop(L) - 1;
+  struct sys_thread *td = sys_thread_get();
+  struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
+  int nput = lua_gettop(L) - 1;
 
-    if (!td) luaL_argerror(L, 0, "Threading not initialized");
-    if (!nput) luaL_argerror(L, 2, "data expected");
+  if (!td) luaL_argerror(L, 0, "Threading not initialized");
+  if (!nput) luaL_argerror(L, 2, "data expected");
 
-    lua_getfenv(L, 1);  /* storage */
-    lua_insert(L, 1);
+  lua_getfenv(L, 1);  /* storage */
+  lua_insert(L, 1);
 
-    if (dp->n >= dp->max) {
-	if (dp->flags & DPOOL_PUTONFULL) {
-	    lua_rawgetp(L, 1, (void *) DPOOL_PUTONFULL);
-	    lua_insert(L, 2);
-	    lua_call(L, 1 + nput, LUA_MULTRET);
-	    nput = lua_gettop(L) - 1;
-	    if (!nput) return 0;
-	} else {
-	    do {
-		const int res = thread_event_wait(&dp->tev, td,
-		 TIMEOUT_INFINITE);
+  if (dp->n >= dp->max) {
+    if (dp->flags & DPOOL_PUTONFULL) {
+      lua_rawgetp(L, 1, (void *) DPOOL_PUTONFULL);
+      lua_insert(L, 2);
+      lua_call(L, 1 + nput, LUA_MULTRET);
+      nput = lua_gettop(L) - 1;
+      if (!nput) return 0;
+    } else {
+      do {
+        const int res = thread_event_wait(&dp->tev, td,
+         TIMEOUT_INFINITE);
 
-		sys_thread_check(td);
-		if (res) return sys_seterror(L, 0);
-	    } while (dp->n >= dp->max);
-	}
+        sys_thread_check(td);
+        if (res) return sys_seterror(L, 0);
+      } while (dp->n >= dp->max);
     }
+  }
 
-    /* Try directly move data between threads */
-    if (dp->nwaits && !dp->td) {
-	dp->td = td;
-	dp->nput = nput;
-	thread_event_signal(&dp->tev);
-	sys_thread_switch(0);
-	dp->td = NULL;
-	if (!dp->nput) return 0;  /* moved to thread */
-	dp->nput = 0;
+  /* Try directly move data between threads */
+  if (dp->nwaits && !dp->td) {
+    dp->td = td;
+    dp->nput = nput;
+    thread_event_signal(&dp->tev);
+    sys_thread_switch(0);
+    dp->td = NULL;
+    if (!dp->nput) return 0;  /* moved to thread */
+    dp->nput = 0;
+  }
+
+  /* Keep data in the storage */
+  {
+    int top = dp->top;
+
+    lua_pushinteger(L, nput);
+    do {
+      lua_rawseti(L, 1, ++top);
+    } while (nput--);
+    dp->top = top;
+
+    if (!dp->n++) {
+      thread_event_signal(&dp->tev);
     }
-
-    /* Keep data in the storage */
-    {
-	int top = dp->top;
-
-	lua_pushinteger(L, nput);
-	do {
-	    lua_rawseti(L, 1, ++top);
-	} while (nput--);
-	dp->top = top;
-
-	if (!dp->n++) {
-	    thread_event_signal(&dp->tev);
-	}
-    }
-    return 0;
+  }
+  return 0;
 }
 
 /*
@@ -127,77 +127,77 @@ dpool_put (lua_State *L)
 static int
 dpool_get (lua_State *L)
 {
-    struct sys_thread *td = sys_thread_get();
-    struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
-    const msec_t timeout = lua_isnoneornil(L, 2)
-     ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
-    int nput;
+  struct sys_thread *td = sys_thread_get();
+  struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
+  const msec_t timeout = lua_isnoneornil(L, 2)
+   ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
+  int nput;
 
-    if (!td) luaL_argerror(L, 0, "Threading not initialized");
+  if (!td) luaL_argerror(L, 0, "Threading not initialized");
 
-    lua_settop(L, 1);
-    lua_getfenv(L, 1);  /* storage */
-    lua_insert(L, 1);
+  lua_settop(L, 1);
+  lua_getfenv(L, 1);  /* storage */
+  lua_insert(L, 1);
 
-    if ((dp->flags & DPOOL_GETONEMPTY) && !dp->n) {
-	lua_rawgetp(L, 1, (void *) DPOOL_GETONEMPTY);
-	lua_insert(L, 2);
-	lua_call(L, 1, LUA_MULTRET);
-	nput = lua_gettop(L) - 1;
-	if (nput) return nput;
+  if ((dp->flags & DPOOL_GETONEMPTY) && !dp->n) {
+    lua_rawgetp(L, 1, (void *) DPOOL_GETONEMPTY);
+    lua_insert(L, 2);
+    lua_call(L, 1, LUA_MULTRET);
+    nput = lua_gettop(L) - 1;
+    if (nput) return nput;
+  }
+
+  for (; ; ) {
+    /* get from storage */
+    if (dp->n) {
+      const int idx = dp->idx + 1;
+      int i;
+
+      lua_rawgeti(L, 1, idx);
+      nput = lua_tointeger(L, -1);
+      lua_pushnil(L);
+      lua_rawseti(L, 1, idx);
+      dp->idx = idx + nput;
+      for (i = dp->idx; i > idx; --i) {
+        lua_rawgeti(L, 1, i);
+        lua_pushnil(L);
+        lua_rawseti(L, 1, i);
+      }
+      if (dp->idx == dp->top)
+        dp->idx = dp->top = 0;
+      if (dp->n-- == dp->max) {
+        thread_event_signal(&dp->tev);
+      }
+      return nput;
     }
 
-    for (; ; ) {
-	/* get from storage */
-	if (dp->n) {
-	    const int idx = dp->idx + 1;
-	    int i;
+    /* wait signal */
+    {
+      int res;
 
-	    lua_rawgeti(L, 1, idx);
-	    nput = lua_tointeger(L, -1);
-	    lua_pushnil(L);
-	    lua_rawseti(L, 1, idx);
-	    dp->idx = idx + nput;
-	    for (i = dp->idx; i > idx; --i) {
-		lua_rawgeti(L, 1, i);
-		lua_pushnil(L);
-		lua_rawseti(L, 1, i);
-	    }
-	    if (dp->idx == dp->top)
-		dp->idx = dp->top = 0;
-	    if (dp->n-- == dp->max) {
-		thread_event_signal(&dp->tev);
-	    }
-	    return nput;
-	}
+      dp->nwaits++;
+      res = thread_event_wait(&dp->tev, td, timeout);
+      dp->nwaits--;
 
-	/* wait signal */
-	{
-	    int res;
-
-	    dp->nwaits++;
-	    res = thread_event_wait(&dp->tev, td, timeout);
-	    dp->nwaits--;
-
-	    sys_thread_check(td);
-	    if (res) {
-		if (res == 1) {
-		    lua_pushboolean(L, 0);
-		    return 1;  /* timed out */
-		}
-		return sys_seterror(L, 0);
-	    }
-	}
-
-	/* get directly from another thread */
-	nput = dp->nput;
-	if (nput) {
-	    dp->nput = 0;
-	    luaL_checkstack(L, nput, NULL);
-	    lua_xmove(dp->td->L, L, nput);
-	    return nput;
-	}
+      sys_thread_check(td);
+      if (res) {
+        if (res == 1) {
+          lua_pushboolean(L, 0);
+          return 1;  /* timed out */
+        }
+        return sys_seterror(L, 0);
+      }
     }
+
+    /* get directly from another thread */
+    nput = dp->nput;
+    if (nput) {
+      dp->nput = 0;
+      luaL_checkstack(L, nput, NULL);
+      lua_xmove(dp->td->L, L, nput);
+      return nput;
+    }
+  }
 }
 
 /*
@@ -207,15 +207,15 @@ dpool_get (lua_State *L)
 static int
 dpool_max (lua_State *L)
 {
-    struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
+  struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
 
-    if (lua_isnoneornil(L, 2))
-	lua_pushinteger(L, dp->max);
-    else {
-	dp->max = luaL_checkinteger(L, 2);
-	lua_settop(L, 1);
-    }
-    return 1;
+  if (lua_isnoneornil(L, 2))
+    lua_pushinteger(L, dp->max);
+  else {
+    dp->max = luaL_checkinteger(L, 2);
+    lua_settop(L, 1);
+  }
+  return 1;
 }
 
 /*
@@ -224,22 +224,22 @@ dpool_max (lua_State *L)
 static int
 dpool_callbacks (lua_State *L)
 {
-    struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
+  struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
 
-    lua_settop(L, 3);
-    lua_getfenv(L, 1);  /* storage of callbacks */
+  lua_settop(L, 3);
+  lua_getfenv(L, 1);  /* storage of callbacks */
 
-    dp->flags &= ~(DPOOL_PUTONFULL | DPOOL_GETONEMPTY);
-    dp->flags |= (lua_isfunction(L, 2) ? DPOOL_PUTONFULL : 0)
-     | (lua_isfunction(L, 3) ? DPOOL_GETONEMPTY : 0);
+  dp->flags &= ~(DPOOL_PUTONFULL | DPOOL_GETONEMPTY);
+  dp->flags |= (lua_isfunction(L, 2) ? DPOOL_PUTONFULL : 0)
+   | (lua_isfunction(L, 3) ? DPOOL_GETONEMPTY : 0);
 
-    lua_pushvalue(L, 2);
-    lua_rawsetp(L, -2, (void *) DPOOL_PUTONFULL);
+  lua_pushvalue(L, 2);
+  lua_rawsetp(L, -2, (void *) DPOOL_PUTONFULL);
 
-    lua_pushvalue(L, 3);
-    lua_rawsetp(L, -2, (void *) DPOOL_GETONEMPTY);
+  lua_pushvalue(L, 3);
+  lua_rawsetp(L, -2, (void *) DPOOL_GETONEMPTY);
 
-    return 0;
+  return 0;
 }
 
 /*
@@ -249,10 +249,10 @@ dpool_callbacks (lua_State *L)
 static int
 dpool_count (lua_State *L)
 {
-    struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
+  struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
 
-    lua_pushinteger(L, dp->n);
-    return 1;
+  lua_pushinteger(L, dp->n);
+  return 1;
 }
 
 /*
@@ -262,23 +262,23 @@ dpool_count (lua_State *L)
 static int
 dpool_tostring (lua_State *L)
 {
-    struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
+  struct data_pool *dp = checkudata(L, 1, DPOOL_TYPENAME);
 
-    lua_pushfstring(L, DPOOL_TYPENAME " (%p)", dp);
-    return 1;
+  lua_pushfstring(L, DPOOL_TYPENAME " (%p)", dp);
+  return 1;
 }
 
 
 #define DPOOL_METHODS \
-    {"data_pool",	dpool_new}
+  {"data_pool",	dpool_new}
 
 static luaL_Reg dpool_meth[] = {
-    {"put",		dpool_put},
-    {"get",		dpool_get},
-    {"max",		dpool_max},
-    {"callbacks",	dpool_callbacks},
-    {"__len",		dpool_count},
-    {"__tostring",	dpool_tostring},
-    {"__gc",		dpool_close},
-    {NULL, NULL}
+  {"put",		dpool_put},
+  {"get",		dpool_get},
+  {"max",		dpool_max},
+  {"callbacks",	dpool_callbacks},
+  {"__len",		dpool_count},
+  {"__tostring",	dpool_tostring},
+  {"__gc",		dpool_close},
+  {NULL, NULL}
 };

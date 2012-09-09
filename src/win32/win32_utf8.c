@@ -6,19 +6,19 @@
 static void *
 utf8_to_utf16 (const char *s)
 {
-    WCHAR *ws;
-    int n;
+  WCHAR *ws;
+  int n;
 
-    n = MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
-    ws = malloc(n * sizeof(WCHAR));
-    if (!ws) return NULL;
+  n = MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
+  ws = malloc(n * sizeof(WCHAR));
+  if (!ws) return NULL;
 
-    n = MultiByteToWideChar(CP_UTF8, 0, s, -1, ws, n);
-    if (!n) {
-	free(ws);
-	ws = NULL;
-    }
-    return ws;
+  n = MultiByteToWideChar(CP_UTF8, 0, s, -1, ws, n);
+  if (!n) {
+    free(ws);
+    ws = NULL;
+  }
+  return ws;
 }
 
 /*
@@ -27,19 +27,19 @@ utf8_to_utf16 (const char *s)
 static void *
 utf16_to_utf8 (const WCHAR *ws)
 {
-    char *s;
-    int n;
+  char *s;
+  int n;
 
-    n = WideCharToMultiByte(CP_UTF8, 0, ws, -1, NULL, 0, NULL, 0);
-    s = malloc(n);
-    if (!s) return NULL;
+  n = WideCharToMultiByte(CP_UTF8, 0, ws, -1, NULL, 0, NULL, 0);
+  s = malloc(n);
+  if (!s) return NULL;
 
-    n = WideCharToMultiByte(CP_UTF8, 0, ws, -1, s, n, NULL, 0);
-    if (!n) {
-	free(s);
-	s = NULL;
-    }
-    return s;
+  n = WideCharToMultiByte(CP_UTF8, 0, ws, -1, s, n, NULL, 0);
+  if (!n) {
+    free(s);
+    s = NULL;
+  }
+  return s;
 }
 
 /*
@@ -49,20 +49,20 @@ utf16_to_utf8 (const WCHAR *ws)
 static void *
 mbcs_to_utf16 (const char *mbcs)
 {
-    WCHAR *ws;
-    const int codepage = AreFileApisANSI() ? CP_ACP : CP_OEMCP;
-    int n;
+  WCHAR *ws;
+  const int codepage = AreFileApisANSI() ? CP_ACP : CP_OEMCP;
+  int n;
 
-    n = MultiByteToWideChar(codepage, 0, mbcs, -1, NULL, 0);
-    ws = malloc(n * sizeof(WCHAR));
-    if (!ws) return NULL;
+  n = MultiByteToWideChar(codepage, 0, mbcs, -1, NULL, 0);
+  ws = malloc(n * sizeof(WCHAR));
+  if (!ws) return NULL;
 
-    n = MultiByteToWideChar(codepage, 0, mbcs, -1, ws, n);
-    if (!n) {
-	free(ws);
-	ws = NULL;
-    }
-    return ws;
+  n = MultiByteToWideChar(codepage, 0, mbcs, -1, ws, n);
+  if (!n) {
+    free(ws);
+    ws = NULL;
+  }
+  return ws;
 }
 
 /*
@@ -72,20 +72,20 @@ mbcs_to_utf16 (const char *mbcs)
 static void *
 utf16_to_mbcs (const WCHAR *ws)
 {
-    char *mbcs;
-    const int codepage = AreFileApisANSI() ? CP_ACP : CP_OEMCP;
-    int n;
+  char *mbcs;
+  const int codepage = AreFileApisANSI() ? CP_ACP : CP_OEMCP;
+  int n;
 
-    n = WideCharToMultiByte(codepage, 0, ws, -1, NULL, 0, NULL, 0);
-    mbcs = malloc(n);
-    if (!mbcs) return NULL;
+  n = WideCharToMultiByte(codepage, 0, ws, -1, NULL, 0, NULL, 0);
+  mbcs = malloc(n);
+  if (!mbcs) return NULL;
 
-    n = WideCharToMultiByte(codepage, 0, ws, -1, mbcs, n, NULL, 0);
-    if (!n) {
-	free(mbcs);
-	mbcs = NULL;
-    }
-    return mbcs;
+  n = WideCharToMultiByte(codepage, 0, ws, -1, mbcs, n, NULL, 0);
+  if (!n) {
+    free(mbcs);
+    mbcs = NULL;
+  }
+  return mbcs;
 }
 
 /*
@@ -94,15 +94,15 @@ utf16_to_mbcs (const WCHAR *ws)
 static void *
 mbcs_to_utf8 (const char *mbcs)
 {
-    char *s;
-    WCHAR *ws;
+  char *s;
+  WCHAR *ws;
 
-    ws = mbcs_to_utf16(mbcs);
-    if (!ws) return NULL;
+  ws = mbcs_to_utf16(mbcs);
+  if (!ws) return NULL;
 
-    s = utf16_to_utf8(ws);
-    free(ws);
-    return s;
+  s = utf16_to_utf8(ws);
+  free(ws);
+  return s;
 }
 
 /*
@@ -111,15 +111,15 @@ mbcs_to_utf8 (const char *mbcs)
 static void *
 utf8_to_mbcs (const char *s)
 {
-    char *mbcs;
-    WCHAR *ws;
+  char *mbcs;
+  WCHAR *ws;
 
-    ws = utf8_to_utf16(s);
-    if (!ws) return NULL;
+  ws = utf8_to_utf16(s);
+  if (!ws) return NULL;
 
-    mbcs = utf16_to_mbcs(ws);
-    free(ws);
-    return mbcs;
+  mbcs = utf16_to_mbcs(ws);
+  free(ws);
+  return mbcs;
 }
 
 /*
@@ -128,7 +128,7 @@ utf8_to_mbcs (const char *s)
 void *
 utf8_to_filename (const char *s)
 {
-    return is_WinNT ? utf8_to_utf16(s) : utf8_to_mbcs(s);
+  return is_WinNT ? utf8_to_utf16(s) : utf8_to_mbcs(s);
 }
 
 /*
@@ -137,6 +137,6 @@ utf8_to_filename (const char *s)
 char *
 filename_to_utf8 (const void *s)
 {
-    return is_WinNT ? utf16_to_utf8(s) : mbcs_to_utf8(s);
+  return is_WinNT ? utf16_to_utf8(s) : mbcs_to_utf8(s);
 }
 

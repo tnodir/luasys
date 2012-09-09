@@ -8,15 +8,15 @@
 static int
 affin_cpu_set (mach_port_t tid, int cpu)
 {
-    struct thread_affinity_policy ap;
-    int res;
+  struct thread_affinity_policy ap;
+  int res;
 
-    ap.affinity_tag = cpu;
+  ap.affinity_tag = cpu;
 
-    res = thread_policy_set(tid, THREAD_AFFINITY_POLICY,
-     (thread_policy_t) &ap, THREAD_AFFINITY_POLICY_COUNT);
+  res = thread_policy_set(tid, THREAD_AFFINITY_POLICY,
+   (thread_policy_t) &ap, THREAD_AFFINITY_POLICY_COUNT);
 
-    return (res == KERN_SUCCESS) ? 0 : -1;
+  return (res == KERN_SUCCESS) ? 0 : -1;
 }
 
 /*
@@ -25,12 +25,12 @@ affin_cpu_set (mach_port_t tid, int cpu)
 static int
 affin_nprocs (lua_State *L)
 {
-    const int n = sysconf(_SC_NPROCESSORS_ONLN);
-    if (n < 1) return 0;
-    lua_pushinteger(L, n);
-    return 1;
+  const int n = sysconf(_SC_NPROCESSORS_ONLN);
+  if (n < 1) return 0;
+  lua_pushinteger(L, n);
+  return 1;
 }
 
 
 #define AFFIN_METHODS \
-    {"nprocs",	affin_nprocs}
+  {"nprocs",	affin_nprocs}

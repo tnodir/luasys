@@ -10,15 +10,15 @@ local sd0, sd1 = sock.handle(), sock.handle()
 assert(sd0:socket(sd1))
 
 local function ev_cb(evq, evid, fd, ev)
-    if ev == 'r' then
-	local line = fd:recv()
-	sys.stdout:write("Output:\t", line)
-    elseif ev == 'w' then
-	sys.stdout:write"Input:\t"
-	fd:send(sys.stdin:read())
-    end
-    evq:del(evid)
-    fd:close()
+  if ev == 'r' then
+    local line = fd:recv()
+    sys.stdout:write("Output:\t", line)
+  elseif ev == 'w' then
+    sys.stdout:write"Input:\t"
+    fd:send(sys.stdin:read())
+  end
+  evq:del(evid)
+  fd:close()
 end
 
 local evq = assert(sys.event_queue())
