@@ -468,7 +468,8 @@ sock_inet_pton (lua_State *L)
     if (inet_pton(af, src, inp) == 1) {
 #else
     sa.addrlen = sizeof(sa);
-    if (!WSAStringToAddressA(src, af, NULL, &sa.u.addr, &sa.addrlen)) {
+    if (!WSAStringToAddressA((char *) src, af, NULL,
+     &sa.u.addr, &sa.addrlen)) {
 #endif
  end:
 	lua_pushlstring(L, inp, in_len);
