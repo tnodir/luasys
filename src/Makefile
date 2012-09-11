@@ -4,7 +4,7 @@ PLAT= none
 LUA= /tmp/lua-5.2.0
 
 T= sys.so
-A= $(LUA)/src/libluasys.a
+A= libluasys.a
 
 COPT= -O2 -fPIC -DNDEBUG
 CWARNS = -W -Wall -Wextra -pedantic \
@@ -86,7 +86,7 @@ mingw:
 	OBJS="luasys.o sock/sys_sock.o isa/isapi/isapi_dll.o"
 
 clean:
-	$(RM) $(T) *.o */*.o
+	$(RM) $(T) $(A) *.o */*.o
 
 
 .PHONY: all $(PLATS) default a clean
