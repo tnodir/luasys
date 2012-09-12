@@ -43,10 +43,10 @@ do
   local nskt = 0
 
   chan_insert = function(evq, fd, cb, timeout)
+    fd:nonblocking(true)
     if not evq:add_socket(fd, 'r', cb, timeout) then
       error(SYS_ERR)
     end
-    --fd:nonblocking(true)
 
     if DEBUG then
       nskt = nskt + 1

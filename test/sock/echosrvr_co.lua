@@ -18,17 +18,7 @@ local stderr = sys.stderr
 
 
 local evq = assert(sys.event_queue())
-local sched = assert(thread.scheduler())
-
-
--- Process scheduler in main thread
-do
-  local function on_idle()
-    sched:loop(0)
-  end
-
-  evq:on_idle(on_idle)
-end
+local sched = assert(thread.scheduler(nil, 1, 8))
 
 
 -- Pool of sockets
@@ -88,7 +78,6 @@ local function process(fd, R, W, T, eof)
     line = fd:read()
   end
   if line then
---print("write", fd, line)
     line = fd:write(line)
     if ONE_SHOT_CLIENT then
       fd:shutdown()
@@ -156,3 +145,5 @@ assert(evq:add_signal("INT", evq.stop))
 
 print("Loop...")
 evq:loop()
+
+sched:stop()
