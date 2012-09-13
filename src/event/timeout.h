@@ -14,4 +14,10 @@ struct timeout_queue {
   msec_t msec;
 };
 
+/* Helper function to fast lookup */
+typedef struct timeout_queue *(*timeout_map_fn) (struct event_queue *evq,
+                                                 struct timeout_queue *tq,
+                                                 const msec_t msec,
+                                                 const int is_remove);
+
 #endif

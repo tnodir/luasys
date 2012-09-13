@@ -28,6 +28,7 @@ struct evq_sync_op {
 #define EVQ_CORO_ENV		1  /* environ. */
 #define EVQ_CORO_CALLBACK	2  /* table: callback functions */
 #define EVQ_CORO_UDATA		3  /* table: event objects */
+#define EVQ_CORO_TQ		4  /* table: timeout queues */
 
 #define levq_toevent(L,i) \
     (lua_type(L, (i)) == LUA_TLIGHTUSERDATA \
@@ -68,6 +69,26 @@ getmaxbit (unsigned int v)
 }
 
 
+static struct timeout_queue *
+levq_timeout_map (struct event_queue *evq, struct timeout_queue *tq,
+                  const msec_t msec, const int is_remove)
+{
+  lua_State *L = evq->L;
+
+  if (tq) {
+    if (is_remove)
+      lua_pushnil(L);  /* remove existing entry */
+    else
+      lua_pushlightuserdata(L, tq);  /* add new entry */
+    lua_rawseti(L, EVQ_CORO_TQ, msec);
+  } else {  /* search the entry */
+    lua_rawgeti(L, EVQ_CORO_TQ, msec);
+    tq = lua_touserdata(L, -1);
+    lua_pop(L, 1);
+  }
+  return tq;
+}
+
 /*
  * Returns: [evq_udata]
  */
@@ -94,13 +115,14 @@ levq_new (lua_State *L)
     NL = lua_newthread(L);
     if (!NL) return 0;
 
+    evq->tq_map_fn = levq_timeout_map;
     evq->L = NL;
     lua_rawsetp(L, -2, NL);  /* save coroutine to avoid GC */
 
     lua_newtable(L);  /* {ev_id => cb_func} (EVQ_CORO_CALLBACK) */
     lua_newtable(L);  /* {ev_id => obj_udata} (EVQ_CORO_UDATA) */
-    lua_xmove(L, NL, 3);
-    lua_pushnil(NL);  /* on_idle function */
+    lua_newtable(L);  /* {msec => tq_ludata} (EVQ_CORO_TQ) */
+    lua_xmove(L, NL, 4);
     return 1;
   }
   return sys_seterror(L, 0);

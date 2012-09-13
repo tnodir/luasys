@@ -92,6 +92,8 @@ struct event_queue {
   struct event *ev_post;  /* have to initialize the event source */
 #endif
 
+  timeout_map_fn tq_map_fn;
+
   EVQ_APP_EXTRA
   EVQ_EXTRA
 };

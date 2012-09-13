@@ -14,7 +14,7 @@ struct data_pool {
 
 #define DPOOL_PUTONFULL		1
 #define DPOOL_GETONEMPTY	2
-#define DPOOL_OPEN		8
+#define DPOOL_OPEN		4
   unsigned int flags;
 
   thread_event_t tev;  /* synchronization */

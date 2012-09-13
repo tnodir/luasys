@@ -35,6 +35,7 @@ timeout_del (struct event *ev)
   ev_next = ev->next;
 
   if (!ev_prev && !ev_next) {
+    struct event_queue *evq = event_get_evq(ev);
     struct timeout_queue **tq_headp = &event_get_tq_head(ev);
     struct event **ev_freep = &event_get_evq(ev)->ev_free;
     struct timeout_queue *tq_prev = tq->tq_prev;
@@ -50,6 +51,11 @@ timeout_del (struct event *ev)
 
     ((struct event *) tq)->next_ready = *ev_freep;
     *ev_freep = ((struct event *) tq);
+
+    if (evq->tq_map_fn) {
+      /* remove from map */
+      (void) evq->tq_map_fn(evq, tq, tq->msec, 1);
+    }
     return;
   }
 
@@ -67,12 +73,22 @@ timeout_del (struct event *ev)
 static int
 timeout_add (struct event *ev, msec_t msec, const msec_t now)
 {
+  struct event_queue *evq = event_get_evq(ev);
   struct timeout_queue **tq_headp = &event_get_tq_head(ev);
   struct timeout_queue *tq, *tq_prev;
 
   tq_prev = NULL;
-  for (tq = *tq_headp; tq && tq->msec < msec; tq = tq->tq_next)
-    tq_prev = tq;
+  tq = *tq_headp;
+
+  if (evq->tq_map_fn) {
+    /* search from map */
+    tq_prev = evq->tq_map_fn(evq, NULL, msec, 0);
+    if (tq_prev) tq = tq_prev;
+  } else {
+    /* search from sorted list */
+    for (; tq && tq->msec < msec; tq = tq->tq_next)
+      tq_prev = tq;
+  }
 
   if (!tq || tq->msec != msec) {
     struct event **ev_freep = &event_get_evq(ev)->ev_free;
@@ -94,6 +110,11 @@ timeout_add (struct event *ev, msec_t msec, const msec_t now)
     tq->msec = msec;
     tq->ev_head = ev;
     ev->prev = NULL;
+
+    if (evq->tq_map_fn) {
+      /* add to map */
+      (void) evq->tq_map_fn(evq, tq, msec, 0);
+    }
   } else {
     ev->prev = tq->ev_tail;
     if (tq->ev_tail)
