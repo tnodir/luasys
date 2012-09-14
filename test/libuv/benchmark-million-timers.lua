@@ -1,7 +1,6 @@
 #!/usr/bin/env lua
 
 local sys = require("sys")
-local sock = require("sys.sock")
 
 
 local NUM_TIMERS = 1000 * 1000
@@ -28,11 +27,11 @@ local function million_timers()
 
   period:start()
   assert(evq:loop())
-  local seconds = period:get() / 1e6
+  local duration = period:get() / 1e6
 
   assert(timer_cb_called == NUM_TIMERS)
 
-  print(seconds .. " seconds")
+  print(duration .. " seconds")
 
   return 0
 end
