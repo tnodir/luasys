@@ -1,7 +1,7 @@
 
 PLAT= none
 
-LUA= /tmp/lua-5.2.0
+LUA= /tmp/lua-5.2.1
 
 T= sys.so
 A= libluasys.a
@@ -44,6 +44,20 @@ OBJS= luasys.o sock/sys_sock.o
 LDOBJS= $(OBJS)
 
 
+ifneq (,$(findstring Windows,$(OS)))
+  UNAME_S= $(shell uname -s)
+  ifneq (,$(findstring MINGW,$(UNAME_S)))
+    T= sys.dll
+    A= sys.lib
+
+    MYCFLAGS= -DLUA_BUILD_AS_DLL
+    MYLDFLAGS= -s -shared
+    LIBS= $(LUA)/src/lua51.dll -lkernel32 -luser32 -lwinmm -lshell32 -ladvapi32 -lws2_32
+    OBJS+= isa/isapi/isapi_dll.o
+  endif
+endif
+
+
 default: $(PLAT)
 
 all:	$(T)
@@ -76,31 +90,24 @@ osx:
 	$(MAKE) all MYCFLAGS="-DUSE_KQUEUE" STRIP="echo strip" \
 	MYLDFLAGS="-bundle -undefined dynamic_lookup /usr/lib/bundle1.o"
 
-mingw:
-	$(MAKE) all A="sys.lib" T="sys.dll" \
-	AR="$(CC) -shared -o" RANLIB="strip --strip-unneeded" \
-	COPT="-O2 -DNDEBUG" RM="del" \
-	MYCFLAGS="-DLUA_BUILD_AS_DLL" \
-	MYLDFLAGS="-s -shared -L$(MINGW_HOME)/i686-w64-mingw32/lib" \
-	LIBS="$(LUA)/src/lua51.dll -lmsvcrt -lkernel32 -luser32 -lwinmm -lshell32 -ladvapi32 -lws2_32" \
-	OBJS="luasys.o sock/sys_sock.o isa/isapi/isapi_dll.o"
+mingw:	all
 
 clean:
-	$(RM) $(T) $(A) *.o */*.o
+	$(RM) $(T) $(A) $(OBJS) *.o
 
 
 .PHONY: all $(PLATS) default a clean
 
 
 luasys.o: luasys.c sys_comm.c sys_date.c sys_env.c sys_evq.c sys_file.c \
-    sys_fs.c sys_log.c sys_proc.c sys_rand.c sys_unix.c common.h \
-    thread/sys_thread.c thread/thread_dpool.c \
-    thread/thread_pipe.c thread/thread_sync.c \
-    mem/sys_mem.c mem/membuf.c \
-    event/evq.c event/epoll.c event/kqueue.c event/poll.c \
-    event/select.c event/signal.c event/timeout.c \
-    event/evq.h event/epoll.h event/kqueue.h event/poll.h \
-    event/select.h event/timeout.h \
-    win32/sys_win32.c win32/win32_reg.c win32/win32_svc.c win32/win32_utf8.c
+ sys_fs.c sys_log.c sys_proc.c sys_rand.c sys_unix.c common.h \
+ thread/sys_thread.c thread/thread_dpool.c \
+ thread/thread_pipe.c thread/thread_sync.c \
+ mem/sys_mem.c mem/membuf.c \
+ event/evq.c event/epoll.c event/kqueue.c event/poll.c \
+ event/select.c event/signal.c event/timeout.c \
+ event/evq.h event/epoll.h event/kqueue.h event/poll.h \
+ event/select.h event/timeout.h \
+ win32/sys_win32.c win32/win32_reg.c win32/win32_svc.c win32/win32_utf8.c
 sock/sys_sock.o: sock/sys_sock.c sock/sock_addr.c common.h
 isa/isapi/isapi_dll.o: isa/isapi/isapi_dll.c isa/isapi/isapi_ecb.c common.h
