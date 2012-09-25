@@ -296,7 +296,7 @@ static luaL_Reg svc_meth[] = {
 
 static luaL_Reg svc_lib[] = {
   {"install",		svc_install},
-  {"uninstall",	svc_uninstall},
+  {"uninstall",		svc_uninstall},
   {"handle",		svc_handle},
   {NULL, NULL}
 };

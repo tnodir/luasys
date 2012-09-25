@@ -816,7 +816,7 @@ sys_tostring (lua_State *L)
 static luaL_Reg fd_meth[] = {
   {"open",		sys_open},
   {"create",		sys_create},
-  {"tempfile",	sys_tempfile},
+  {"tempfile",		sys_tempfile},
   {"pipe",		sys_pipe},
   {"close",		sys_close},
   {"handle",		sys_handle},

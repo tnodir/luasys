@@ -663,8 +663,8 @@ sock_addr_tostring (lua_State *L)
   {"getaddrinfo",	sock_getaddrinfo}, \
   {"getnameinfo",	sock_getnameinfo}, \
   {"getifaddrs",	sock_getifaddrs}, \
-  {"inet_pton",	sock_inet_pton}, \
-  {"inet_ntop",	sock_inet_ntop}, \
+  {"inet_pton",		sock_inet_pton}, \
+  {"inet_ntop",		sock_inet_ntop}, \
   {"addr",		sock_addr_new}
 
 static luaL_Reg addr_meth[] = {

@@ -1140,8 +1140,8 @@ thread_tostring (lua_State *L)
 static luaL_Reg thread_meth[] = {
   {"resume",		thread_resume_wrap},
   {"interrupted",	thread_interrupted},
-  {"interrupt",	thread_set_interrupt},
-  {"terminate",	thread_set_terminate},
+  {"interrupt",		thread_set_interrupt},
+  {"terminate",		thread_set_terminate},
   {"wait",		thread_wait},
   {"__tostring",	thread_tostring},
   {"__gc",		thread_done},

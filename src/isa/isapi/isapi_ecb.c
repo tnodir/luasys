@@ -270,7 +270,7 @@ static luaL_Reg ecb_meth[] = {
   {"write",		ecb_write},
   {"header",		ecb_header},
   {"req_pending",	ecb_req_pending},
-  {"req_done",	ecb_req_done},
+  {"req_done",		ecb_req_done},
   {SYS_BUFIO_TAG,	NULL},  /* can operate with buffers */
   {NULL, NULL}
 };

@@ -389,9 +389,9 @@ comm_wait (lua_State *L)
 
 
 #define COMM_METHODS \
-  {"comm_init",	comm_init}, \
+  {"comm_init",		comm_init}, \
   {"comm_control",	comm_control}, \
   {"comm_timeout",	comm_timeout}, \
   {"comm_queues",	comm_queues}, \
   {"comm_purge",	comm_purge}, \
-  {"comm_wait",	comm_wait}
+  {"comm_wait",		comm_wait}

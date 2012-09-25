@@ -308,11 +308,11 @@ period_get (lua_State *L)
 
 
 #define DATE_METHODS \
-  {"msec",		sys_msec}, \
-  {"date",		sys_date}, \
-  {"time",		sys_time}, \
+  {"msec",	sys_msec}, \
+  {"date",	sys_date}, \
+  {"time",	sys_time}, \
   {"difftime",	sys_difftime}, \
-  {"period",		sys_period}
+  {"period",	sys_period}
 
 static luaL_Reg period_meth[] = {
   {"start",	period_start},

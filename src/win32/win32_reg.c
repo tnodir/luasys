@@ -310,7 +310,7 @@ static luaL_Reg reg_meth[] = {
   {"create",		reg_create},
   {"close",		reg_close},
   {"del_key",		reg_del_key},
-  {"del_value",	reg_del_value},
+  {"del_value",		reg_del_value},
   {"keys",		reg_keys},
   {"values",		reg_values},
   {"get",		reg_get},

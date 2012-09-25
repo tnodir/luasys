@@ -464,7 +464,7 @@ proc_tostring (lua_State *L)
 static luaL_Reg pid_meth[] = {
   {"close",		proc_close},
   {"id",		proc_id},
-  {"priority",	proc_priority},
+  {"priority",		proc_priority},
   {"wait",		proc_wait},
   {"kill",		proc_kill},
   {"__tostring",	proc_tostring},

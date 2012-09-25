@@ -67,5 +67,5 @@ sys_mkfifo (lua_State *L)
 
 #define UNIX_METHODS \
   {"chroot",		sys_chroot}, \
-  {"daemonize",	sys_daemonize}, \
+  {"daemonize",		sys_daemonize}, \
   {"mkfifo",		sys_mkfifo}

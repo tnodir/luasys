@@ -229,7 +229,7 @@ sys_xpcall (lua_State *L)
 
 
 static luaL_Reg sys_lib[] = {
-  {"strerror",	sys_strerror},
+  {"strerror",		sys_strerror},
   {"nprocs",		sys_nprocs},
   {"loadavg",		sys_loadavg},
   {"limit_nfiles",	sys_limit_nfiles},
@@ -266,7 +266,7 @@ createmeta (lua_State *L)
     {DIR_TYPENAME,		dir_meth,	0},
     {EVQ_TYPENAME,		evq_meth,	1},
     {FD_TYPENAME,		fd_meth,	1},
-    {PERIOD_TYPENAME,	period_meth,	1},
+    {PERIOD_TYPENAME,		period_meth,	1},
     {PID_TYPENAME,		pid_meth,	1},
     {LOG_TYPENAME,		log_meth,	0},
     {RAND_TYPENAME,		rand_meth,	0},

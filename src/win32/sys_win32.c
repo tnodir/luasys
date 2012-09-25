@@ -96,7 +96,7 @@ win32_beep (lua_State *L)
 
 static luaL_Reg win32_lib[] = {
   {"beep",		win32_beep},
-  {"registry",	reg_new},
+  {"registry",		reg_new},
   {NULL, NULL}
 };
 

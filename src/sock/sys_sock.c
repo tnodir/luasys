@@ -818,7 +818,7 @@ static luaL_Reg sock_meth[] = {
   {"socket",		sock_socket},
   {"close",		sock_close},
   {"handle",		sock_handle},
-  {"shutdown",	sock_shutdown},
+  {"shutdown",		sock_shutdown},
   {"nonblocking",	sock_nonblocking},
   {"sockopt",		sock_sockopt},
   {"membership",	sock_membership},
@@ -829,7 +829,7 @@ static luaL_Reg sock_meth[] = {
   {"send",		sock_send},
   {"recv",		sock_recv},
 #ifdef USE_SENDFILE
-  {"sendfile",	sock_sendfile},
+  {"sendfile",		sock_sendfile},
 #endif
   {"write",		sock_write},
   {"read",		sock_read},

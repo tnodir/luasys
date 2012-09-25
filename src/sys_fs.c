@@ -651,7 +651,7 @@ sys_dir_next (lua_State *L)
   {"statfs",		sys_statfs}, \
   {"remove",		sys_remove}, \
   {"rename",		sys_rename}, \
-  {"realpath",	sys_realpath}, \
+  {"realpath",		sys_realpath}, \
   {"curdir",		sys_curdir}, \
   {"mkdir",		sys_mkdir}, \
   {"rmdir",		sys_rmdir}, \

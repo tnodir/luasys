@@ -276,7 +276,7 @@ static luaL_Reg dpool_meth[] = {
   {"put",		dpool_put},
   {"get",		dpool_get},
   {"max",		dpool_max},
-  {"callbacks",	dpool_callbacks},
+  {"callbacks",		dpool_callbacks},
   {"__len",		dpool_count},
   {"__tostring",	dpool_tostring},
   {"__gc",		dpool_close},

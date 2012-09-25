@@ -716,7 +716,7 @@ levq_loop (lua_State *L)
   const msec_t timeout = (lua_type(L, 2) != LUA_TNUMBER)
    ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
   const int linger = lua_toboolean(L, 3);  /* keep running on empty queue */
-  const int once = lua_toboolean(L, 4);  /* process only one event */
+  const int once = lua_toboolean(L, 4);  /* process one cycle of active events */
   const int fetch = lua_toboolean(L, 5);  /* return event instead of callback */
 
 #undef ARG_LAST
@@ -1018,7 +1018,7 @@ sys_evq_sched_del (lua_State *L, void *ev, const int ev_added)
 
 static luaL_Reg evq_meth[] = {
   {"add",		levq_add},
-  {"add_timer",	levq_add_timer},
+  {"add_timer",		levq_add_timer},
   {"add_pid",		levq_add_pid},
   {"add_winmsg",	levq_add_winmsg},
   {"add_dirwatch",	levq_add_dirwatch},
@@ -1030,7 +1030,7 @@ static luaL_Reg evq_meth[] = {
   {"del",		levq_del},
   {"timeout",		levq_timeout},
   {"timeout_manual",	levq_timeout_manual},
-  {"callback",	levq_callback},
+  {"callback",		levq_callback},
   {"sync",		levq_sync},
   {"loop",		levq_loop},
   {"stop",		levq_stop},
