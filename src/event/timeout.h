@@ -7,6 +7,7 @@
  */
 
 #define MIN_TIMEOUT	10  /* milliseconds */
+#define MAX_TIMEOUT	(~0U >> 1)  /* milliseconds */
 
 struct timeout_queue {
   struct timeout_queue *tq_prev, *tq_next;

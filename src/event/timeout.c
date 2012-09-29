@@ -147,7 +147,8 @@ timeout_get (const struct timeout_queue *tq, msec_t min, const msec_t now)
 
   {
     const long d = (long) min - (long) now;
-    return (d < 0L) ? 0L : (msec_t) d;
+    return (d < 0L) ? 0L
+     : (d > (long) MAX_TIMEOUT ? (msec_t) MAX_TIMEOUT : (msec_t) d);
   }
 }
 

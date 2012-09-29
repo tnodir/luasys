@@ -14,7 +14,7 @@ win32thr_sleep (struct win32thr *wth)
 
   if (wth == &evq->head)
     return 0;
-  wth_cs = &wth->cs;
+  wth_cs = &wth->sig_cs;
   polling = 0;
 
   EnterCriticalSection(wth_cs);
@@ -41,9 +41,9 @@ win32thr_poll (struct event_queue *evq)
 
   evq->nwakeup = 0;
 
-  EnterCriticalSection(&evq->head.cs);
+  EnterCriticalSection(&evq->head.sig_cs);
   while (wth) {
-    CRITICAL_SECTION *wth_cs = &wth->cs;
+    CRITICAL_SECTION *wth_cs = &wth->sig_cs;
     int sleeping;
 
     EnterCriticalSection(wth_cs);
@@ -77,7 +77,7 @@ win32thr_poll (struct event_queue *evq)
     }
     wth = wth->next;
   }
-  LeaveCriticalSection(&evq->head.cs);
+  LeaveCriticalSection(&evq->head.sig_cs);
 
   /* wait of starting of all polling threads */
   if (polled)
@@ -93,7 +93,7 @@ win32thr_wait (struct event_queue *evq)
   HANDLE head_signal;
   struct win32thr wth;
 
-  InitCriticalSection(&wth.cs);
+  InitCriticalSection(&wth.sig_cs);
   wth.state = WTHR_SLEEP;
   wth.n = 0;
   wth.tq = NULL;
@@ -101,7 +101,7 @@ win32thr_wait (struct event_queue *evq)
   wth.evq = evq = ((struct win32thr_arg *) evq)->evq;
   wth.next = evq->head.next;
   evq->head.next = &wth;
-  head_cs = &evq->head.cs;
+  head_cs = &evq->head.sig_cs;
   head_signal = evq->head.signal;
 
   SetEvent(evq->ack_event);
@@ -124,13 +124,13 @@ win32thr_wait (struct event_queue *evq)
     wth.idx = res;
     res = (res == WAIT_TIMEOUT) || (res < (WAIT_OBJECT_0 + n));
 
-    EnterCriticalSection(&wth.cs);
+    EnterCriticalSection(&wth.sig_cs);
     if (wth.state == WTHR_ACK) {
       SetEvent(evq->ack_event);
       ResetEvent(wth.signal);
     }
     wth.state = res ? WTHR_READY : WTHR_SLEEP;
-    LeaveCriticalSection(&wth.cs);
+    LeaveCriticalSection(&wth.sig_cs);
 
     if (res) {
       EnterCriticalSection(head_cs);
@@ -142,7 +142,7 @@ win32thr_wait (struct event_queue *evq)
     }
   }
   CloseHandle(wth.signal);
-  DeleteCriticalSection(&wth.cs);
+  DeleteCriticalSection(&wth.sig_cs);
   return 0;
 }
 
@@ -215,6 +215,7 @@ static int
 win32thr_del (struct win32thr *wth, struct event *ev)
 {
   int i, n = --wth->n;
+  int res = 0;
 
   if (ev->tq) timeout_del(ev);
 
@@ -226,7 +227,10 @@ win32thr_del (struct win32thr *wth, struct event *ev)
     HANDLE hEvent = wth->handles[i];
     WSAEventSelect((int) ev->fd, hEvent, 0);
     CloseHandle(hEvent);
+  } else if (ev->flags & EVENT_DIRWATCH) {
+    res = !FindCloseChangeNotification(ev->fd);
   }
+
   if (i < n) {
     ev = wth->events[n];
     ev->w.index = i;
@@ -235,9 +239,6 @@ win32thr_del (struct win32thr *wth, struct event *ev)
   }
   wth->handles[n] = wth->signal;  /* lower signal event */
 
-  if (ev->flags & EVENT_DIRWATCH)
-    return !FindCloseChangeNotification(ev->fd);
-
-  return 0;
+  return res;
 }
 

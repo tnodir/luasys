@@ -109,6 +109,7 @@ local function accept(_, _, fd)
       stderr:write("Peer: ", sock.inet_ntop(addr), ":", port, "\n")
     end
   else
+    socket_put(newfd)
     stderr:write("accept: ", SYS_ERR, "\n")
   end
 end

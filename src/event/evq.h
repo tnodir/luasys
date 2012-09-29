@@ -25,7 +25,7 @@ struct event_queue;
 
 /* Event Queue wait result */
 #define EVQ_TIMEOUT	1
-#define EVQ_FAILED	-1
+#define EVQ_ERROR	2
 
 /* Directory watcher filter flags */
 #define EVQ_DIRWATCH_MODIFY	0x01
@@ -76,7 +76,10 @@ struct event {
 };
 
 struct event_queue {
-  unsigned int stop: 1;  /* break the loop? */
+#define EVQ_FLAG_STOP		0x01  /* break the loop? */
+#define EVQ_FLAG_MULTITHREAD	0x02  /* multi-threaded loop? */
+#define EVQ_FLAG_WAITING	0x04  /* waiting events? */
+  unsigned int volatile flags;
 
   unsigned int nevents;  /* number of alive events */
 
@@ -87,10 +90,6 @@ struct event_queue {
 
   struct event * volatile ev_ready;  /* head of ready events */
   struct event *ev_free;  /* head of free events */
-
-#ifdef EVQ_POST_INIT
-  struct event *ev_post;  /* have to initialize the event source */
-#endif
 
   timeout_map_fn tq_map_fn;
 

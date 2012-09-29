@@ -11,7 +11,7 @@ struct win32thr {
   struct timeout_queue *tq;
   struct win32thr *next, *next_ready;
 
-  CRITICAL_SECTION cs;
+  CRITICAL_SECTION sig_cs;
   HANDLE signal;
   unsigned int volatile n;  /* count of events */
 
@@ -72,6 +72,7 @@ struct win32overlapped {
 #define iocp_is_empty(evq)	(!(evq)->iocp.n)
 #define evq_is_empty(evq)	(!((evq)->nevents || (evq)->head.next))
 
+/* Have to initialize the event source */
 #define EVQ_POST_INIT
 
 #define evq_post_init(ev)						\

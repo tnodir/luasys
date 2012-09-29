@@ -17,7 +17,7 @@ evq_init (struct event_queue *evq)
     return -1;
   }
 
-  pthread_mutex_init(&evq->cs, NULL);
+  pthread_mutex_init(&evq->sig_cs, NULL);
 
   {
     fd_t *sig_fd = evq->sig_fd;
@@ -46,7 +46,7 @@ evq_init (struct event_queue *evq)
 EVQ_API void
 evq_done (struct event_queue *evq)
 {
-  pthread_mutex_destroy(&evq->cs);
+  pthread_mutex_destroy(&evq->sig_cs);
 
   close(evq->sig_fd[0]);
   close(evq->sig_fd[1]);
@@ -191,7 +191,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
   evq->now = sys_milliseconds();
 
   if (nready == -1)
-    return (errno == EINTR) ? 0 : EVQ_FAILED;
+    return (errno == EINTR) ? 0 : -1;
 
   if (timeout != TIMEOUT_INFINITE) {
     if (!nready) {

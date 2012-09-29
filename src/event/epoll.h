@@ -20,7 +20,7 @@
 
 #define EVQ_EXTRA							\
   struct timeout_queue *tq;						\
-  pthread_mutex_t cs;							\
+  pthread_mutex_t sig_cs;						\
   int volatile sig_ready;  /* triggered signals */			\
   fd_t sig_fd[NSIG_FD];  /* eventfd or pipe to interrupt the loop */	\
   int epoll_fd;  /* epoll descriptor */

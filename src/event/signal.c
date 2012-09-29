@@ -87,11 +87,11 @@ evq_signal (struct event_queue *evq, const int signo)
 {
   int res = 0;
 
-  pthread_mutex_lock(&evq->cs);
+  pthread_mutex_lock(&evq->sig_cs);
   if (!evq->sig_ready)
     res = evq_interrupt(evq);
   evq->sig_ready |= 1 << signo;
-  pthread_mutex_unlock(&evq->cs);
+  pthread_mutex_unlock(&evq->sig_cs);
   return res;
 }
 
@@ -263,7 +263,7 @@ signal_process_interrupt (struct event_queue *evq, struct event *ev_ready,
   unsigned int sig_ready;
   int signo;
 
-  pthread_mutex_lock(&evq->cs);
+  pthread_mutex_lock(&evq->sig_cs);
   /* reset interruption event */
   {
     const fd_t fd = evq->sig_fd[0];
@@ -275,7 +275,7 @@ signal_process_interrupt (struct event_queue *evq, struct event *ev_ready,
   }
   sig_ready = evq->sig_ready;
   evq->sig_ready = 0;
-  pthread_mutex_unlock(&evq->cs);
+  pthread_mutex_unlock(&evq->sig_cs);
 
   sig_ready &= ~(1 << EVQ_SIGEVQ);
 

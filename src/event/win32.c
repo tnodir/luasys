@@ -25,7 +25,7 @@ evq_init (struct event_queue *evq)
   wth->handles[0] = wth->signal;
   wth->evq = evq;
 
-  InitCriticalSection(&wth->cs);
+  InitCriticalSection(&wth->sig_cs);
 
   if (is_WinNT) {
     evq->iocp.h = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
@@ -47,7 +47,7 @@ evq_done (struct event_queue *evq)
 
   CloseHandle(evq->ack_event);
   CloseHandle(evq->head.signal);
-  DeleteCriticalSection(&evq->head.cs);
+  DeleteCriticalSection(&evq->head.sig_cs);
 }
 
 EVQ_API int
@@ -67,8 +67,9 @@ evq_add (struct event_queue *evq, struct event *ev)
     return 0;
   }
 
-  if ((ev_flags & (EVENT_SOCKET | EVENT_SOCKET_ACC_CONN)) == EVENT_SOCKET
-   && evq->iocp.h) {
+  if (evq->iocp.h
+   && (ev_flags & (EVENT_SOCKET | EVENT_SOCKET_ACC_CONN)) == EVENT_SOCKET
+   && (!(evq->flags & EVQ_FLAG_MULTITHREAD) || pCancelIoEx)) {
     if (!CreateIoCompletionPort((HANDLE) ev->fd, evq->iocp.h, 0, 0)
      && GetLastError() != ERROR_INVALID_PARAMETER)  /* already assosiated */
       return -1;
@@ -237,7 +238,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
   struct event *ev_ready = NULL;
   struct win32thr *wth = &evq->head;
   struct win32thr *threads = wth->next;
-  CRITICAL_SECTION *head_cs = &wth->cs;
+  CRITICAL_SECTION *head_cs = &wth->sig_cs;
   HANDLE head_signal = wth->signal;
   int n = wth->n;
   int sig_ready = 0;
@@ -259,7 +260,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
       ev_ready = win32iocp_process(evq, NULL, 0L);
 
     if (ev_ready) {
-      evq->ev_ready = ev_ready;
+      /* avoid saturation from IOCP events */
       timeout = 0L;
     } else {
       /* head_signal is resetted by IOCP WSARecv/WSASend */
@@ -277,13 +278,15 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 
   evq->now = sys_milliseconds();
 
-  ev_ready = evq->ev_ready;
-
   if (wait_res == WAIT_TIMEOUT) {
     if (ev_ready) goto end;
     if (!wth->tq && !evq->sig_ready)
       return EVQ_TIMEOUT;
   }
+
+  if (!ev_ready)
+    ev_ready = evq->ev_ready;
+
   if (wait_res == (DWORD) (WAIT_OBJECT_0 + n + 1)) {
     struct event *ev = evq->win_msg;
     if (ev && !(ev->flags & EVENT_ACTIVE)) {
@@ -294,7 +297,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     goto end;
   }
   if (wait_res == WAIT_FAILED)
-    return EVQ_FAILED;
+    return -1;
 
   timeout = evq->now;
   if (!iocp_is_empty(evq))
@@ -314,7 +317,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     LeaveCriticalSection(head_cs);
 
     if (wait_res == (DWORD) (WAIT_OBJECT_0 + n))
-      wth = threads;
+      wth = threads;  /* there are no active events in head */
     else
       wth->next_ready = threads;
   } else {

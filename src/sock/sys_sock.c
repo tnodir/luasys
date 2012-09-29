@@ -231,6 +231,7 @@ sock_nonblocking (lua_State *L)
    : sys_seterror(L, 0);
 }
 
+#define OPT_START	2
 /*
  * Arguments: sd_udata, option (string),
  *	[value_lo (number), value_hi (number)]
@@ -255,8 +256,7 @@ sock_sockopt (lua_State *L)
     "tcp_nodelay",
     "multicast_ttl", "multicast_if", "multicast_loop", NULL
   };
-#undef OPT_START
-#define OPT_START	2
+
   sd_t sd = (sd_t) lua_unboxinteger(L, 1, SD_TYPENAME);
   const int optname = luaL_checkoption(L, OPT_START, NULL, opt_names);
   const int level = (optname < OPTNAMES_TCP) ? SOL_SOCKET
@@ -285,6 +285,7 @@ sock_sockopt (lua_State *L)
   }
   return sys_seterror(L, 0);
 }
+#undef OPT_START
 
 /*
  * Arguments: sd_udata, binary_address (multiaddr),

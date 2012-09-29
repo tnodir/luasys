@@ -273,6 +273,7 @@ local function accept(evq, evid, fd)
 
   fd = fd:accept(channel.fd)
   if not fd then
+    channels.put(channel)
     log("accept")
     return
   end

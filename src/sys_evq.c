@@ -14,7 +14,10 @@ struct evq_sync_op {
 
 #define EVQ_APP_EXTRA \
   struct evq_sync_op * volatile sync_op; \
-  lua_State *L;  /* storage */
+  lua_State *L;  /* storage */ \
+  thread_event_t wait_tev;  /* evq_wait synchronization */ \
+  unsigned int volatile nidles;  /* number of idle loops */ \
+  unsigned int volatile nactives;  /* number of active event handlers */
 
 
 #include "event/evq.c"
@@ -69,6 +72,24 @@ getmaxbit (unsigned int v)
 }
 
 
+static void
+levq_control_wait (struct event_queue *evq, const int stop)
+{
+  if (evq->flags & EVQ_FLAG_MULTITHREAD) {
+    if (stop) {
+      if (!evq->nactives++ && (evq->flags & EVQ_FLAG_WAITING)) {
+        evq_signal(evq, EVQ_SIGEVQ);
+        do {
+          sys_thread_switch(0);
+        } while (evq->flags & EVQ_FLAG_WAITING);
+      }
+    } else {
+      if (!--evq->nactives)
+        thread_event_signal(&evq->wait_tev);
+    }
+  }
+}
+
 static struct timeout_queue *
 levq_timeout_map (struct event_queue *evq, struct timeout_queue *tq,
                   const msec_t msec, const int is_remove)
@@ -90,11 +111,13 @@ levq_timeout_map (struct event_queue *evq, struct timeout_queue *tq,
 }
 
 /*
+ * Arguments: [multithread (boolean)]
  * Returns: [evq_udata]
  */
 static int
 levq_new (lua_State *L)
 {
+  const int multithread = lua_toboolean(L, 1);
   struct event_queue *evq = lua_newuserdata(L, sizeof(struct event_queue));
 
   memset(evq, 0, sizeof(struct event_queue));
@@ -115,6 +138,12 @@ levq_new (lua_State *L)
     NL = lua_newthread(L);
     if (!NL) return 0;
 
+    if (multithread) {
+      evq->flags |= EVQ_FLAG_MULTITHREAD;
+      if (thread_event_new(&evq->wait_tev))
+        goto err;
+    }
+
     evq->tq_map_fn = levq_timeout_map;
     evq->L = NL;
     lua_rawsetp(L, -2, NL);  /* save coroutine to avoid GC */
@@ -125,6 +154,7 @@ levq_new (lua_State *L)
     lua_xmove(L, NL, 4);
     return 1;
   }
+ err:
   return sys_seterror(L, 0);
 }
 
@@ -138,10 +168,9 @@ levq_done (lua_State *L)
   struct event *buffers[EVQ_ENV_BUF_MAX + 1];  /* cache */
   lua_State *NL = evq->L;
 
-  memset(buffers, 0, sizeof(buffers));
+  if (!NL) return 0;
 
-#undef ARG_LAST
-#define ARG_LAST	1
+  memset(buffers, 0, sizeof(buffers));
 
   /* delete object events */
   lua_pushnil(NL);
@@ -165,7 +194,12 @@ levq_done (lua_State *L)
     lua_pop(NL, 1);  /* pop value */
   }
 
+  if (evq->flags & EVQ_FLAG_MULTITHREAD) {
+    (void) thread_event_del(&evq->wait_tev);
+  }
+
   evq_done(evq);
+  evq->L = NULL;
   return 0;
 }
 
@@ -244,18 +278,18 @@ levq_add (lua_State *L)
    | (lua_toboolean(L, 6) ? EVENT_ONESHOT : 0);
   const msec_t timeout = lua_isnoneornil(L, 5)
    ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 5);
+  const char *dirwatch_path = NULL;
   struct event *ev;
   int res;
 
-#undef ARG_LAST
-#define ARG_LAST	4
-
   ev = levq_new_event(evq);
 
-  if (!(ev_flags & EVENT_TIMER)) {
+  if (!(ev_flags & (EVENT_TIMER | EVENT_DIRWATCH))) {
     fd_t *fdp = lua_touserdata(L, 2);
     ev->fd = fdp ? *fdp
      : (fd_t) (size_t) lua_tointeger(L, 2);  /* signo */
+  } else if (ev_flags & EVENT_DIRWATCH) {
+    dirwatch_path = luaL_checkstring(L, 2);
   }
 
   if (!(ev_flags & (EVENT_READ | EVENT_WRITE))) {
@@ -280,12 +314,12 @@ levq_add (lua_State *L)
   if (!evq->ev_free)
     evq->ev_free = levq_new_event(evq);
 
+  levq_control_wait(evq, 1);
   if (ev_flags & EVENT_TIMER) {
     res = evq_add_timer(evq, ev, timeout);
   } else {
     if (ev_flags & EVENT_DIRWATCH) {
-      const char *path = luaL_checkstring(L, 2);
-      res = evq_add_dirwatch(evq, ev, path);
+      res = evq_add_dirwatch(evq, ev, dirwatch_path);
     } else {
       res = evq_add(evq, ev);
     }
@@ -294,6 +328,8 @@ levq_add (lua_State *L)
       evq_set_timeout(ev, timeout);
     }
   }
+  levq_control_wait(evq, 0);
+
   if (!res) {
     lua_State *NL = evq->L;
     const int ev_id = ev->ev_id;
@@ -473,15 +509,21 @@ levq_add_socket (lua_State *L)
 static int
 levq_mod_socket (lua_State *L)
 {
+  struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
   struct event *ev = levq_toevent(L, 2);
   const char *evstr = luaL_checkstring(L, 3);
   const unsigned int rw_flags = (evstr[0] == 'r')
    ? EVENT_READ : EVENT_WRITE;
+  int res;
 
+  levq_control_wait(evq, 1);
   lua_assert(ev && !event_deleted(ev) && (ev->flags & EVENT_SOCKET)
    && rw_flags != (ev->flags & (EVENT_READ | EVENT_WRITE)));
 
-  if (!evq_modify(ev, rw_flags)) {
+  res = evq_modify(ev, rw_flags);
+  levq_control_wait(evq, 0);
+
+  if (!res) {
     ev->flags &= ~(EVENT_READ | EVENT_WRITE);
     ev->flags |= rw_flags;
     lua_settop(L, 1);
@@ -505,16 +547,11 @@ levq_del (lua_State *L)
 
   lua_assert(ev);
 
-#undef ARG_LAST
-#define ARG_LAST	1
-
-#ifdef EVQ_POST_INIT
-  if (ev == evq->ev_post)
-    evq->ev_post = NULL;
-#endif
-
-  if (!event_deleted(ev))
+  levq_control_wait(evq, 1);
+  if (!event_deleted(ev)) {
     res = evq_del(ev, reuse_fd);
+  }
+  levq_control_wait(evq, 0);
 
   if (!(ev->flags & (EVENT_ACTIVE | EVENT_DELETE)))
     levq_del_event(evq, ev);
@@ -571,14 +608,19 @@ levq_timeout (lua_State *L)
   struct event *ev = levq_toevent(L, 2);
   const msec_t timeout = lua_isnoneornil(L, 3)
    ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 3);
+  int res;
 
+  levq_control_wait(evq, 1);
   lua_assert(ev && !event_deleted(ev) && !(ev->flags & EVENT_WINMSG));
 
   /* reserve place for timeout_queue */
   if (!evq->ev_free)
     evq->ev_free = levq_new_event(evq);
 
-  if (!evq_set_timeout(ev, timeout)) {
+  res = evq_set_timeout(ev, timeout);
+  levq_control_wait(evq, 0);
+
+  if (!res) {
     lua_settop(L, 1);
     return 1;
   }
@@ -701,13 +743,12 @@ levq_sync (lua_State *L)
   return levq_sync_call(L, evq, &op, 0, 2);
 }
 
+#define ARG_LAST	1
+#define ARG_EXTRAS	2
 /*
- * Arguments: evq_udata, [timeout (milliseconds), linger (boolean),
- *	once (boolean), fetch (boolean)]
+ * Arguments: evq_udata, [timeout (milliseconds),
+ *	linger (boolean), once (boolean)]
  * Returns: [evq_udata | timeout (false)]
- *	|
- * Returns: [ev_ludata, obj_udata, event (string: "r", "w", "t", "e"),
- *	eof_status (number)]
  */
 static int
 levq_loop (lua_State *L)
@@ -717,10 +758,9 @@ levq_loop (lua_State *L)
    ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
   const int linger = lua_toboolean(L, 3);  /* keep running on empty queue */
   const int once = lua_toboolean(L, 4);  /* process one cycle of active events */
-  const int fetch = lua_toboolean(L, 5);  /* return event instead of callback */
-
-#undef ARG_LAST
-#define ARG_LAST	1
+  struct sys_thread *td = (evq->flags & EVQ_FLAG_MULTITHREAD)
+   ? sys_thread_get() : NULL;
+  int res = 0;
 
   lua_settop(L, ARG_LAST);
   {
@@ -728,23 +768,11 @@ levq_loop (lua_State *L)
 
     lua_pushvalue(NL, EVQ_CORO_CALLBACK);
     lua_pushvalue(NL, EVQ_CORO_UDATA);
-    lua_xmove(NL, L, 2);
+    lua_xmove(NL, L, ARG_EXTRAS);
   }
 
-#ifdef EVQ_POST_INIT
-  if (evq->ev_post) {
-    evq_post_init(evq->ev_post);
-    evq->ev_post = NULL;
-  }
-#endif
-
-  for (; ; ) {
+  while (!(evq->flags & EVQ_FLAG_STOP)) {
     struct event *ev;
-
-    if (evq->stop) {
-      evq->stop = 0;
-      break;
-    }
 
     /* process synchronous operations */
     if (evq->sync_op) {
@@ -755,22 +783,39 @@ levq_loop (lua_State *L)
     }
 
     if (!evq->ev_ready) {
-      int res;
-
       if (!linger && evq_is_empty(evq))
         break;
 
-      res = evq_wait(evq, timeout);
-      if (res == EVQ_TIMEOUT) {
-        lua_pushboolean(L, 0);
-        return 1;
+      if (td) {
+        while (evq->nactives || (evq->flags & EVQ_FLAG_WAITING)) {
+          evq->nidles++;
+          res = thread_event_wait(&evq->wait_tev, td, TIMEOUT_INFINITE);
+          evq->nidles--;
+
+          sys_thread_check(td);
+          if (res || evq->ev_ready || (evq->flags & EVQ_FLAG_STOP)) {
+            goto no_wait;
+          }
+        }
+
+        evq->flags |= EVQ_FLAG_WAITING;
+        res = evq_wait(evq, timeout);
+        evq->flags &= ~EVQ_FLAG_WAITING;
+      } else {
+        res = evq_wait(evq, timeout);
       }
-      if (res == EVQ_FAILED)
-        return sys_seterror(L, 0);
+ no_wait:
+      if (res) break;
     }
 
     ev = evq->ev_ready;
     if (!ev) continue;
+
+    evq->nactives++;
+    /* notify another thread to process ready events */
+    if (evq->nidles && ev->next_ready)
+      thread_event_signal(&evq->wait_tev);
+
     do {
       const unsigned int ev_flags = ev->flags;
 
@@ -782,7 +827,7 @@ levq_loop (lua_State *L)
         /* postponed deletion of active event */
         levq_del_event(evq, ev);
       } else {
-        if ((ev_flags & EVENT_CALLBACK) || fetch) {
+        if (ev_flags & EVENT_CALLBACK) {
           const int ev_id = ev->ev_id;
 
           /* callback function */
@@ -810,20 +855,17 @@ levq_loop (lua_State *L)
 
         if (event_deleted(ev))
           levq_del_event(evq, ev);  /* deletion of oneshot event */
-#ifdef EVQ_POST_INIT
-        else evq->ev_post = ev;
-#endif
 
         if (ev_flags & EVENT_CALLBACK_SCHED) {
           /* callback function: coroutine */
-          lua_State *co = lua_tothread(L, ARG_LAST+3);
+          lua_State *co = lua_tothread(L, ARG_LAST + ARG_EXTRAS + 1);
 
           lua_xmove(L, co, 2);
           lua_pop(L, 1);  /* pop coroutine */
 
           sys_sched_event_ready(co, ev);
         } else if (ev_flags & EVENT_CALLBACK_CORO) {
-          lua_State *co = lua_tothread(L, ARG_LAST+3);
+          lua_State *co = lua_tothread(L, ARG_LAST + ARG_EXTRAS + 1);
 
           lua_xmove(L, co, 5);
           lua_pop(L, 1);  /* pop coroutine */
@@ -834,39 +876,54 @@ levq_loop (lua_State *L)
             if (!event_deleted(ev)) {
               evq_del(ev, 0);
               levq_del_event(evq, ev);
-#ifdef EVQ_POST_INIT
-              evq->ev_post = NULL;
-#endif
             }
             break;
           case LUA_YIELD:
+            res = 0;
             lua_settop(co, 0);
             break;
           default:
             lua_xmove(co, L, 1);  /* error message */
-            lua_error(L);
+            res = EVQ_ERROR;
           }
-        } else if (ev_flags & EVENT_CALLBACK)
-          lua_call(L, 5, 0);
-        else if (fetch)
-          return 4;
+        } else if (ev_flags & EVENT_CALLBACK) {
+          if (lua_pcall(L, 5, 0, 0)) {
+            res = EVQ_ERROR;
+          }
+        }
 
 #ifdef EVQ_POST_INIT
-        if (evq->ev_post) {
-          evq_post_init(evq->ev_post);
-          evq->ev_post = NULL;
-        }
+        if (!event_deleted(ev))
+          evq_post_init(ev);
 #endif
+        if (res) break;  /* error */
       }
       ev = evq->ev_ready;
     } while (ev);
 
-    if (once) break;
+    evq->nactives--;
+
+    if (res || once) break;
   }
 
-  lua_settop(L, 1);
-  return 1;
+  if (evq->nidles && !(evq->flags & EVQ_FLAG_WAITING))
+    thread_event_signal(&evq->wait_tev);
+
+  if (!res) {
+    lua_settop(L, 1);
+    return 1;
+  }
+  if (res == EVQ_TIMEOUT) {
+    lua_pushboolean(L, 0);
+    return 1;
+  }
+  if (res == EVQ_ERROR) {
+    lua_error(L);
+  }
+  return sys_seterror(L, 0);
 }
+#undef ARG_EXTRAS
+#undef ARG_LAST
 
 /*
  * Arguments: evq_udata, [stop/work (boolean)]
@@ -875,9 +932,13 @@ static int
 levq_stop (lua_State *L)
 {
   struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
-  const int state = lua_isnoneornil(L, 2) || lua_toboolean(L, 2);
+  const int stop = lua_isnoneornil(L, 2) || lua_toboolean(L, 2);
 
-  evq->stop = state;
+  if (stop) {
+    evq->flags |= EVQ_FLAG_STOP;
+  } else {
+    evq->flags = ~EVQ_FLAG_STOP;
+  }
   evq_signal(evq, EVQ_SIGEVQ);
   return 0;
 }

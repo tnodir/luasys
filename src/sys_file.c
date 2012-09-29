@@ -42,6 +42,7 @@ sys_file (lua_State *L)
   return 1;
 }
 
+#define OPT_START	5
 /*
  * Arguments: fd_udata, path (string), [mode (string: "r", "w", "rw"),
  *	permissions (number), options (string) ...]
@@ -59,9 +60,6 @@ sys_open (lua_State *L)
   int append = 0;
 #endif
   int flags = O_RDONLY, i;
-
-#undef OPT_START
-#define OPT_START	5
 
   if (mode) {
     switch (mode[0]) {
@@ -140,6 +138,7 @@ sys_open (lua_State *L)
   }
   return sys_seterror(L, 0);
 }
+#undef OPT_START
 
 /*
  * Arguments: fd_udata, path (string), [permissions (number)]

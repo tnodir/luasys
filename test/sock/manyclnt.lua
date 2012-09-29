@@ -14,11 +14,14 @@ local askt, iskt = {}, 0
 
 local function ev_cb(evq, evid, fd, ev)
   local s = tostring(fd)
-  if ev ~= 'r' then
+  if ev == 'w' then
     assert(fd:write(s))
     assert(evq:mod_socket(evid, 'r'))
   else
-    local line = fd:read()
+    local line
+    if ev == 'r' then
+      line = fd:read()
+    end
     if not (line or askt[evid]) then
       evq:del(evid)
       fd:close()

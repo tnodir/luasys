@@ -727,6 +727,7 @@ sys_thread_create (struct sys_thread *td, const int is_affin)
   return -1;
 }
 
+#define ARG_LAST	2
 /*
  * Arguments: options (table: {1..n: library names, "cpu": number}),
  *	filename (string) | function_dump (string),
@@ -742,9 +743,6 @@ thread_runvm (lua_State *L)
   lua_State *NL;
   unsigned int loadlibs = ~0U;  /* load all standard libraries */
   int is_affin = 0, cpu = 0;
-
-#undef ARG_LAST
-#define ARG_LAST	2
 
   if (!vmtd) luaL_argerror(L, 0, "Threading not initialized");
 
@@ -847,6 +845,7 @@ thread_runvm (lua_State *L)
  err:
   return sys_seterror(L, 0);
 }
+#undef ARG_LAST
 
 /*
  * Arguments: function, [arguments (any) ...]

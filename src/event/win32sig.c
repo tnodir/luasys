@@ -63,11 +63,11 @@ evq_signal (struct event_queue *evq, const int signo)
   struct win32thr *wth = &evq->head;
   int res = 0;
 
-  EnterCriticalSection(&wth->cs);
+  EnterCriticalSection(&wth->sig_cs);
   if (!evq->sig_ready)
     res = !SetEvent(wth->signal);
   evq->sig_ready |= 1 << signo;
-  LeaveCriticalSection(&wth->cs);
+  LeaveCriticalSection(&wth->sig_cs);
   return res;
 }
 

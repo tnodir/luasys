@@ -34,6 +34,11 @@ sys_strerror (lua_State *L)
 #if defined(BSD) || (_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600)
   char buf[512];
 
+  if (!err) {
+    lua_pushliteral(L, "OK");
+    return 1;
+  }
+
   if (!strerror_r(err, buf, sizeof(buf))) {
     lua_pushstring(L, buf);
     return 1;
@@ -44,6 +49,11 @@ sys_strerror (lua_State *L)
   const int flags = FORMAT_MESSAGE_IGNORE_INSERTS
    | FORMAT_MESSAGE_FROM_SYSTEM;
   WCHAR buf[512];
+
+  if (!err) {
+    lua_pushliteral(L, "OK");
+    return 1;
+  }
 
   if (is_WinNT
    ? FormatMessageW(flags, NULL, err, 0, buf, sizeof(buf) / sizeof(buf[0]), NULL)

@@ -6,12 +6,21 @@ local sock = require"sys.sock"
 
 local ONE_SHOT_CLIENT = false
 local DEBUG = false
+local EXTRA_LOOPS = 0
 
 local bind = {
   [8080] = "127.0.0.1",
 }
 
 local stderr = sys.stderr
+
+
+-- Multi-threaded event queue?
+local thread = sys.thread
+local is_multithread = (EXTRA_LOOPS and EXTRA_LOOPS > 0)
+if is_multithread then
+  thread.init()
+end
 
 
 -- Pool of sockets
@@ -97,12 +106,13 @@ local function accept(evq, evid, fd)
       stderr:write("Peer: ", sock.inet_ntop(addr), ":", port, "\n")
     end
   else
+    socket_put(newfd)
     stderr:write("accept: ", SYS_ERR, "\n")
   end
 end
 
 
-local evq = assert(sys.event_queue())
+local evq = assert(sys.event_queue(is_multithread))
 
 print("Binding servers...")
 local saddr = sock.addr()
@@ -119,5 +129,10 @@ end
 -- Quit by Ctrl-C
 assert(evq:add_signal("INT", evq.stop))
 
-print("Loop...")
+print("Loop (+" .. (EXTRA_LOOPS or 0) .. ")...")
+if is_multithread then
+  for i = 1, EXTRA_LOOPS do
+    assert(thread.run(evq.loop, evq))
+  end
+end
 evq:loop()

@@ -174,6 +174,7 @@ sched_task_del (lua_State *L, struct scheduler *sched,
   }
 }
 
+#define ARG_LAST	1
 /*
  * Arguments: [coroutines_controller (function),
  *	min_workers (number), max_workers (number),
@@ -188,9 +189,6 @@ sched_new (lua_State *L)
   const msec_t worker_timeout = luaL_optint(L, 4, SCHED_WORKER_TIMEOUT);
   struct scheduler *sched;
   lua_State *NL;
-
-#undef ARG_LAST
-#define ARG_LAST	1
 
   lua_settop(L, ARG_LAST);
 
@@ -227,6 +225,7 @@ sched_new (lua_State *L)
   }
   return sys_seterror(L, 0);
 }
+#undef ARG_LAST
 
 /*
  * Arguments: sched_udata
