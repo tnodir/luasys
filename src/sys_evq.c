@@ -169,6 +169,7 @@ levq_done (lua_State *L)
   lua_State *NL = evq->L;
 
   if (!NL) return 0;
+  evq->L = NULL;
 
   memset(buffers, 0, sizeof(buffers));
 
@@ -199,7 +200,6 @@ levq_done (lua_State *L)
   }
 
   evq_done(evq);
-  evq->L = NULL;
   return 0;
 }
 

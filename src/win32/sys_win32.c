@@ -2,8 +2,6 @@
 
 PCancelSynchronousIo pCancelSynchronousIo;
 PCancelIoEx pCancelIoEx;
-PGetQueuedCompletionStatusEx pGetQueuedCompletionStatusEx;
-PSetFileCompletionNotificationModes pSetFileCompletionNotificationModes;
 
 int is_WinNT;
 
@@ -124,10 +122,6 @@ win32_init (void)
      GetProcAddress(mh, "CancelSynchronousIo");
     pCancelIoEx = (PCancelIoEx)
      GetProcAddress(mh, "CancelIoEx");
-    pGetQueuedCompletionStatusEx = (PGetQueuedCompletionStatusEx)
-     GetProcAddress(mh,"GetQueuedCompletionStatusEx");
-    pSetFileCompletionNotificationModes = (PSetFileCompletionNotificationModes)
-     GetProcAddress(mh,"SetFileCompletionNotificationModes");
   }
 }
 

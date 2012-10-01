@@ -271,30 +271,12 @@ void sys_sched_event_ready (lua_State *co, void *ev);
 #define STATUS_CANCELLED	((DWORD) 0xC0000120L)
 #endif
 
-#ifndef DeleteFileTransacted
-typedef struct _OVERLAPPED_ENTRY {
-  ULONG_PTR lpCompletionKey;
-  LPOVERLAPPED lpOverlapped;
-  ULONG_PTR Internal;
-  DWORD dwNumberOfBytesTransferred;
-} OVERLAPPED_ENTRY, *LPOVERLAPPED_ENTRY;
-#endif
-
 typedef BOOL (WINAPI *PCancelSynchronousIo) (HANDLE hThread);
 
 typedef BOOL (WINAPI *PCancelIoEx) (HANDLE hThread, LPOVERLAPPED overlapped);
 
-typedef BOOL (WINAPI *PGetQueuedCompletionStatusEx) (HANDLE handle,
-    LPOVERLAPPED_ENTRY entries, ULONG count, PULONG n,
-    DWORD timeout, BOOL alertable);
-
-typedef BOOL (WINAPI *PSetFileCompletionNotificationModes) (HANDLE handle,
-    UCHAR flags);
-
 extern PCancelSynchronousIo pCancelSynchronousIo;
 extern PCancelIoEx pCancelIoEx;
-extern PGetQueuedCompletionStatusEx pGetQueuedCompletionStatusEx;
-extern PSetFileCompletionNotificationModes pSetFileCompletionNotificationModes;
 
 extern int is_WinNT;
 

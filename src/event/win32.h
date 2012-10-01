@@ -26,18 +26,32 @@ struct win32thr {
   struct event *events[NEVENT-1];
 };
 
-/* Win32 IOCP */
-struct win32iocp {
-  int n;  /* number of assosiated events */
-  HANDLE h;  /* IOCP handle */
+/* Win32 NT I/O Completion Routines */
+struct win32iocr {
+  HANDLE h;  /* thread handle */
+  struct win32overlapped *ov_head;  /* head of overlaps to be queued */
+  struct win32overlapped *ov_tail;  /* tail of overlaps to be queued */
+  struct win32overlapped * volatile ov_set;  /* set overlaps to queue */
+  struct win32overlapped * volatile ov_ready;  /* ready overlaps */
 };
 
 struct win32overlapped {
   union {
-    struct win32overlapped *next_free;
-    OVERLAPPED ov;
-  } u;
-  struct event *ev;
+    DWORD Internal;
+    DWORD err;
+  };
+  union {
+    DWORD InternalHigh;
+    DWORD rw_flags;
+  };
+  union {
+    LONGLONG Offset;
+    struct win32overlapped *ov_next;
+  };
+  union {
+    HANDLE hEvent;
+    struct event *ev;
+  };
 };
 
 #define EVENT_EXTRA							\
@@ -45,8 +59,8 @@ struct win32overlapped {
   union {								\
     unsigned int index;							\
     struct {								\
-      struct win32overlapped *rov, *wov;  /* IOCP overlaps */		\
-    } iocp;								\
+      struct win32overlapped *rov, *wov;  /* IOCR overlaps */		\
+    } iocr;								\
   } w;
 
 #define WIN32OV_BUF_IDX		6  /* initial buffer size on power of 2 */
@@ -56,7 +70,7 @@ struct win32overlapped {
 #define EVQ_EXTRA							\
   HANDLE ack_event;							\
   struct event *win_msg;  /* window messages handler */			\
-  struct win32iocp iocp;						\
+  struct win32iocr iocr;						\
   struct win32thr * volatile wth_ready;					\
   struct win32thr head;							\
   int volatile nwakeup;  /* number of the re-polling threads */		\
@@ -69,7 +83,6 @@ struct win32overlapped {
 #define event_get_evq(ev)	(ev)->wth->evq
 #define event_get_tq_head(ev)	(ev)->wth->tq
 #define event_deleted(ev)	((ev)->wth == NULL)
-#define iocp_is_empty(evq)	(!(evq)->iocp.n)
 #define evq_is_empty(evq)	(!((evq)->nevents || (evq)->head.next))
 
 /* Have to initialize the event source */
@@ -78,11 +91,11 @@ struct win32overlapped {
 #define evq_post_init(ev)						\
   do {									\
     if (((ev)->flags & (EVENT_AIO | EVENT_PENDING | EVENT_ACTIVE)) == EVENT_AIO) \
-      win32iocp_set((ev), (ev)->flags);					\
+      win32iocr_set((ev), (ev)->flags);					\
     else if ((ev)->flags & EVENT_DIRWATCH)				\
       FindNextChangeNotification((ev)->fd);				\
   } while (0)
 
-EVQ_API int win32iocp_set (struct event *ev, const unsigned int ev_flags);
+EVQ_API int win32iocr_set (struct event *ev, const unsigned int ev_flags);
 
 #endif
