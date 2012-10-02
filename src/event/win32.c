@@ -391,7 +391,8 @@ evq_wait (struct event_queue *evq, msec_t timeout)
       ev_ready = ev;
     }
   }
-  if (!ev_ready) return 0;
+  if (!ev_ready)
+    return (wait_res == WAIT_TIMEOUT) ? EVQ_TIMEOUT : 0;
  end:
   evq->ev_ready = ev_ready;
   return 0;
