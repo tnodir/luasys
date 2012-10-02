@@ -108,9 +108,13 @@ win32iocr_set_handle (struct win32iocr_thread *iocr_thr,
   static WSABUF buf = {0, 0};
 
   struct event *ev = ov->ev;
-  const unsigned int rw_flags = ov->rw_flags;
-  const sd_t sd = (sd_t) ev->fd;
+  unsigned int rw_flags;
+  sd_t sd;
 
+  if (!ev) goto ready;
+
+  sd = (sd_t) ev->fd;
+  rw_flags = ov->rw_flags;
   ov->rw_flags = 0;
 
   if (rw_flags == EVENT_READ) {
@@ -127,6 +131,7 @@ win32iocr_set_handle (struct win32iocr_thread *iocr_thr,
       return;
   }
   ov->err = WSAGetLastError();
+ ready:
   win32iocr_list_put(iocr_thr->ov_list, ov);
 }
 
