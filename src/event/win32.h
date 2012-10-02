@@ -26,15 +26,6 @@ struct win32thr {
   struct event *events[NEVENT-1];
 };
 
-/* Win32 NT I/O Completion Routines */
-struct win32iocr {
-  HANDLE h;  /* thread handle */
-  struct win32overlapped *ov_head;  /* head of overlaps to be queued */
-  struct win32overlapped *ov_tail;  /* tail of overlaps to be queued */
-  struct win32overlapped * volatile ov_set;  /* set overlaps to queue */
-  struct win32overlapped * volatile ov_ready;  /* ready overlaps */
-};
-
 struct win32overlapped {
   union {
     DWORD Internal;
@@ -52,6 +43,26 @@ struct win32overlapped {
     HANDLE hEvent;
     struct event *ev;
   };
+};
+
+/* List of overlaps */
+struct win32overlapped_list {
+  struct win32overlapped *ov_head, *ov_tail;
+};
+
+/* IOCR thread */
+struct win32iocr_thread {
+  int stop;  /* terminate the thread? */
+  struct win32overlapped_list ov_list;  /* overlaps to be ready */
+  struct win32overlapped * volatile ov_set;  /* set overlaps to queue */
+};
+
+/* Win32 NT I/O Completion Routines */
+struct win32iocr {
+  HANDLE h;  /* thread handle */
+  struct win32overlapped_list ov_list;  /* overlaps to be queued */
+  struct win32iocr_thread *iocr_thr;  /* IOCR thread */
+  struct win32overlapped * volatile ov_ready;  /* ready overlaps */
 };
 
 #define EVENT_EXTRA							\

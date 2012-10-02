@@ -249,7 +249,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     }
   }
 
-  if (evq->iocr.ov_head)
+  if (evq->iocr.ov_list.ov_head)
     win32iocr_submit(evq);
 
   sys_vm_leave();

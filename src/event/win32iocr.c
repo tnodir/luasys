@@ -1,11 +1,5 @@
 /* Win32 NT I/O Completion Routines */
 
-/* IOCR thread */
-struct win32iocr_thread {
-  int stop;
-  struct win32overlapped *ov_head, *ov_tail;
-};
-
 #define IOCR_NENTRY	48  /* number of events in head to trigger IOCR */
 
 #define win32iocr_apc_put(apc_fn,evq,param) \
@@ -14,12 +8,19 @@ struct win32iocr_thread {
 #define win32iocr_signal(evq) \
     win32iocr_apc_put(win32iocr_apc_signal, (evq), 0)
 
-#define win32iocr_list_put(ov_head,ov_tail,ov) \
+#define win32iocr_list_put(ov_list,ov) \
   do { \
-    (ov)->ov_next = (ov_head); \
-    if (!(ov_head)) \
-      (ov_tail) = (ov); \
-    (ov_head) = (ov); \
+    (ov)->ov_next = (ov_list).ov_head; \
+    if (!(ov_list).ov_head) \
+      (ov_list).ov_tail = (ov); \
+    (ov_list).ov_head = (ov); \
+  } while (0)
+
+#define win32iocr_list_move(ov_list,ov_dest) \
+  do { \
+    (ov_list).ov_tail->ov_next = (ov_dest); \
+    (ov_dest) = (ov_list).ov_head; \
+    (ov_list).ov_head = (ov_list).ov_tail = NULL; \
   } while (0)
 
 
@@ -58,11 +59,11 @@ win32iocr_overlapped_new (struct event_queue *evq)
 {
   struct win32overlapped *ov = evq->ov_free;
 
-  if (ov) {
+  if (ov)
     evq->ov_free = ov->ov_next;
-  } else {
+  else
     ov = win32iocr_overlapped_alloc(evq);
-  }
+
   if (ov) memset(ov, 0, sizeof(struct win32overlapped));
   return ov;
 }
@@ -74,15 +75,6 @@ win32iocr_overlapped_del (struct event_queue *evq, struct win32overlapped *ov)
   evq->ov_free = ov;
 }
 
-static void WINAPI
-win32iocr_apc_done (ULONG_PTR param)
-{
-  struct win32iocr_thread *iocr_thr = TlsGetValue(g_IOCR_TLSIndex);
-
-  (void) param;
-
-  iocr_thr->stop = 1;
-}
 
 static void WINAPI
 win32iocr_apc_signal (ULONG_PTR param)
@@ -106,7 +98,7 @@ win32iocr_completion (DWORD err, DWORD n, struct win32overlapped *ov,
   (void) n;
   (void) flags;
 
-  win32iocr_list_put(iocr_thr->ov_head, iocr_thr->ov_tail, ov);
+  win32iocr_list_put(iocr_thr->ov_list, ov);
 }
 
 static void
@@ -135,7 +127,7 @@ win32iocr_set_handle (struct win32iocr_thread *iocr_thr,
       return;
   }
   ov->err = WSAGetLastError();
-  win32iocr_list_put(iocr_thr->ov_head, iocr_thr->ov_tail, ov);
+  win32iocr_list_put(iocr_thr->ov_list, ov);
 }
 
 static void
@@ -144,9 +136,7 @@ win32iocr_submit (struct event_queue *evq)
   CRITICAL_SECTION *head_cs = &evq->head.sig_cs;
 
   EnterCriticalSection(head_cs);
-  evq->iocr.ov_tail->ov_next = evq->iocr.ov_set;
-  evq->iocr.ov_set = evq->iocr.ov_head;
-  evq->iocr.ov_head = evq->iocr.ov_tail = NULL;
+  win32iocr_list_move(evq->iocr.ov_list, evq->iocr.iocr_thr->ov_set);
   LeaveCriticalSection(head_cs);
 
   (void) win32iocr_signal(evq);
@@ -162,18 +152,19 @@ win32iocr_wait (struct event_queue *evq)
   memset(&iocr_thr, 0, sizeof(struct win32iocr_thread));
   TlsSetValue(g_IOCR_TLSIndex, &iocr_thr);
 
+  evq->iocr.iocr_thr = &iocr_thr;
+  SetEvent(evq->ack_event);
+
   while (!iocr_thr.stop) {
     struct win32overlapped *ov_set = NULL;
 
     EnterCriticalSection(head_cs);
-    if (iocr_thr.ov_head) {
-      iocr_thr.ov_tail->ov_next = evq->iocr.ov_ready;
-      evq->iocr.ov_ready = iocr_thr.ov_head;
-      iocr_thr.ov_head = iocr_thr.ov_tail = NULL;
+    if (iocr_thr.ov_list.ov_head) {
+      win32iocr_list_move(iocr_thr.ov_list, evq->iocr.ov_ready);
       SetEvent(head_signal);
     }
-    ov_set = evq->iocr.ov_set;
-    evq->iocr.ov_set = NULL;
+    ov_set = iocr_thr.ov_set;
+    iocr_thr.ov_set = NULL;
     LeaveCriticalSection(head_cs);
 
     /* handle read/write requests */
@@ -182,7 +173,7 @@ win32iocr_wait (struct event_queue *evq)
       ov_set = ov_set->ov_next;
     }
 
-    if (!iocr_thr.ov_head)
+    if (!iocr_thr.ov_list.ov_head)
       SleepEx(INFINITE, TRUE);
   }
   return 0;
@@ -204,6 +195,7 @@ win32iocr_init (struct event_queue *evq)
    (LPTHREAD_START_ROUTINE) win32iocr_wait, evq, 0, &id);
   if (hThr) {
     SetThreadPriority(hThr, THREAD_PRIORITY_ABOVE_NORMAL);
+    WaitForSingleObject(evq->ack_event, INFINITE);
     evq->iocr.h = hThr;
   }
 }
@@ -215,7 +207,8 @@ win32iocr_done (struct event_queue *evq)
   unsigned int i;
 
   if (evq->iocr.h) {
-    if (!win32iocr_apc_put(win32iocr_apc_done, (evq), 0))
+    evq->iocr.iocr_thr->stop = 1;
+    if (!win32iocr_signal(evq))
       WaitForSingleObject(evq->iocr.h, INFINITE);
     CloseHandle(evq->iocr.h);
   }
@@ -317,7 +310,7 @@ win32iocr_set (struct event *ev, const unsigned int rw_flags)
     ov->ev = ev;
     ev->w.iocr.rov = ov;
     ev->flags |= EVENT_RPENDING;  /* read request is installed */
-    win32iocr_list_put(evq->iocr.ov_head, evq->iocr.ov_tail, ov);
+    win32iocr_list_put(evq->iocr.ov_list, ov);
   }
   if ((rw_flags & EVENT_WRITE) && !ev->w.iocr.wov) {
     struct win32overlapped *ov = win32iocr_overlapped_new(evq);
@@ -327,7 +320,7 @@ win32iocr_set (struct event *ev, const unsigned int rw_flags)
     ov->ev = ev;
     ev->w.iocr.wov = ov;
     ev->flags |= EVENT_WPENDING;  /* write request is installed */
-    win32iocr_list_put(evq->iocr.ov_head, evq->iocr.ov_tail, ov);
+    win32iocr_list_put(evq->iocr.ov_list, ov);
   }
   return 0;
 }
