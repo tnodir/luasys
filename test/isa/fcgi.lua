@@ -186,7 +186,7 @@ do
 
     if dir_files then
       chunk = dir_files[filename]
-    elseif evq:add_dirwatch(dir, on_change, nil, nil, true) then
+    elseif evq:add_dirwatch(dir, on_change, true) then
       dir_files = {}
       dirs[dir] = dir_files
     else

@@ -254,6 +254,12 @@ enum {
   EVQ_SCHED_SOCKET
 };
 
+enum {
+  EVQ_SCHED_ADD_SYNC = 0,
+  EVQ_SCHED_ADD_RES,
+  EVQ_SCHED_ADD_ERR
+};
+
 int sys_evq_sched_add (lua_State *L, const int evq_idx, const int type);
 int sys_evq_sched_del (lua_State *L, void *ev, const int ev_added);
 

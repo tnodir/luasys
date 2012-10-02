@@ -16,7 +16,7 @@ do
     assert(ev ~= 't', "file change notification expected")
   end
 
-  assert(evq:add_dirwatch(".", on_change, 100, true))
+  assert(evq:add_dirwatch(".", on_change, true, 100, true))
   assert(fd:create(filename))
 
   evq:loop()

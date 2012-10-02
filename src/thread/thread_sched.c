@@ -15,7 +15,7 @@ struct sched_task {
   int prev_id, next_id;  /* circular list of tasks */
   void *ev;  /* waiting in event queue */
 
-  unsigned int started:	1;  /* execution started */
+  unsigned int started:		1;  /* execution started */
   unsigned int suspended:	1;  /* execution was suspended */
   unsigned int ev_added:	1;  /* event added to event queue */
   unsigned int terminate:	1;  /* termination requested */
@@ -611,7 +611,20 @@ sched_event_add (lua_State *L, const int cb_idx, const int type)
   lua_insert(L, 3);
 
   res = sys_evq_sched_add(L, 3, type);
-  if (res == 1) {
+  if (res == EVQ_SCHED_ADD_RES) {
+    struct sched_task *task = sched_id_to_task(sched, sched_ctx->task_id);
+
+    task->ev = lua_touserdata(L, -1);
+    task->ev_added = -1;
+    task->suspended = -1;
+
+    lua_pop(L, 1);  /* pop ev_ludata, */
+    return 2;  /* sched_udata, evq_udata */
+  }
+  if (res == EVQ_SCHED_ADD_ERR) {
+    return 2; /* nil, error_message */
+  }
+  if (res == EVQ_SCHED_ADD_SYNC) {
     struct sched_task *task = sched_id_to_task(sched, sched_ctx->task_id);
 
     task->suspended = -1;
@@ -630,16 +643,23 @@ sched_event_add (lua_State *L, const int cb_idx, const int type)
   return res;
 }
 
+static int
+sched_wait_obj (lua_State *L, const int cb_idx, const int type,
+                const int narg)
+{
+  lua_settop(L, narg);
+  lua_pushboolean(L, 1);  /* one_shot */
+  return lua_yield(L, sched_event_add(L, cb_idx, type));
+}
+
 /*
  * Arguments: sched_udata, evq_udata, obj_udata,
- *	events (string: "r", "w"),
- *	[timeout (milliseconds)]
+ *	event (string: "r", "w"), [timeout (milliseconds)]
  */
 static int
 sched_wait_event (lua_State *L)
 {
-  const int res = sched_event_add(L, 5, EVQ_SCHED_OBJ);
-  return lua_yield(L, res);
+  return sched_wait_obj(L, 5, EVQ_SCHED_OBJ, 5);
 }
 
 /*
@@ -648,8 +668,7 @@ sched_wait_event (lua_State *L)
 static int
 sched_wait_timer (lua_State *L)
 {
-  const int res = sched_event_add(L, 3, EVQ_SCHED_TIMER);
-  return lua_yield(L, res);
+  return sched_wait_obj(L, 3, EVQ_SCHED_TIMER, 3);
 }
 
 /*
@@ -659,19 +678,17 @@ sched_wait_timer (lua_State *L)
 static int
 sched_wait_pid (lua_State *L)
 {
-  const int res = sched_event_add(L, 4, EVQ_SCHED_PID);
-  return lua_yield(L, res);
+  return sched_wait_obj(L, 4, EVQ_SCHED_PID, 4);
 }
 
 /*
  * Arguments: sched_udata, evq_udata, path (string),
- *	[modify (boolean)]
+ *	[modify (boolean), timeout (milliseconds)]
  */
 static int
 sched_wait_dirwatch (lua_State *L)
 {
-  const int res = sched_event_add(L, 4, EVQ_SCHED_DIRWATCH);
-  return lua_yield(L, res);
+  return sched_wait_obj(L, 4, EVQ_SCHED_DIRWATCH, 5);
 }
 
 /*
@@ -681,20 +698,18 @@ sched_wait_dirwatch (lua_State *L)
 static int
 sched_wait_signal (lua_State *L)
 {
-  const int res = sched_event_add(L, 4, EVQ_SCHED_SIGNAL);
-  return lua_yield(L, res);
+  return sched_wait_obj(L, 4, EVQ_SCHED_SIGNAL, 4);
 }
 
 /*
  * Arguments: sched_udata, evq_udata, sd_udata,
- *	events (string: "r", "w", "accept", "connect"),
+ *	event (string: "r", "w", "accept", "connect"),
  *	[timeout (milliseconds)]
  */
 static int
 sched_wait_socket (lua_State *L)
 {
-  const int res = sched_event_add(L, 5, EVQ_SCHED_SOCKET);
-  return lua_yield(L, res);
+  return sched_wait_obj(L, 5, EVQ_SCHED_SOCKET, 5);
 }
 
 
