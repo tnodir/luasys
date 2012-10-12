@@ -224,18 +224,22 @@ evq_wait (struct event_queue *evq, msec_t timeout)
   if (nready == -1)
     return (errno == EINTR) ? 0 : -1;
 
+  ev_ready = evq->ev_ready;
   if (tsp) {
     if (!nready) {
-      ev_ready = !evq->tq ? NULL
-       : timeout_process(evq->tq, NULL, evq->now);
-      if (ev_ready) goto end;
+      if (evq->tq) {
+        struct event *ev = timeout_process(evq->tq, ev_ready, evq->now);
+        if (ev != ev_ready) {
+          ev_ready = ev;
+          goto end;
+        }
+      }
       return EVQ_TIMEOUT;
     }
 
     timeout = evq->now;
   }
 
-  ev_ready = NULL;
   for (; nready--; ++kev) {
     struct event *ev;
     const int flags = kev->flags;

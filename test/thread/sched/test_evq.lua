@@ -10,16 +10,9 @@ assert(thread.init())
 local evq = assert(sys.event_queue())
 
 -- Scheduler
-local sched, sched_stop
+local sched
 do
-  local function controller(co)
-    if co and sched_stop and sched:size() == 0 then
-      sched:stop()
-      evq:stop()
-    end
-  end
-
-  sched = assert(thread.scheduler(controller))
+  sched = assert(thread.scheduler())
 
   -- Workers
   assert(thread.run(sched.loop, sched))
@@ -27,15 +20,16 @@ end
 
 
 print("-- Timer event")
+local task
 do
-  local timeout = 100
+  local timeout = 10
 
-  local function yield_timeout()
+  local function on_timeout()
     local ev = sched:wait_timer(evq, timeout)
     assert(ev == 't', timeout .. " msec timeout expected")
   end
 
-  assert(sched:put(yield_timeout))
+  assert(sched:put(on_timeout))
 end
 
 
@@ -43,25 +37,53 @@ print("-- Socket event")
 do
   local msg = "test"
 
-  local function on_read(fd)
-    local ev = sched:wait_socket(evq, fd, "r")
-    assert(ev == 'r')
-    local s = assert(fd:read())
-    assert(s == msg, msg .. " expected, got " .. tostring(s))
-  end
-
   local fdi, fdo = sock.handle(), sock.handle()
   assert(fdi:socket(fdo))
 
-  assert(sched:put(on_read, fdi))
+  local function on_read()
+    local ev = sched:wait_socket(evq, fdi, "r")
+    assert(ev == 'r')
+    local s = assert(fdi:read())
+    assert(s == msg, msg .. " expected, got " .. tostring(s))
+    fdi:close()
+    fdo:close()
+  end
+
+  assert(sched:put(on_read))
 
   thread.sleep(100)
   assert(fdo:write(msg))
 end
 
 
-sched_stop = true
+print("-- Terminate task, waiting on event")
+do
+  local timeout = 100
 
-assert(evq:loop(nil, true))
+  local fdi, fdo = sock.handle(), sock.handle()
+  assert(fdi:socket(fdo))
+
+  local function on_timeout(task)
+    local ev = sched:wait_timer(evq, timeout)
+    assert(ev == 't', timeout .. " msec timeout expected")
+    assert(sched:terminate(task))
+    fdi:close()
+    fdo:close()
+  end
+
+  local function on_read(fd)
+    sched:wait_socket(evq, fd, "r")
+    assert(false, "Termination expected")
+  end
+
+  local task = assert(sched:put(on_read, fdi))
+  assert(sched:put(on_timeout, task))
+
+  thread.sleep(100)
+end
+
+
+assert(evq:loop())
 print("OK")
 
+sched:stop()

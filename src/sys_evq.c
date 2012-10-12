@@ -710,11 +710,12 @@ levq_sync_call (lua_State *L, struct event_queue *evq,
   op->next = evq->sync_op;
 
   evq->sync_op = op;
-  evq_signal(evq, EVQ_SIGEVQ);
+  if (evq->flags & EVQ_FLAG_WAITING)
+    evq_signal(evq, EVQ_SIGEVQ);
 
   if (is_sched_add) {
     lua_pushlightuserdata(L, op);  /* sync_op_ludata */
-    return EVQ_SCHED_ADD_SYNC;
+    return 0;
   } else {
     struct sys_thread *td = sys_thread_get();
     const int old_top = fn_idx - 1;
@@ -794,17 +795,13 @@ levq_loop (lua_State *L)
           evq->nidles--;
 
           sys_thread_check(td);
-          if (res || evq->ev_ready || (evq->flags & EVQ_FLAG_STOP)) {
+          if (res || evq->ev_ready || (evq->flags & EVQ_FLAG_STOP))
             goto no_wait;
-          }
         }
-
-        evq->flags |= EVQ_FLAG_WAITING;
-        res = evq_wait(evq, timeout);
-        evq->flags &= ~EVQ_FLAG_WAITING;
-      } else {
-        res = evq_wait(evq, timeout);
       }
+      evq->flags |= EVQ_FLAG_WAITING;
+      res = evq_wait(evq, timeout);
+      evq->flags &= ~EVQ_FLAG_WAITING;
  no_wait:
       if (res) break;
     }
@@ -940,7 +937,8 @@ levq_stop (lua_State *L)
   } else {
     evq->flags = ~EVQ_FLAG_STOP;
   }
-  evq_signal(evq, EVQ_SIGEVQ);
+  if (evq->flags & EVQ_FLAG_WAITING)
+    evq_signal(evq, EVQ_SIGEVQ);
   return 0;
 }
 
@@ -976,6 +974,9 @@ levq_notify (lua_State *L)
     luaL_argerror(L, 2, "timer expected");
 
   evq->ev_ready = evq_process_active(ev, evq->ev_ready, evq->now);
+
+  if (evq->flags & EVQ_FLAG_WAITING)
+    evq_signal(evq, EVQ_SIGEVQ);
 
   lua_settop(L, 1);
   return 1;
@@ -1041,19 +1042,6 @@ sys_evq_sched_add (lua_State *L, const int evq_idx, const int type)
   lua_pushcfunction(L, func);  /* function */
   lua_insert(L, evq_idx);
 
-  if (evq->flags & EVQ_FLAG_MULTITHREAD) {
-    struct event *ev;
-
-    /* result: ev_ludata | nil, error_message */
-    lua_call(L, lua_gettop(L) - evq_idx, LUA_MULTRET);
-    ev = lua_touserdata(L, evq_idx);
-    if (ev) {
-      ev->flags |= EVENT_CALLBACK_SCHED;
-      return EVQ_SCHED_ADD_RES;
-    }
-    return EVQ_SCHED_ADD_ERR;
-  }
-
   return levq_sync_call(L, evq,
    (struct evq_sync_op *) levq_new_event(evq), 1, evq_idx);
 }
@@ -1062,33 +1050,29 @@ sys_evq_sched_add (lua_State *L, const int evq_idx, const int type)
  * Arguments: ..., evq_udata
  * Returns: [nil, error_message]
  */
-int
-sys_evq_sched_del (lua_State *L, void *ev, const int ev_added)
+void
+sys_evq_sched_del (lua_State *L, void *ev_op, const int ev_added)
 {
   struct event_queue *evq = checkudata(L, -1, EVQ_TYPENAME);
-  struct evq_sync_op op;
-  const int evq_idx = lua_gettop(L);
 
-  if (!ev_added) {
-    struct evq_sync_op *old_op = (struct evq_sync_op *) ev;
-    old_op->L = NULL;
-    return 0;
+  if (ev_added) {
+    struct event *ev = (struct event *) ev_op;
+
+    if (event_deleted(ev) || (ev->flags & EVENT_ACTIVE))
+      return;
+
+    ev->flags |= EVENT_ACTIVE | EVENT_ONESHOT;
+    ev->flags &= ~(EVENT_CALLBACK | EVENT_CALLBACK_CORO | EVENT_CALLBACK_SCHED);
+
+    ev->next_ready = evq->ev_ready;
+    evq->ev_ready = ev;
+  } else {
+    struct evq_sync_op *sync_op = (struct evq_sync_op *) ev_op;
+    sync_op->L = NULL;
   }
 
-  lua_pushcfunction(L, levq_del);  /* function */
-  lua_insert(L, evq_idx);
-  lua_pushlightuserdata(L, ev);  /* ev_ludata */
-
-  if (evq->flags & EVQ_FLAG_MULTITHREAD) {
-    lua_call(L, 2, 0);
-    return 0;
-  }
-
-  if (levq_sync_call(L, evq, &op, 0, evq_idx) == 1) {
-    lua_pop(L, 1);  /* pop evq_udata */
-    return 0;
-  }
-  return -1;
+  if (evq->flags & EVQ_FLAG_WAITING)
+    evq_signal(evq, EVQ_SIGEVQ);
 }
 
 

@@ -228,7 +228,7 @@ evq_modify (struct event *ev, unsigned int flags)
 EVQ_API int
 evq_wait (struct event_queue *evq, msec_t timeout)
 {
-  struct event *ev_ready = NULL;
+  struct event *ev_ready;
   struct win32overlapped *ov_ready;
   struct win32thr *wth = &evq->head;
   struct win32thr *threads = wth->next;
@@ -263,6 +263,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     if (!wth->tq) return EVQ_TIMEOUT;
   }
 
+  ev_ready = evq->ev_ready;
   if (wait_res == (DWORD) (WAIT_OBJECT_0 + n + 1)) {
     struct event *ev = evq->win_msg;
     if (ev && !(ev->flags & EVENT_ACTIVE)) {
@@ -361,15 +362,19 @@ evq_wait (struct event_queue *evq, msec_t timeout)
       }
 
       if (res) {
-        ev->flags |= EVENT_ACTIVE | res;
-        ev->next_ready = ev_ready;
-        ev_ready = ev;
+        ev->flags |= res;
+        if (ev->flags & EVENT_ACTIVE)
+          continue;
 
+        ev->flags |= EVENT_ACTIVE;
         if (ev_flags & EVENT_ONESHOT) {
           win32thr_del(wth, ev);
           --i, --n, --hp;
         } else if (ev->tq && !(ev_flags & EVENT_TIMEOUT_MANUAL))
           timeout_reset(ev, timeout);
+
+        ev->next_ready = ev_ready;
+        ev_ready = ev;
       }
 
       /* skip inactive events */

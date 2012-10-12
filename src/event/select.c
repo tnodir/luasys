@@ -190,24 +190,28 @@ evq_wait (struct event_queue *evq, msec_t timeout)
   if (nready == -1)
     return (errno == EINTR) ? 0 : -1;
 
+  ev_ready = evq->ev_ready;
   if (tvp) {
     if (!nready) {
-      ev_ready = !evq->tq ? NULL
-       : timeout_process(evq->tq, NULL, evq->now);
-      if (ev_ready) goto end;
+      if (evq->tq) {
+        struct event *ev = timeout_process(evq->tq, ev_ready, evq->now);
+        if (ev != ev_ready) {
+          ev_ready = ev;
+          goto end;
+        }
+      }
       return EVQ_TIMEOUT;
     }
 
     timeout = evq->now;
   }
 
-  ev_ready = NULL;
   if (FD_ISSET(evq->sig_fd[0], &work_readset)) {
     ev_ready = signal_process_interrupt(evq, ev_ready, timeout);
     --nready;
   }
 
-  for (i = 1; i < npolls; i++) {
+  for (i = 1; i < npolls && nready; i++) {
     struct event *ev = events[i];
     unsigned int res, ev_flags = ev->flags;
 
@@ -218,7 +222,12 @@ evq_wait (struct event_queue *evq, msec_t timeout)
       res |= EVENT_WRITE_RES;
 
     if (res) {
-      ev->flags |= EVENT_ACTIVE | res;
+      --nready;
+      ev->flags |= res;
+      if (ev->flags & EVENT_ACTIVE)
+        continue;
+
+      ev->flags |= EVENT_ACTIVE;
       if (ev_flags & EVENT_ONESHOT)
         evq_del(ev, 1);
       else if (ev->tq && !(ev_flags & EVENT_TIMEOUT_MANUAL))
@@ -226,8 +235,6 @@ evq_wait (struct event_queue *evq, msec_t timeout)
 
       ev->next_ready = ev_ready;
       ev_ready = ev;
-
-      if (!--nready) break;
     }
   }
   if (!ev_ready) return 0;

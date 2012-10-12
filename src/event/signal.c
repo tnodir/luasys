@@ -67,7 +67,7 @@ signal_init (void)
 static int
 evq_interrupt (struct event_queue *evq)
 {
-#ifdef USE_EVENTFD
+#if defined(USE_EPOLL) && defined(USE_EVENTFD)
   const fd_t fd = evq->sig_fd[0];
   const int64_t data = 1;
 #else

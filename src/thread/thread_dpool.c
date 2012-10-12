@@ -270,7 +270,7 @@ dpool_tostring (lua_State *L)
 
 
 #define DPOOL_METHODS \
-  {"data_pool",	dpool_new}
+  {"data_pool",		dpool_new}
 
 static luaL_Reg dpool_meth[] = {
   {"put",		dpool_put},

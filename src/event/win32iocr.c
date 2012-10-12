@@ -256,6 +256,7 @@ win32iocr_process (struct event_queue *evq, struct win32overlapped *ov,
 
     if (ev->flags & EVENT_ACTIVE)
       continue;
+
     ev->flags |= EVENT_ACTIVE;
     if (ev->flags & EVENT_ONESHOT)
       evq_del(ev, 1);

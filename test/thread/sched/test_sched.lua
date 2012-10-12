@@ -34,17 +34,17 @@ do
     assert(s == msg, msg .. " expected, got " .. tostring(s))
   end
 
-  local co = assert(sched:put(test))
+  local task = assert(sched:put(test))
 
-  thread.sleep(100)
-  sched:resume(co, msg)
+  thread.sleep(10)
+  sched:resume(task, msg)
 end
 
 
 print("-- Preemptive multi-tasking")
 do
-  assert(thread.run(sched.preempt_tasks, sched, 200))
-  thread.sleep(100)
+  assert(thread.run(sched.preempt_tasks, sched, 50))
+  thread.sleep(10)
 
   local condition
 
