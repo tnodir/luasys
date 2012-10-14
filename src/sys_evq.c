@@ -1,7 +1,5 @@
 /* Lua System: Event Queue */
 
-#define EVQ_TYPENAME		"sys.event_queue"
-
 /* Thread-safe synchronous operations */
 struct evq_sync_op {
   struct evq_sync_op *next;
@@ -745,26 +743,20 @@ levq_sync (lua_State *L)
   return levq_sync_call(L, evq, &op, 0, 2);
 }
 
-#define ARG_LAST	1
 #define ARG_EXTRAS	2
 /*
- * Arguments: evq_udata, [timeout (milliseconds),
- *	linger (boolean), once (boolean)]
- * Returns: [evq_udata | timeout (false)]
+ * Arguments: ..., evq_udata
  */
-static int
-levq_loop (lua_State *L)
+int
+sys_evq_loop (lua_State *L, struct event_queue *evq,
+              const msec_t timeout, const int linger, const int once,
+              const int evq_idx)
 {
-  struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
-  const msec_t timeout = (lua_type(L, 2) != LUA_TNUMBER)
-   ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
-  const int linger = lua_toboolean(L, 3);  /* keep running on empty queue */
-  const int once = lua_toboolean(L, 4);  /* process one cycle of active events */
   struct sys_thread *td = (evq->flags & EVQ_FLAG_MULTITHREAD)
    ? sys_thread_get() : NULL;
   int res = 0;
 
-  lua_settop(L, ARG_LAST);
+  /* push callback and object tables */
   {
     lua_State *NL = evq->L;
 
@@ -829,12 +821,12 @@ levq_loop (lua_State *L)
           const int ev_id = ev->ev_id;
 
           /* callback function */
-          lua_rawgeti(L, ARG_LAST+1, ev_id);
+          lua_rawgeti(L, evq_idx+1, ev_id);
           /* arguments */
           if (!(ev_flags & EVENT_CALLBACK_SCHED)) {
             lua_pushvalue(L, 1);  /* evq_udata */
             lua_pushlightuserdata(L, ev);  /* ev_ludata */
-            lua_rawgeti(L, ARG_LAST+2, ev_id);  /* obj_udata */
+            lua_rawgeti(L, evq_idx+2, ev_id);  /* obj_udata */
           }
           if (ev_flags & EVENT_EOF_MASK_RES) {
             lua_pushliteral(L, "e");
@@ -856,14 +848,14 @@ levq_loop (lua_State *L)
 
         if (ev_flags & EVENT_CALLBACK_SCHED) {
           /* callback function: coroutine */
-          lua_State *co = lua_tothread(L, ARG_LAST + ARG_EXTRAS + 1);
+          lua_State *co = lua_tothread(L, evq_idx + ARG_EXTRAS + 1);
 
           lua_xmove(L, co, 2);
           lua_pop(L, 1);  /* pop coroutine */
 
           sys_sched_event_ready(co, ev);
         } else if (ev_flags & EVENT_CALLBACK_CORO) {
-          lua_State *co = lua_tothread(L, ARG_LAST + ARG_EXTRAS + 1);
+          lua_State *co = lua_tothread(L, evq_idx + ARG_EXTRAS + 1);
 
           lua_xmove(L, co, 5);
           lua_pop(L, 1);  /* pop coroutine */
@@ -882,11 +874,11 @@ levq_loop (lua_State *L)
             break;
           default:
             lua_xmove(co, L, 1);  /* error message */
-            res = EVQ_ERROR;
+            res = SYS_ERR_THROW;
           }
         } else if (ev_flags & EVENT_CALLBACK) {
           if (lua_pcall(L, 5, 0, 0)) {
-            res = EVQ_ERROR;
+            res = SYS_ERR_THROW;
           }
         }
 
@@ -907,21 +899,38 @@ levq_loop (lua_State *L)
   if (evq->nidles && !(evq->flags & EVQ_FLAG_WAITING))
     thread_event_signal(&evq->wait_tev);
 
-  if (!res) {
-    lua_settop(L, 1);
-    return 1;
-  }
-  if (res == EVQ_TIMEOUT) {
-    lua_pushboolean(L, 0);
-    return 1;
-  }
-  if (res == EVQ_ERROR) {
-    lua_error(L);
-  }
-  return sys_seterror(L, 0);
+  return res;
 }
 #undef ARG_EXTRAS
-#undef ARG_LAST
+
+/*
+ * Arguments: evq_udata, [timeout (milliseconds),
+ *	linger (boolean), once (boolean)]
+ * Returns: [evq_udata | timeout (false)]
+ */
+static int
+levq_loop (lua_State *L)
+{
+  struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
+  const msec_t timeout = (lua_type(L, 2) != LUA_TNUMBER)
+   ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 2);
+  const int linger = lua_toboolean(L, 3);  /* keep running on empty queue */
+  const int once = lua_toboolean(L, 4);  /* process one cycle of active events */
+
+  lua_settop(L, 1);
+
+  switch (sys_evq_loop(L, evq, timeout, linger, once, 1)) {
+  case SYS_ERR_TIMEOUT:
+    lua_pushboolean(L, 0);
+    return 1;  /* timed out */
+  case SYS_ERR_SYSTEM:
+    return sys_seterror(L, 0);
+  case SYS_ERR_THROW:
+    lua_error(L);
+  }
+  lua_settop(L, 1);
+  return 1;
+}
 
 /*
  * Arguments: evq_udata, [stop/work (boolean)]

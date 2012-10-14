@@ -260,7 +260,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
   evq->now = sys_milliseconds();
 
   if (wait_res == WAIT_TIMEOUT) {
-    if (!wth->tq) return EVQ_TIMEOUT;
+    if (!wth->tq) return SYS_ERR_TIMEOUT;
   }
 
   ev_ready = evq->ev_ready;
@@ -397,7 +397,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     }
   }
   if (!ev_ready)
-    return (wait_res == WAIT_TIMEOUT) ? EVQ_TIMEOUT : 0;
+    return (wait_res == WAIT_TIMEOUT) ? SYS_ERR_TIMEOUT : 0;
  end:
   evq->ev_ready = ev_ready;
   return 0;

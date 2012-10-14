@@ -18,7 +18,9 @@ local stderr = sys.stderr
 
 
 local evq = assert(sys.event_queue())
-local sched = assert(thread.scheduler(nil, 1, 8))
+
+local sched = assert(thread.scheduler())
+assert(sched:event_queue(evq))
 
 
 -- Pool of sockets
@@ -142,9 +144,14 @@ do
 end
 
 -- Quit by Ctrl-C
-assert(evq:add_signal("INT", evq.stop))
+do
+  local function on_interrupt()
+    evq:stop()
+    sched:stop()
+  end
+
+  assert(evq:add_signal("INT", on_interrupt))
+end
 
 print("Loop...")
-evq:loop()
-
-sched:stop()
+sched:loop()

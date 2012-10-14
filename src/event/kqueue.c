@@ -234,7 +234,7 @@ evq_wait (struct event_queue *evq, msec_t timeout)
           goto end;
         }
       }
-      return EVQ_TIMEOUT;
+      return SYS_ERR_TIMEOUT;
     }
 
     timeout = evq->now;

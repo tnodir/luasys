@@ -245,6 +245,14 @@ int sys_eintr (void);
  * Event Queue & Scheduler
  */
 
+#define EVQ_TYPENAME	"sys.event_queue"
+
+enum {
+  SYS_ERR_SYSTEM = -1,
+  SYS_ERR_TIMEOUT = 1,
+  SYS_ERR_THROW
+};
+
 enum {
   EVQ_SCHED_OBJ = 0,
   EVQ_SCHED_TIMER,
@@ -253,6 +261,12 @@ enum {
   EVQ_SCHED_SIGNAL,
   EVQ_SCHED_SOCKET
 };
+
+struct event_queue;
+
+int sys_evq_loop (lua_State *L, struct event_queue *evq,
+                  const msec_t timeout, const int linger,
+                  const int once, const int evq_idx);
 
 int sys_evq_sched_add (lua_State *L, const int evq_idx, const int type);
 void sys_evq_sched_del (lua_State *L, void *ev_op, const int ev_added);

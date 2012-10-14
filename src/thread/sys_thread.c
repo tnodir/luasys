@@ -1144,6 +1144,7 @@ static luaL_Reg thread_meth[] = {
   {"wait",		thread_wait},
   {"__tostring",	thread_tostring},
   {"__gc",		thread_done},
+  THREAD_SCHED_METHODS,
   {NULL, NULL}
 };
 

@@ -8,6 +8,8 @@
 /* Scheduler coroutine reserved indexes */
 #define SCHED_CORO_ENV		1  /* environ. */
 #define SCHED_CORO_CBCOCTL	2  /* callback: coroutines controller */
+#define SCHED_CORO_UDATA	3  /* sched_udata */
+#define SCHED_CORO_EVQ		4  /* evq_udata */
 
 struct sched_task {
   lua_State *co;  /* coroutine */
@@ -24,6 +26,8 @@ struct sched_task {
 struct scheduler {
   lua_State *L;  /* storage */
 
+  struct event_queue *evq;  /* event queue */
+
   int active_task_id;  /* active tasks */
   int free_task_id;  /* free tasks */
 
@@ -36,7 +40,8 @@ struct scheduler {
   int buf_idx, buf_max;  /* tasks buffer current and maximum indexes */
 
   unsigned int stop:		1;  /* stop looping */
-  unsigned int cb_coctl:	1;  /* coroutines controller exist */
+  unsigned int cb_coctl:	1;  /* coroutines controller exists */
+  unsigned int evq_waiting:	1;  /* waiting in event queue */
 
   msec_t worker_timeout;  /* worker thread timeout */
 
@@ -206,7 +211,9 @@ sched_new (lua_State *L)
   sched->cb_coctl = lua_isfunction(L, 1);
 
   lua_pushvalue(L, 1);  /* coroutines controller (SCHED_CORO_CBCOCTL) */
-  lua_xmove(L, NL, 2);
+  lua_pushvalue(L, ARG_LAST+1);  /* sched_udata (SCHED_CORO_UDATA) */
+  lua_pushnil(L);  /* SCHED_CORO_EVQ */
+  lua_xmove(L, NL, 4);
 
   if (!thread_critsect_new(&sched->cs)
    && !thread_cond_new(&sched->cond)) {
@@ -234,6 +241,35 @@ sched_close (lua_State *L)
   return 0;
 }
 
+/*
+ * Arguments: sched_udata, [evq_udata]
+ * Returns: sched_udata | evq_udata
+ */
+static int
+sched_event_queue (lua_State *L)
+{
+  struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
+
+  if (lua_gettop(L) > 1) {
+    struct event_queue *evq = checkudata(L, 2, EVQ_TYPENAME);
+
+    if (!sched_is_empty(sched))
+      luaL_argerror(L, 2, "Scheduler must be empty");
+
+    sched->evq = evq;
+
+    lua_settop(L, 2);
+    lua_xmove(L, sched->L, 1);
+    lua_replace(sched->L, SCHED_CORO_EVQ);
+  } else if (sched->evq) {
+    lua_pushvalue(sched->L, SCHED_CORO_EVQ);
+    lua_xmove(sched->L, L, 1);
+  } else {
+    lua_pushnil(L);
+  }
+  return 1;
+}
+
 
 static void
 sched_vm_switch (struct sched_context *sched_ctx, const int enter_vm)
@@ -244,6 +280,26 @@ sched_vm_switch (struct sched_context *sched_ctx, const int enter_vm)
   thread_critsect_enter(csp);
   sched->ctx = enter_vm ? sched_ctx : NULL;
   thread_critsect_leave(csp);
+}
+
+/*
+ * Arguments: thread_udata
+ * Returns: [sched_udata]
+ */
+static int
+sched_self (lua_State *L)
+{
+  struct sys_thread *td = checkudata(L, 1, THREAD_TYPENAME);
+  struct sched_context *sched_ctx = td->sched_ctx;
+
+  if (sched_ctx) {
+    struct scheduler *sched = sched_ctx->sched;
+
+    lua_pushvalue(sched->L, SCHED_CORO_UDATA);
+    lua_xmove(sched->L, L, 1);
+    return 1;
+  }
+  return 0;
 }
 
 /*
@@ -262,13 +318,11 @@ sched_loop (lua_State *L)
   const int once = lua_toboolean(L, 4);  /* process only one event */
   thread_critsect_t *csp = &sched->cs;
   struct sched_context sched_ctx;
-
-#define SCHED_LOOP_TIMEOUT	1
-#define SCHED_LOOP_SYSERROR	2
-#define SCHED_LOOP_ERROR	3
   int err = 0;
 
   if (!td) luaL_argerror(L, 0, "Threading not initialized");
+
+  sched->nworkers++;
 
   sched_ctx.sched = sched;
   sched_ctx.co = NULL;
@@ -296,15 +350,27 @@ sched_loop (lua_State *L)
       if (not_linger) break;
 
       sched->nwaiters++;
-      res = thread_cond_wait_vm(&sched->cond, td, timeout);
+      if (sched->nwaiters == sched->nworkers && sched->evq
+       && !sched->evq_waiting) {
+        lua_pushvalue(sched->L, SCHED_CORO_EVQ);
+        lua_xmove(sched->L, L, 1);  /* evq_udata */
+
+        sched->evq_waiting = 1;
+        err = sys_evq_loop(L, sched->evq, TIMEOUT_INFINITE,
+         0 /* linger */, 1 /* once */, 2 /* evq_idx */);
+        sched->evq_waiting = 0;
+
+        if (!err) lua_settop(L, 1);
+      } else {
+        res = thread_cond_wait_vm(&sched->cond, td, timeout);
+        if (res) {
+          err = (res == 1) ? SYS_ERR_TIMEOUT : SYS_ERR_SYSTEM;
+        }
+      }
       sched->nwaiters--;
 
       sys_thread_check(td);
-      if (res) {
-        err = (res == 1) ? SCHED_LOOP_TIMEOUT
-         : SCHED_LOOP_SYSERROR;
-        break;
-      }
+      if (err) break;
       continue;
     }
 
@@ -346,8 +412,8 @@ sched_loop (lua_State *L)
           sched_tasklist_add(sched, &sched->active_task_id, task);
         break;
       }
-      /* FALLTHROUGH */
       res = 0;
+      /* FALLTHROUGH */
     case 0:
       /* FALLTHROUGH */
     default:
@@ -357,7 +423,7 @@ sched_loop (lua_State *L)
       }
       sched_task_del(L, sched, task, res);
       if (res) {
-        err = SCHED_LOOP_ERROR;
+        err = SYS_ERR_THROW;
         goto end;
       }
     }
@@ -372,13 +438,19 @@ sched_loop (lua_State *L)
 
   td->sched_ctx = NULL;
 
+  sched->nworkers--;
+
+  if (!sched->stop && !sched->evq_waiting && sched->evq
+   && sched->nwaiters == sched->nworkers)
+    (void) thread_cond_signal(&sched->cond);
+
   switch (err) {
-  case SCHED_LOOP_TIMEOUT:
+  case SYS_ERR_TIMEOUT:
     lua_pushboolean(L, 0);
     return 1;  /* timed out */
-  case SCHED_LOOP_SYSERROR:
+  case SYS_ERR_SYSTEM:
     return sys_seterror(L, 0);
-  case SCHED_LOOP_ERROR:
+  case SYS_ERR_THROW:
     lua_error(L);
   }
   lua_settop(L, 1);
@@ -392,9 +464,9 @@ static int
 sched_stop (lua_State *L)
 {
   struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
-  const int state = lua_isnoneornil(L, 2) || lua_toboolean(L, 2);
+  const int stop = lua_isnoneornil(L, 2) || lua_toboolean(L, 2);
 
-  sched->stop = state;
+  sched->stop = stop;
   (void) thread_cond_signal(&sched->cond);
   return 0;
 }
@@ -407,22 +479,14 @@ sched_thread_start (lua_State *L)
 {
   struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
   struct sys_thread *td = lua_touserdata(L, 2);
-  int status, nargs = 1;
 
   sys_thread_resume(td);
 
   lua_settop(L, 1);
-  lua_pushcfunction(L, sched_loop);
-  lua_insert(L, 1);
-
-  if (++sched->nworkers > sched->min_workers) {
+  if (sched->nworkers == sched->min_workers) {
     lua_pushinteger(L, sched->worker_timeout);
-    nargs++;
   }
-  status = lua_pcall(L, nargs, 0, 0);
-  sched->nworkers--;
-
-  if (status) lua_error(L);
+  sched_loop(L);
   return 0;
 }
 
@@ -514,7 +578,7 @@ sched_running (lua_State *L)
   struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
   struct sched_context *sched_ctx = sched->ctx;
 
-  if (sched_ctx) {
+  if (sched_ctx && L == sched_ctx->co) {
     lua_pushinteger(L, sched_ctx->task_id);
     return 1;
   }
@@ -828,10 +892,14 @@ sys_sched_event_ready (lua_State *co, void *ev)
 }
 
 
+#define THREAD_SCHED_METHODS \
+  {"scheduler",		sched_self}
+
 #define SCHED_METHODS \
   {"scheduler",		sched_new}
 
 static luaL_Reg sched_meth[] = {
+  {"event_queue",	sched_event_queue},
   {"loop",		sched_loop},
   {"stop",		sched_stop},
   {"put",		sched_put},
