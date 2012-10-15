@@ -25,6 +25,19 @@ do
 end
 
 
+print("-- Add coroutine as task")
+do
+  local msg = "test"
+
+  local function test(s)
+    assert(s == msg, msg .. " expected, got " .. tostring(s))
+  end
+
+  local co = assert(coroutine.create(test))
+  local task = assert(sched:put(co, msg))
+end
+
+
 print("-- Suspend/Resume")
 do
   local msg = "test"
