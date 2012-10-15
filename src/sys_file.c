@@ -609,7 +609,7 @@ sys_write (lua_State *L)
 #endif
     sys_vm_enter();
     if (nw == -1) {
-      if (n > 0 || SYS_EAGAIN(SYS_ERRNO))
+      if (n > 0 || SYS_IS_EAGAIN(SYS_ERRNO))
         break;
       return sys_seterror(L, 0);
     }
@@ -660,7 +660,7 @@ sys_read (lua_State *L)
   } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
    && sys_buffer_write_next(L, &sb, buf, 0));
   if (nr <= 0 && len == n) {
-    if (nr && SYS_EAGAIN(SYS_ERRNO))
+    if (nr && SYS_IS_EAGAIN(SYS_ERRNO))
       lua_pushboolean(L, 0);
     else res = -1;
   } else {

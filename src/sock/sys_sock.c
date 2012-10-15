@@ -410,7 +410,7 @@ sock_accept (lua_State *L)
     *sdp = sd;
     lua_settop(L, 2);
     return 1;
-  } else if (SYS_EAGAIN(SYS_ERRNO)) {
+  } else if (SYS_IS_EAGAIN(SYS_ERRNO)) {
     lua_pushboolean(L, 0);
     return 1;
   }
@@ -437,7 +437,11 @@ sock_connect (lua_State *L)
 #endif
   sys_vm_enter();
 
-  if (!res
+  if (!res) {
+    lua_settop(L, 1);
+    return 1;
+  }
+  if (SYS_IS_EAGAIN(SYS_ERRNO)
 #ifndef _WIN32
    || SYS_ERRNO == EINPROGRESS || SYS_ERRNO == EALREADY
 #else
@@ -446,9 +450,8 @@ sock_connect (lua_State *L)
 #if defined(__FreeBSD__)
    || SYS_ERRNO == EADDRINUSE
 #endif
-   || SYS_EAGAIN(SYS_ERRNO)) {
-    if (res) lua_pushboolean(L, 0);
-    else lua_settop(L, 1);
+  ) {
+    lua_pushboolean(L, 0);
     return 1;
   }
   return sys_seterror(L, 0);
@@ -490,7 +493,7 @@ sock_send (lua_State *L)
 #endif
   sys_vm_enter();
   if (nw == -1) {
-    if (!SYS_EAGAIN(SYS_ERRNO))
+    if (!SYS_IS_EAGAIN(SYS_ERRNO))
       return sys_seterror(L, 0);
     nw = 0;
   } else {
@@ -562,7 +565,7 @@ sock_recv (lua_State *L)
   } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
    && sys_buffer_write_next(L, &sb, buf, 0));
   if (nr <= 0 && len == n) {
-    if (nr && SYS_EAGAIN(SYS_ERRNO))
+    if (nr && SYS_IS_EAGAIN(SYS_ERRNO))
       lua_pushboolean(L, 0);
     else res = -1;
   } else {
@@ -675,7 +678,7 @@ sock_sendfile (lua_State *L)
 #endif
   sys_vm_enter();
 
-  if (res != -1 || SYS_EAGAIN(SYS_ERRNO)) {
+  if (res != -1 || SYS_IS_EAGAIN(SYS_ERRNO)) {
     if (res == -1) {
       lua_pushboolean(L, 0);
       return 1;
@@ -730,7 +733,7 @@ sock_write (lua_State *L)
 #endif
     sys_vm_enter();
     if (nw == -1) {
-      if (n > 0 || SYS_EAGAIN(SYS_ERRNO))
+      if (n > 0 || SYS_IS_EAGAIN(SYS_ERRNO))
         break;
       return sys_seterror(L, 0);
     }
@@ -786,7 +789,7 @@ sock_read (lua_State *L)
   } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
    && sys_buffer_write_next(L, &sb, buf, 0));
   if (nr <= 0 && len == n) {
-    if (nr && SYS_EAGAIN(SYS_ERRNO))
+    if (nr && SYS_IS_EAGAIN(SYS_ERRNO))
       lua_pushboolean(L, 0);
     else res = -1;
   } else {

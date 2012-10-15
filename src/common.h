@@ -52,15 +52,15 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
     (InitializeCriticalSection(cs), TRUE)
 #endif
 
-#define SYS_ERRNO	GetLastError()
-#define SYS_EAGAIN(e)	((e) == WSAEWOULDBLOCK)
+#define SYS_ERRNO		GetLastError()
+#define SYS_IS_EAGAIN(e)	((e) == WSAEWOULDBLOCK)
 
 #else
 
-#define SYS_ERRNO	errno
-#define SYS_EAGAIN(e)	((e) == EAGAIN || (e) == EWOULDBLOCK)
+#define SYS_ERRNO		errno
+#define SYS_IS_EAGAIN(e)	((e) == EAGAIN || (e) == EWOULDBLOCK)
 
-#define SYS_SIGINTR	SIGUSR2
+#define SYS_SIGINTR		SIGUSR2
 
 #endif
 
