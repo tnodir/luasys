@@ -651,10 +651,14 @@ levq_sync_process (lua_State *L, struct event_queue *evq,
     lua_State *NL = op->L;
 
     if (op->is_sched_add) {
-      struct event *ev;
+      struct event *ev = (struct event *) op;
+      const int fn_idx = op->fn_idx;
+
+      op = op->next;
+      levq_free_event(evq, ev);
 
       if (NL) {
-        const int narg = lua_gettop(NL) - op->fn_idx;
+        const int narg = lua_gettop(NL) - fn_idx;
 
         lua_xmove(NL, L, narg + 1);
         lua_call(L, narg, LUA_MULTRET);
@@ -669,9 +673,6 @@ levq_sync_process (lua_State *L, struct event_queue *evq,
         }
         sys_sched_event_added(NL, ev);
       }
-      ev = (struct event *) op;
-      op = op->next;
-      levq_free_event(evq, ev);
     } else {
       const int narg = lua_gettop(NL) - op->fn_idx;
 
@@ -1039,6 +1040,21 @@ sys_evq_sched_add (lua_State *L, const int evq_idx, const int type)
 
   lua_pushcfunction(L, func);  /* function */
   lua_insert(L, evq_idx);
+
+  if (!(evq->flags & EVQ_FLAG_WAITING)) {
+    struct event *ev;
+
+    /* result: ev_ludata | nil, error_message */
+    lua_call(L, lua_gettop(L) - evq_idx, LUA_MULTRET);
+    ev = lua_touserdata(L, evq_idx);
+    if (ev) {
+      ev->flags |= EVENT_CALLBACK_SCHED;
+      sys_sched_event_added(L, ev);
+      lua_pop(L, 1);  /* pop ev_ludata */
+      return 0;
+    }
+    return -1;
+  }
 
   return levq_sync_call(L, evq,
    (struct evq_sync_op *) levq_new_event(evq), 1, evq_idx);

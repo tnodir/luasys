@@ -699,7 +699,7 @@ sched_event_add (lua_State *L, const int type)
     }
     return lua_gettop(L);  /* sched_udata, task_id, evq_udata, arguments ... */
   }
-  return 0;
+  return 2; /* nil, error_message */
 }
 
 static int
@@ -781,7 +781,7 @@ sched_wait_socket (lua_State *L)
 void
 sys_sched_event_added (lua_State *co, void *ev)
 {
-  struct scheduler *sched = checkudata(co, 1, SCHED_TYPENAME);
+  struct scheduler *sched = lua_touserdata(co, 1);
   const int task_id = lua_tointeger(co, 2);
   struct sched_task *task = sched_id_to_task(sched, task_id);
 
@@ -799,7 +799,7 @@ sys_sched_event_added (lua_State *co, void *ev)
 void
 sys_sched_event_ready (lua_State *co, void *ev)
 {
-  struct scheduler *sched = checkudata(co, 1, SCHED_TYPENAME);
+  struct scheduler *sched = lua_touserdata(co, 1);
   const int task_id = lua_tointeger(co, 2);
   struct sched_task *task = sched_id_to_task(sched, task_id);
 

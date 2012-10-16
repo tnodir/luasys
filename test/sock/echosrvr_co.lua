@@ -19,8 +19,27 @@ local stderr = sys.stderr
 
 local evq = assert(sys.event_queue())
 
-local sched = assert(thread.scheduler())
-assert(sched:event_queue(evq))
+-- Scheduler
+local sched
+do
+  local pool = setmetatable({n = 0}, {__mode = "v"})
+
+  local function controller(co, err)
+    if err then return end
+    if co then
+      local n = pool.n + 1
+      pool.n, pool[n] = n, co
+    else
+      local n = pool.n
+      local co = pool[n]
+      pool.n = co and (n - 1) or 0
+      return co
+    end
+  end
+
+  sched = assert(thread.scheduler(controller))
+  assert(sched:event_queue(evq))
+end
 
 
 -- Pool of sockets
@@ -42,6 +61,37 @@ do
   socket_put = function(fd)
     local n = pool.n + 1
     pool.n, pool[n] = n, fd
+  end
+end
+
+
+-- Socket non-blocking read/write operations
+local socket_read, socket_write
+do
+  socket_read = function(fd)
+    while true do
+      local res = fd:read()
+      if res then
+        return res
+      end
+      if res == false then
+        local _, eof = sched:wait_socket(evq, fd, 'r')
+        if eof then break end
+      else break end
+    end
+  end
+
+  socket_write = function(fd, line)
+    while true do
+      local res = fd:write(line)
+      if res then
+        return res
+      end
+      if res == false then
+        local _, eof = sched:wait_socket(evq, fd, 'w')
+        if eof then break end
+      else break end
+    end
   end
 end
 
@@ -74,26 +124,22 @@ do
   end
 end
 
-local function process(fd, R, W, T, eof)
-  local line
-  if not eof then
-    line = fd:read()
-  end
+local function process(fd)
+  local line = socket_read(fd)
   if line then
-    line = fd:write(line)
+    line = socket_write(fd, line)
     if ONE_SHOT_CLIENT then
       fd:shutdown()
     end
+    if line then
+      return true
+    end
   end
-  if not line then
-    chan_remove(fd)
-    return false
-  end
-  return true
+  chan_remove(fd)
 end
 
 local function task_process(fd)
-  while process(fd, sched:wait_socket(evq, fd, 'r')) do end
+  while process(fd) do end
 end
 
 local function accept(_, _, fd)
