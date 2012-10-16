@@ -72,8 +72,7 @@ struct event {
 
 struct event_queue {
 #define EVQ_FLAG_STOP		0x01  /* break the loop? */
-#define EVQ_FLAG_MULTITHREAD	0x02  /* multi-threaded loop? */
-#define EVQ_FLAG_WAITING	0x04  /* waiting events? */
+#define EVQ_FLAG_WAITING	0x02  /* waiting events? */
   unsigned int volatile flags;
 
   unsigned int nevents;  /* number of alive events */

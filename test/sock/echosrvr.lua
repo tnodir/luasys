@@ -112,7 +112,7 @@ local function accept(evq, evid, fd)
 end
 
 
-local evq = assert(sys.event_queue(is_multithread))
+local evq = assert(sys.event_queue())
 
 print("Binding servers...")
 local saddr = sock.addr()

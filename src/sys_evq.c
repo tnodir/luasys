@@ -73,18 +73,15 @@ getmaxbit (unsigned int v)
 static void
 levq_control_wait (struct event_queue *evq, const int stop)
 {
-  if (evq->flags & EVQ_FLAG_MULTITHREAD) {
-    if (stop) {
-      if (!evq->nactives++ && (evq->flags & EVQ_FLAG_WAITING)) {
-        evq_signal(evq, EVQ_SIGEVQ);
-        do {
-          sys_thread_switch(0);
-        } while (evq->flags & EVQ_FLAG_WAITING);
-      }
-    } else {
-      if (!--evq->nactives)
-        thread_event_signal(&evq->wait_tev);
+  if (stop) {
+    if (!evq->nactives++ && (evq->flags & EVQ_FLAG_WAITING)) {
+      evq_signal(evq, EVQ_SIGEVQ);
+      do sys_thread_switch(0);
+      while (evq->flags & EVQ_FLAG_WAITING);
     }
+  } else {
+    if (!--evq->nactives && evq->nidles)
+      thread_event_signal(&evq->wait_tev);
   }
 }
 
@@ -109,13 +106,11 @@ levq_timeout_map (struct event_queue *evq, struct timeout_queue *tq,
 }
 
 /*
- * Arguments: [multithread (boolean)]
  * Returns: [evq_udata]
  */
 static int
 levq_new (lua_State *L)
 {
-  const int multithread = lua_toboolean(L, 1);
   struct event_queue *evq = lua_newuserdata(L, sizeof(struct event_queue));
 
   memset(evq, 0, sizeof(struct event_queue));
@@ -136,11 +131,8 @@ levq_new (lua_State *L)
     NL = lua_newthread(L);
     if (!NL) return 0;
 
-    if (multithread) {
-      evq->flags |= EVQ_FLAG_MULTITHREAD;
-      if (thread_event_new(&evq->wait_tev))
-        goto err;
-    }
+    if (thread_event_new(&evq->wait_tev))
+      goto err;
 
     evq->tq_map_fn = levq_timeout_map;
     evq->L = NL;
@@ -193,9 +185,7 @@ levq_done (lua_State *L)
     lua_pop(NL, 1);  /* pop value */
   }
 
-  if (evq->flags & EVQ_FLAG_MULTITHREAD) {
-    (void) thread_event_del(&evq->wait_tev);
-  }
+  (void) thread_event_del(&evq->wait_tev);
 
   evq_done(evq);
   return 0;
@@ -752,8 +742,7 @@ sys_evq_loop (lua_State *L, struct event_queue *evq,
               const msec_t timeout, const int linger, const int once,
               const int evq_idx)
 {
-  struct sys_thread *td = (evq->flags & EVQ_FLAG_MULTITHREAD)
-   ? sys_thread_get() : NULL;
+  struct sys_thread *td = sys_thread_get();
   int res = 0;
 
   /* push callback and object tables */
