@@ -7,7 +7,7 @@ T= sys.so
 A= libluasys.a
 
 COPT= -O2 -fPIC -DNDEBUG
-CWARNS = -W -Wall -Wextra -pedantic \
+CWARNS= -W -Wall -Wextra -pedantic \
 	-Waggregate-return \
 	-Wbad-function-cast \
 	-Wcast-align \

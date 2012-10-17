@@ -1,6 +1,5 @@
 #!/usr/bin/env lua
 
-local string = require"string"
 local sys = require"sys"
 
 local thread = sys.thread
@@ -19,7 +18,6 @@ local work_pipe = thread.pipe()
 -- Producer VM-Thread
 do
   local function produce(work_pipe, from, to)
-    local string = require"string"
     local sys = require"sys"
 
     local rep = string.rep
@@ -42,7 +40,6 @@ end
 -- Consumer VM-Thread
 do
   local function consume(work_pipe, from, to)
-    local string = require"string"
     local sys = require"sys"
 
     local rep = string.rep
