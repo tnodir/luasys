@@ -32,7 +32,7 @@ MYLDFLAGS= -shared -Bdynamic
 MYLIBS=
 
 CC= gcc
-MAKE_DLL= ld $(MYLDFLAGS) -o
+MAKE_DLL= $(CC) $(MYLDFLAGS) -o
 AR= ar rcu
 RANLIB= ranlib
 RM= rm -f
