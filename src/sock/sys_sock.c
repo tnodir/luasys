@@ -37,6 +37,10 @@ typedef int		socklen_t;
 
 #endif /* !WIN32 */
 
+#ifndef SO_EXCLUSIVEADDRUSE
+#define SO_EXCLUSIVEADDRUSE	((int) ~SO_REUSEADDR)
+#endif
+
 
 #define SD_TYPENAME	"sys.sock.handle"
 
@@ -241,7 +245,7 @@ static int
 sock_sockopt (lua_State *L)
 {
   static const int opt_flags[] = {
-    SO_REUSEADDR, SO_TYPE, SO_ERROR, SO_DONTROUTE,
+    SO_REUSEADDR, SO_EXCLUSIVEADDRUSE, SO_TYPE, SO_ERROR, SO_DONTROUTE,
     SO_SNDBUF, SO_RCVBUF, SO_SNDLOWAT, SO_RCVLOWAT,
     SO_BROADCAST, SO_KEEPALIVE, SO_OOBINLINE, SO_LINGER,
 #define OPTNAMES_TCP	12
@@ -250,7 +254,7 @@ sock_sockopt (lua_State *L)
     IP_MULTICAST_TTL, IP_MULTICAST_IF, IP_MULTICAST_LOOP
   };
   static const char *const opt_names[] = {
-    "reuseaddr", "type", "error", "dontroute",
+    "reuseaddr", "exclusiveaddruse", "type", "error", "dontroute",
     "sndbuf", "rcvbuf", "sndlowat", "rcvlowat",
     "broadcast", "keepalive", "oobinline", "linger",
     "tcp_nodelay",
@@ -266,6 +270,15 @@ sock_sockopt (lua_State *L)
   socklen_t optlen = sizeof(int);
   const int narg = lua_gettop(L);
 
+#ifndef _WIN32
+  /* Equivalent to setting flag on Windows */
+  if (optflag == SO_EXCLUSIVEADDRUSE)
+#else
+  /* Equivalent to setting flag on *nix */
+  if (optflag == SO_REUSEADDR)
+#endif
+    goto success;
+
   if (narg > OPT_START) {
     optval[0] = lua_tointeger(L, OPT_START + 1);
     if (narg > OPT_START + 1) {
@@ -273,6 +286,7 @@ sock_sockopt (lua_State *L)
       optlen *= 2;
     }
     if (!setsockopt(sd, level, optflag, (char *) &optval, optlen)) {
+ success:
       lua_settop(L, 1);
       return 1;
     }
