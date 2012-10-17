@@ -349,9 +349,8 @@ sched_loop (lua_State *L)
     if (task_id == -1) {
       if (not_linger) break;
 
-      sched->nwaiters++;
-      if (sched->nwaiters == sched->nworkers && sched->evq
-       && !sched->evq_waiting) {
+      if (sched->nwaiters == (sched->nworkers - 1)
+       && sched->evq && !sched->evq_waiting) {
         lua_pushvalue(sched->L, SCHED_CORO_EVQ);
         lua_xmove(sched->L, L, 1);  /* evq_udata */
 
@@ -361,16 +360,18 @@ sched_loop (lua_State *L)
         sched->evq_waiting = 0;
 
         if (!err) lua_settop(L, 1);
+        else break;
       } else {
+        sched->nwaiters++;
         res = thread_cond_wait_vm(&sched->cond, td, timeout);
+        sched->nwaiters--;
+
+        sys_thread_check(td);
         if (res) {
           err = (res == 1) ? SYS_ERR_TIMEOUT : SYS_ERR_SYSTEM;
+          break;
         }
       }
-      sched->nwaiters--;
-
-      sys_thread_check(td);
-      if (err) break;
       continue;
     }
 
