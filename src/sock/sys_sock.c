@@ -37,10 +37,6 @@ typedef int		socklen_t;
 
 #endif /* !WIN32 */
 
-#ifndef SO_EXCLUSIVEADDRUSE
-#define SO_EXCLUSIVEADDRUSE	((int) ~SO_REUSEADDR)
-#endif
-
 
 #define SD_TYPENAME	"sys.sock.handle"
 
@@ -245,7 +241,7 @@ static int
 sock_sockopt (lua_State *L)
 {
   static const int opt_flags[] = {
-    SO_REUSEADDR, SO_EXCLUSIVEADDRUSE, SO_TYPE, SO_ERROR, SO_DONTROUTE,
+    SO_REUSEADDR, SO_TYPE, SO_ERROR, SO_DONTROUTE,
     SO_SNDBUF, SO_RCVBUF, SO_SNDLOWAT, SO_RCVLOWAT,
     SO_BROADCAST, SO_KEEPALIVE, SO_OOBINLINE, SO_LINGER,
 #define OPTNAMES_TCP	12
@@ -254,7 +250,7 @@ sock_sockopt (lua_State *L)
     IP_MULTICAST_TTL, IP_MULTICAST_IF, IP_MULTICAST_LOOP
   };
   static const char *const opt_names[] = {
-    "reuseaddr", "exclusiveaddruse", "type", "error", "dontroute",
+    "reuseaddr", "type", "error", "dontroute",
     "sndbuf", "rcvbuf", "sndlowat", "rcvlowat",
     "broadcast", "keepalive", "oobinline", "linger",
     "tcp_nodelay",
@@ -265,37 +261,60 @@ sock_sockopt (lua_State *L)
   const int optname = luaL_checkoption(L, OPT_START, NULL, opt_names);
   const int level = (optname < OPTNAMES_TCP) ? SOL_SOCKET
    : (optname < OPTNAMES_IP ? IPPROTO_TCP : IPPROTO_IP);
-  const int optflag = opt_flags[optname];
+  int optflag = opt_flags[optname];
   int optval[4];
   socklen_t optlen = sizeof(int);
   const int narg = lua_gettop(L);
-
-#ifndef _WIN32
-  /* Equivalent to setting flag on Windows */
-  if (optflag == SO_EXCLUSIVEADDRUSE)
-#else
-  /* Equivalent to setting flag on *nix */
-  if (optflag == SO_REUSEADDR)
+#ifdef _WIN32
+  int is_success = 0;
 #endif
-    goto success;
+
+#if defined(_WIN32) || defined(SO_REUSEPORT)
+  if (optflag == SO_REUSEADDR) {
+    int so_type = -1;
+    getsockopt(sd, SOL_SOCKET, SO_TYPE, (char *) &so_type, &optlen);
+#ifdef _WIN32
+    is_success = (so_type == SOCK_STREAM);
+#else
+    if (so_type == SOCK_DGRAM)
+      optflag = SO_REUSEPORT;
+#endif
+  }
+#endif
 
   if (narg > OPT_START) {
+#ifdef _WIN32
+    if (is_success) goto set_success;
+#endif
     optval[0] = lua_tointeger(L, OPT_START + 1);
     if (narg > OPT_START + 1) {
       optval[1] = lua_tointeger(L, OPT_START + 2);
       optlen *= 2;
     }
     if (!setsockopt(sd, level, optflag, (char *) &optval, optlen)) {
- success:
+#ifdef _WIN32
+ set_success:
+#endif
       lua_settop(L, 1);
       return 1;
     }
-  } else if (!getsockopt(sd, level, optflag, (char *) &optval, &optlen)) {
-    lua_pushinteger(L, optval[0]);
-    if (optlen <= (socklen_t) sizeof(int))
-      return 1;
-    lua_pushinteger(L, optval[1]);
-    return 2;
+  } else {
+#ifdef _WIN32
+    if (is_success) {
+      optval[0] = 1;
+      goto get_success;
+    }
+#endif
+    if (!getsockopt(sd, level, optflag, (char *) &optval, &optlen)) {
+#ifdef _WIN32
+ get_success:
+#endif
+      lua_pushinteger(L, optval[0]);
+      if (optlen <= (socklen_t) sizeof(int))
+        return 1;
+      lua_pushinteger(L, optval[1]);
+      return 2;
+    }
   }
   return sys_seterror(L, 0);
 }
