@@ -607,6 +607,7 @@ sock_recv (lua_State *L)
   }
   if (td) sys_thread_check(td);
   if (!res) return 1;
+  if (!nr) return 0;
   return sys_seterror(L, 0);
 }
 
@@ -831,6 +832,7 @@ sock_read (lua_State *L)
   }
   if (td) sys_thread_check(td);
   if (!res) return 1;
+  if (!nr) return 0;
   return sys_seterror(L, 0);
 }
 

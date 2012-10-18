@@ -79,7 +79,7 @@ sys_strerror (lua_State *L)
 int
 sys_seterror (lua_State *L, int err)
 {
-  if (err != 0) {
+  if (err) {
 #ifndef _WIN32
     errno = err;
 #else
