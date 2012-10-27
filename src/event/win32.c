@@ -351,11 +351,9 @@ evq_wait (struct event_queue *evq, msec_t timeout)
           ResetEvent(ev->fd);  /* all events must be manual-reset */
         res |= EVENT_READ_RES;
       } else if (!WSAEnumNetworkEvents((int) ev->fd, *hp, &ne)) {
-        if ((ev_flags & EVENT_READ)
-         && (ne.lNetworkEvents & WFD_READ))
+        if ((ev_flags & EVENT_READ) && (ne.lNetworkEvents & WFD_READ))
           res = EVENT_READ_RES;
-        if ((ev_flags & EVENT_WRITE)
-         && (ne.lNetworkEvents & WFD_WRITE))
+        if ((ev_flags & EVENT_WRITE) && (ne.lNetworkEvents & WFD_WRITE))
           res |= EVENT_WRITE_RES;
         if (ne.lNetworkEvents & FD_CLOSE)
           res |= EVENT_EOF_RES;

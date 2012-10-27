@@ -1,6 +1,7 @@
 #!/usr/bin/env lua
 
 local sys = require("sys")
+local sock = require"sys.sock"
 
 
 print"-- Directory Watch"
@@ -18,6 +19,72 @@ do
 
   assert(evq:add_dirwatch(".", on_change, false, 100, true))
   assert(fd:create(filename))
+
+  evq:loop()
+  print"OK"
+end
+
+
+print"-- Sockets Chain"
+do
+  local evq = assert(sys.event_queue())
+
+  local pipe1, pipe2, pipe3
+
+  local function read_cb(evq, evid, fd)
+    fd:read(1)
+    evq:del(evid)
+    if pipe3 then
+      pipe2[2]:write("e")
+      evq:del(pipe3[3])
+      pipe3[1]:close()
+      pipe3[2]:close()
+      pipe3 = nil
+    end
+  end
+
+  local function create_socketpair()
+    local pipe = {sock.handle(), sock.handle()}
+    assert(pipe[1]:socket(pipe[2]))
+    pipe[3] = assert(evq:add_socket(pipe[1], "r", read_cb))
+    return pipe
+  end
+
+  pipe1 = create_socketpair()
+  pipe2 = create_socketpair()
+  pipe3 = create_socketpair()
+
+  pipe1[2]:write("e")
+
+  evq:loop()
+  print"OK"
+end
+
+
+print"-- Socket Pair"
+do
+  local evq = assert(sys.event_queue())
+
+  local msg = "test"
+
+  local function ev_cb(evq, evid, fd, ev)
+    if ev == 'r' then
+      local line = fd:recv()
+      assert(line == msg, "Got: " .. tostring(line))
+    elseif ev == 'w' then
+      fd:send(msg)
+    else
+      error("Bad event: " .. ev)
+    end
+    evq:del(evid)
+    fd:close()
+  end
+
+  local sd0, sd1 = sock.handle(), sock.handle()
+  assert(sd0:socket(sd1))
+
+  evq:add_socket(sd0, 'r', ev_cb)
+  evq:add_socket(sd1, 'w', ev_cb)
 
   evq:loop()
   print"OK"

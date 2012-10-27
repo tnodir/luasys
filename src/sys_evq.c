@@ -159,7 +159,6 @@ levq_done (lua_State *L)
   lua_State *NL = evq->L;
 
   if (!NL) return 0;
-  evq->L = NULL;
 
   memset(buffers, 0, sizeof(buffers));
 
@@ -188,6 +187,7 @@ levq_done (lua_State *L)
   (void) thread_event_del(&evq->wait_tev);
 
   evq_done(evq);
+  evq->L = NULL;
   return 0;
 }
 
@@ -818,16 +818,15 @@ sys_evq_loop (lua_State *L, struct event_queue *evq,
             lua_pushlightuserdata(L, ev);  /* ev_ludata */
             lua_rawgeti(L, evq_idx+2, ev_id);  /* obj_udata */
           }
-          if (ev_flags & EVENT_EOF_MASK_RES) {
-            lua_pushliteral(L, "e");
+          lua_pushstring(L,
+           (ev_flags & EVENT_READ_RES) ? "r"
+           : (ev_flags & EVENT_WRITE_RES) ? "w"
+           : (ev_flags & EVENT_TIMEOUT_RES) ? "t" : "e");
+          if (ev_flags & (EVENT_EOF_RES | EVENT_EOF_MASK_RES))
             lua_pushinteger(L,
              (int) ev_flags >> EVENT_EOF_SHIFT_RES);
-          } else {
-            lua_pushstring(L,
-             (ev_flags & EVENT_TIMEOUT_RES) ? "t"
-             : (ev_flags & EVENT_WRITE_RES) ? "w" : "r");
+          else
             lua_pushnil(L);
-          }
         }
 
         if ((ev_flags & EVENT_ONESHOT) && !event_deleted(ev))

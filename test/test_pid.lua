@@ -38,10 +38,9 @@ do
   local function on_child(evq, evid, pid, ev, err)
     evq:del(timer_id)
     if ev == 't' then
-      print("Timeout")
-      if not pid:kill() then
-        print("Kill:", SYS_ERR)
-      end
+      print("Timeout: Kill the subprocess")
+      assert(pid:kill())
+      assert(evq:add_pid(pid, on_child))
     else
       print("Status:", err or 0)
       if err then
@@ -52,7 +51,7 @@ do
     end
   end
 
-  assert(evq:add_pid(pid, on_child, 1007))
+  assert(evq:add_pid(pid, on_child, 1014))
 end
 
 evq:loop()
