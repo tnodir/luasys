@@ -162,18 +162,19 @@ static int
 sock_close (lua_State *L)
 {
   sd_t *sdp = checkudata(L, 1, SD_TYPENAME);
+  int res;
 
   if (*sdp != (sd_t) -1) {
+    sys_vm_leave();
 #ifndef _WIN32
-    int res;
-
     do res = close(*sdp);
     while (res == -1 && sys_eintr());
-    lua_pushboolean(L, !res);
 #else
-    lua_pushboolean(L, !closesocket(*sdp));
+    res = closesocket(*sdp);
 #endif
+    sys_vm_enter();
     *sdp = (sd_t) -1;
+    lua_pushboolean(L, !res);
     return 1;
   }
   return 0;

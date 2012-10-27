@@ -322,23 +322,24 @@ sys_close (lua_State *L)
 {
   fd_t *fdp = checkudata(L, 1, FD_TYPENAME);
   const int close_std = lua_toboolean(L, 2);
+  int res = 0;
 
   if (*fdp != (fd_t) -1) {
     luaL_getmetatable(L, FD_TYPENAME);
     lua_rawgeti(L, -1, (int) *fdp);  /* don't close std. handles */
-    if (!(lua_isnil(L, -1) || close_std))
-      lua_pushboolean(L, 0);
-    else {
+    if (lua_isnil(L, -1) || close_std) {
+      sys_vm_leave();
 #ifndef _WIN32
-      int res;
       do res = close(*fdp);
       while (res == -1 && sys_eintr());
-      lua_pushboolean(L, !res);
+      res = !res;
 #else
-      lua_pushboolean(L, CloseHandle(*fdp));
+      res = CloseHandle(*fdp);
 #endif
+      sys_vm_enter();
       *fdp = (fd_t) -1;
     }
+    lua_pushboolean(L, res);
     return 1;
   }
   return 0;
