@@ -292,7 +292,11 @@ typedef BOOL (WINAPI *PCancelIoEx) (HANDLE hThread, LPOVERLAPPED overlapped);
 extern PCancelSynchronousIo pCancelSynchronousIo;
 extern PCancelIoEx pCancelIoEx;
 
+#if defined(_WIN32_WCE) || defined(WIN32_VISTA)
+#define is_WinNT	1
+#else
 extern int is_WinNT;
+#endif
 
 
 /*

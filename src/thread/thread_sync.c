@@ -1,6 +1,6 @@
 /* Lua System: Threading: Synchronization */
 
-#if !defined(_WIN32) || defined(SRWLOCK_INIT)
+#if !defined(_WIN32) || (defined(SRWLOCK_INIT) && defined(WIN32_VISTA))
 #define USE_PTHREAD_SYNC
 #endif
 

@@ -3,7 +3,9 @@
 PCancelSynchronousIo pCancelSynchronousIo;
 PCancelIoEx pCancelIoEx;
 
+#if !(defined(_WIN32_WCE) || defined(WIN32_VISTA))
 int is_WinNT;
+#endif
 
 
 /*
@@ -100,18 +102,26 @@ static luaL_Reg win32_lib[] = {
 
 
 static void
-win32_init (void)
+win32_init (lua_State *L)
 {
-#ifdef _WIN32_WCE
-  is_WinNT = 1;
-#else
+  (void) L;
+
+#ifndef _WIN32_WCE
   /* Is Win32 NT platform? */
   {
     OSVERSIONINFO osvi;
 
+    memset(&osvi, 0, sizeof(OSVERSIONINFO));
     osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-    is_WinNT = (GetVersionEx(&osvi)
-     && osvi.dwPlatformId == VER_PLATFORM_WIN32_NT);
+    GetVersionEx(&osvi);
+
+#ifndef WIN32_VISTA
+    is_WinNT = (osvi.dwPlatformId == VER_PLATFORM_WIN32_NT);
+#else
+    if (osvi.dwPlatformId != VER_PLATFORM_WIN32_NT
+     || osvi.dwMajorVersion < 6)
+      luaL_argerror(L, 0, "Windows Vista+ expected");
+#endif
   }
 #endif
 
@@ -131,7 +141,7 @@ win32_init (void)
 static void
 luaopen_sys_win32 (lua_State *L)
 {
-  win32_init();
+  win32_init(L);
 
   luaL_newlib(L, win32_lib);
   lua_pushvalue(L, -1);  /* push win32_lib */

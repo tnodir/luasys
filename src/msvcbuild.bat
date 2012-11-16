@@ -5,7 +5,7 @@
 @set LSCOMPILE=cl /nologo /c /LD /MD /O2 /W3 /D_CRT_SECURE_NO_DEPRECATE /I%LUA%/src
 @set LSLINK=link /nologo
 
-%LSCOMPILE% /DLUA_BUILD_AS_DLL luasys.c sock/sys_sock.c isa/isapi/isapi_dll.c
+%LSCOMPILE% /DLUA_BUILD_AS_DLL /DWIN32_VISTA luasys.c sock/sys_sock.c isa/isapi/isapi_dll.c
 @if errorlevel 1 goto :END
 %LSLINK% /DLL /OUT:sys.dll /DEF:isa/isapi/isapi_dll.def *.obj %LUA%/src/lua*.lib kernel32.lib user32.lib winmm.lib shell32.lib advapi32.lib ws2_32.lib
 @if errorlevel 1 goto :END
