@@ -7,7 +7,7 @@ struct data_pool {
 
   int volatile nwaits;  /* number of blocked readers */
   int volatile nput; /* number of items to put as new data */
-  struct sys_thread * volatile td;  /* data writer */
+  lua_State * volatile L;  /* data writer */
 
   unsigned int idx, top;  /* storage indexes */
   unsigned int max;  /* maximum watermark of data */
@@ -93,12 +93,12 @@ dpool_put (lua_State *L)
   }
 
   /* Try directly move data between threads */
-  if (dp->nwaits && !dp->td) {
-    dp->td = td;
+  if (dp->nwaits && !dp->L) {
+    dp->L = L;
     dp->nput = nput;
     thread_event_signal(&dp->tev);
     sys_thread_switch(0);
-    dp->td = NULL;
+    dp->L = NULL;
     if (!dp->nput) return 0;  /* moved to thread */
     dp->nput = 0;
   }
@@ -192,9 +192,9 @@ dpool_get (lua_State *L)
     /* get directly from another thread */
     nput = dp->nput;
     if (nput) {
-      dp->nput = 0;
       luaL_checkstack(L, nput, NULL);
-      lua_xmove(dp->td->L, L, nput);
+      lua_xmove(dp->L, L, nput);
+      dp->nput = 0;
       return nput;
     }
   }
