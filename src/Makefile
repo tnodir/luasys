@@ -93,7 +93,7 @@ osx:
 mingw:	all
 
 clean:
-	$(RM) $(T) $(A) $(OBJS) *.o
+	$(RM) $(T) $(A) $(LDOBJS)
 
 
 .PHONY: all $(PLATS) default a clean
