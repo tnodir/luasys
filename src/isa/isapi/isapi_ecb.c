@@ -129,7 +129,7 @@ ecb_read (lua_State *L)
     if (!sys_buffer_write_done(L, &sb, buf, nr))
       lua_pushinteger(L, len - n);
   }
-  if (td) sys_thread_check(td);
+  if (td) sys_thread_check(td, L);
   if (!res) return 1;
   return sys_seterror(L, 0);
 }
@@ -167,13 +167,13 @@ ecb_write (lua_State *L)
     if (!sys_buffer_read_init(L, i, &sb)
      || sb.size == 0)  /* don't close the connection */
       continue;
-    sys_vm_leave();
+    sys_vm_leave(L);
     {
       DWORD l = sb.size;
       nw = ecb->WriteClient(ecb->ConnID, sb.ptr.w, &l, 0)
        ? (int) l : -1;
     }
-    sys_vm_enter();
+    sys_vm_enter(L);
     if (nw == -1) {
       if (n > 0) break;
       return sys_seterror(L, 0);

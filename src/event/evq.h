@@ -101,7 +101,8 @@ EVQ_API int evq_del (struct event *ev, const int reuse_fd);
 
 EVQ_API int evq_modify (struct event *ev, unsigned int flags);
 
-EVQ_API int evq_wait (struct event_queue *evq, msec_t timeout);
+EVQ_API int evq_wait (struct event_queue *evq, struct sys_thread *td,
+                      msec_t timeout);
 
 EVQ_API int evq_set_timeout (struct event *ev, const msec_t msec);
 EVQ_API int evq_add_timer (struct event_queue *evq, struct event *ev,

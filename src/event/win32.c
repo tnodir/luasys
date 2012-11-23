@@ -226,7 +226,7 @@ evq_modify (struct event *ev, unsigned int flags)
 }
 
 EVQ_API int
-evq_wait (struct event_queue *evq, msec_t timeout)
+evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
 {
   struct event *ev_ready;
   struct win32overlapped *ov_ready;
@@ -252,10 +252,10 @@ evq_wait (struct event_queue *evq, msec_t timeout)
   if (evq->iocr.ov_list.ov_head)
     win32iocr_submit(evq);
 
-  sys_vm_leave();
+  if (td) sys_vm2_leave(td);
   wait_res = MsgWaitForMultipleObjects(n + 1, wth->handles, FALSE, timeout,
    (evq->win_msg ? QS_ALLEVENTS : 0));
-  sys_vm_enter();
+  if (td) sys_vm2_enter(td);
 
   evq->now = sys_milliseconds();
 

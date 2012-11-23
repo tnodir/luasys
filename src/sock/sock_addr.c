@@ -122,9 +122,9 @@ sock_getaddrinfo (lua_State *L)
   hints.ai_family = AF_UNSPEC;
   hints.ai_flags = AI_ADDRCONFIG | AI_CANONNAME;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   gai_errno = getaddrinfo(host, NULL, &hints, &result);
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (gai_errno) goto err;
 
@@ -145,9 +145,9 @@ sock_getaddrinfo (lua_State *L)
 #else
   struct hostent *hp;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   hp = gethostbyname(host);
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (!hp) {
     gai_errno = h_errno;
@@ -198,18 +198,18 @@ sock_getnameinfo (lua_State *L)
   memcpy(inp, addr, in_len);
 
 #ifdef USE_GAI
-  sys_vm_leave();
+  sys_vm_leave(L);
   gai_errno = getnameinfo(&sa.u.addr, sizeof(struct sock_addr),
    host, sizeof(host), NULL, 0, NI_NAMEREQD);
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (gai_errno) goto err;
 
   lua_pushstring(L, host);
 #else
-  sys_vm_leave();
+  sys_vm_leave(L);
   hp = gethostbyaddr(inp, in_len, af);
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (!hp) {
     gai_errno = h_errno;
@@ -235,20 +235,20 @@ sock_getifaddrs (lua_State *L)
 #ifndef _WIN32
   struct ifaddrs *result, *rp;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   res = getifaddrs(&result);
-  sys_vm_enter();
+  sys_vm_enter(L);
 #else
   INTERFACE_INFO result[8192], *rp;
   SOCKET sd = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
   DWORD n;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   res = WSAIoctl(sd, SIO_GET_INTERFACE_LIST, NULL, 0,
    result, sizeof(result), &n, NULL, NULL);
 
   closesocket(sd);
-  sys_vm_enter();
+  sys_vm_enter(L);
 #endif
 
   if (res == -1)

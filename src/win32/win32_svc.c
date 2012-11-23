@@ -261,10 +261,10 @@ svc_wait (lua_State *L)
   HANDLE he = (HANDLE) lua_unboxpointer(L, 1, WSVC_TYPENAME);
   DWORD res = luaL_optinteger(L, 2, INFINITE);
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   res = WaitForSingleObject(he, res);
   ResetEvent(he);
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (res != WAIT_FAILED) {
     lua_pushboolean(L, res == WAIT_OBJECT_0);

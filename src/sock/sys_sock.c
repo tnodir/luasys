@@ -165,14 +165,14 @@ sock_close (lua_State *L)
   int res;
 
   if (*sdp != (sd_t) -1) {
-    sys_vm_leave();
+    sys_vm_leave(L);
 #ifndef _WIN32
     do res = close(*sdp);
     while (res == -1 && sys_eintr());
 #else
     res = closesocket(*sdp);
 #endif
-    sys_vm_enter();
+    sys_vm_enter(L);
     *sdp = (sd_t) -1;
     lua_pushboolean(L, !res);
     return 1;
@@ -431,14 +431,14 @@ sock_accept (lua_State *L)
     *slp = SOCK_ADDR_LEN;
   }
 
-  sys_vm_leave();
+  sys_vm_leave(L);
 #ifndef _WIN32
   do sd = accept(sd, sap, slp);
   while (sd == -1 && sys_eintr());
 #else
   sd = accept(sd, sap, slp);
 #endif
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (sd != (sd_t) -1) {
     *sdp = sd;
@@ -462,14 +462,14 @@ sock_connect (lua_State *L)
   struct sock_addr *sap = checkudata(L, 2, SA_TYPENAME);
   int res;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   do res = connect(sd, &sap->u.addr, sap->addrlen);
 #ifndef _WIN32
   while (res == -1 && sys_eintr());
 #else
   while (0);
 #endif
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (!res) {
     lua_settop(L, 1);
@@ -517,7 +517,7 @@ sock_send (lua_State *L)
   for (i = lua_gettop(L); i > 3; --i) {
     flags |= o_flags[luaL_checkoption(L, i, NULL, o_names)];
   }
-  sys_vm_leave();
+  sys_vm_leave(L);
   do nw = !to ? send(sd, sb.ptr.r, sb.size, flags)
    : sendto(sd, sb.ptr.r, sb.size, flags, &to->u.addr, to->addrlen);
 #ifndef _WIN32
@@ -525,7 +525,7 @@ sock_send (lua_State *L)
 #else
   while (0);
 #endif
-  sys_vm_enter();
+  sys_vm_enter(L);
   if (nw == -1) {
     if (!SYS_IS_EAGAIN(SYS_ERRNO))
       return sys_seterror(L, 0);
@@ -606,7 +606,7 @@ sock_recv (lua_State *L)
     if (!sys_buffer_write_done(L, &sb, buf, nr))
       lua_pushinteger(L, len - n);
   }
-  if (td) sys_thread_check(td);
+  if (td) sys_thread_check(td, L);
   if (!res) return 1;
   if (!nr) return 0;
   return sys_seterror(L, 0);
@@ -689,7 +689,7 @@ sock_sendfile (lua_State *L)
   size_t n = (size_t) lua_tointeger(L, 3);
   ssize_t res;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
 #ifndef _WIN32
 #if defined(__linux__)
   do res = sendfile(sd, fd, NULL, n ? n : ~((size_t) 0));
@@ -711,7 +711,7 @@ sock_sendfile (lua_State *L)
     }
   }
 #endif
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (res != -1 || SYS_IS_EAGAIN(SYS_ERRNO)) {
     if (res == -1) {
@@ -720,7 +720,7 @@ sock_sendfile (lua_State *L)
     }
 #else
   res = TransmitFileMap(sd, fd, n);
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (res != 0L) {
 #endif
@@ -750,7 +750,7 @@ sock_write (lua_State *L)
 
     if (!sys_buffer_read_init(L, i, &sb))
       continue;
-    sys_vm_leave();
+    sys_vm_leave(L);
 #ifndef _WIN32
     do nw = write(sd, sb.ptr.r, sb.size);
     while (nw == -1 && sys_eintr());
@@ -766,7 +766,7 @@ sock_write (lua_State *L)
        ? (int) l : -1;
     }
 #endif
-    sys_vm_enter();
+    sys_vm_enter(L);
     if (nw == -1) {
       if (n > 0 || SYS_IS_EAGAIN(SYS_ERRNO))
         break;
@@ -831,7 +831,7 @@ sock_read (lua_State *L)
     if (!sys_buffer_write_done(L, &sb, buf, nr))
       lua_pushinteger(L, len - n);
   }
-  if (td) sys_thread_check(td);
+  if (td) sys_thread_check(td, L);
   if (!res) return 1;
   if (!nr) return 0;
   return sys_seterror(L, 0);

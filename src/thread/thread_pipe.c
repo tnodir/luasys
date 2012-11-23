@@ -370,7 +370,7 @@ pipe_put (lua_State *L)
           if (!res) continue;
           thread_critsect_leave(csp);
 
-          sys_thread_check(td);
+          sys_thread_check(td, L);
           if (res == 1) {
             lua_pushboolean(L, 0);
             return 1;  /* timed out */
@@ -448,7 +448,7 @@ pipe_get (lua_State *L)
       if (!res) continue;
       thread_critsect_leave(csp);
 
-      sys_thread_check(td);
+      sys_thread_check(td, L);
       if (res == 1) {
         lua_pushboolean(L, 0);
         return 1;  /* timed out */

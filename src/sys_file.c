@@ -72,9 +72,9 @@ sys_open (lua_State *L)
     flags |= fdopt_flags[luaL_checkoption(L, i, NULL, fdopt_names)];
   }
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   fd = open(path, flags, perm);
-  sys_vm_enter();
+  sys_vm_enter(L);
 #else
   {
     DWORD share = FILE_SHARE_READ | FILE_SHARE_WRITE
@@ -115,13 +115,13 @@ sys_open (lua_State *L)
       if (!os_path)
         return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
-      sys_vm_leave();
+      sys_vm_leave(L);
       fd = is_WinNT
        ? CreateFileW(os_path, flags, share, NULL, creation, attr, NULL)
        : CreateFileA(os_path, flags, share, NULL, creation, attr, NULL);
 
       free(os_path);
-      sys_vm_enter();
+      sys_vm_enter(L);
     }
   }
 #endif
@@ -154,9 +154,9 @@ sys_create (lua_State *L)
 #endif
 
 #ifndef _WIN32
-  sys_vm_leave();
+  sys_vm_leave(L);
   fd = creat(path, perm);
-  sys_vm_enter();
+  sys_vm_enter(L);
 #else
   {
     const int flags = GENERIC_WRITE;
@@ -170,13 +170,13 @@ sys_create (lua_State *L)
     if (!os_path)
       return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
-    sys_vm_leave();
+    sys_vm_leave(L);
     fd = is_WinNT
      ? CreateFileW(os_path, flags, share, NULL, creation, attr, NULL)
      : CreateFileA(os_path, flags, share, NULL, creation, attr, NULL);
 
     free(os_path);
-    sys_vm_enter();
+    sys_vm_enter(L);
   }
 #endif
 
@@ -223,9 +223,9 @@ sys_tempfile (lua_State *L)
   }
   memcpy(path + len, template, sizeof(template));  /* include term. zero */
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   fd = mkstemp(path);
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   lua_pushstring(L, path);
 #else
@@ -269,11 +269,11 @@ sys_tempfile (lua_State *L)
      | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION
      | (persist ? 0 : FILE_FLAG_DELETE_ON_CLOSE);
 
-    sys_vm_leave();
+    sys_vm_leave(L);
     fd = is_WinNT
      ? CreateFileW(os_path, flags, 0, NULL, creation, attr, NULL)
      : CreateFileA((char *) os_path, flags, 0, NULL, creation, attr, NULL);
-    sys_vm_enter();
+    sys_vm_enter(L);
   }
 #endif
   if (fd != (fd_t) -1) {
@@ -328,7 +328,7 @@ sys_close (lua_State *L)
     luaL_getmetatable(L, FD_TYPENAME);
     lua_rawgeti(L, -1, (int) *fdp);  /* don't close std. handles */
     if (lua_isnil(L, -1) || close_std) {
-      sys_vm_leave();
+      sys_vm_leave(L);
 #ifndef _WIN32
       do res = close(*fdp);
       while (res == -1 && sys_eintr());
@@ -336,7 +336,7 @@ sys_close (lua_State *L)
 #else
       res = CloseHandle(*fdp);
 #endif
-      sys_vm_enter();
+      sys_vm_enter(L);
       *fdp = (fd_t) -1;
     }
     lua_pushboolean(L, res);
@@ -492,7 +492,7 @@ sys_set_end (lua_State *L)
   const int64_t off = (int64_t) offset;  /* to avoid warning */
   int res;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
 #ifndef _WIN32
   do res = ftruncate(fd, off);
   while (res == -1 && sys_eintr());
@@ -508,7 +508,7 @@ sys_set_end (lua_State *L)
     SetFilePointer(fd, cur_lo, &cur_hi, SEEK_SET);
   }
 #endif
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (!res) {
     lua_settop(L, 1);
@@ -541,14 +541,14 @@ sys_lock (lua_State *L)
   lock.l_start = off;
   lock.l_len = len;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   do res = fcntl(fd, F_SETLK, &lock);
   while (res == -1 && sys_eintr());
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (res != -1) {
 #else
-  sys_vm_leave();
+  sys_vm_leave(L);
   {
     const DWORD off_hi = INT64_HIGH(off);
     const DWORD off_lo = INT64_LOW(off);
@@ -558,7 +558,7 @@ sys_lock (lua_State *L)
     res = locking ? LockFile(fd, off_lo, off_hi, len_lo, len_hi)
      : UnlockFile(fd, off_lo, off_hi, len_lo, len_hi);
   }
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (res) {
 #endif
@@ -588,7 +588,7 @@ sys_write (lua_State *L)
 
     if (!sys_buffer_read_init(L, i, &sb))
       continue;
-    sys_vm_leave();
+    sys_vm_leave(L);
 #ifndef _WIN32
     do nw = write(fd, sb.ptr.r, sb.size);
     while (nw == -1 && sys_eintr());
@@ -608,7 +608,7 @@ sys_write (lua_State *L)
       }
     }
 #endif
-    sys_vm_enter();
+    sys_vm_enter(L);
     if (nw == -1) {
       if (n > 0 || SYS_IS_EAGAIN(SYS_ERRNO))
         break;
@@ -668,7 +668,7 @@ sys_read (lua_State *L)
     if (!sys_buffer_write_done(L, &sb, buf, nr))
       lua_pushinteger(L, len - n);
   }
-  if (td) sys_thread_check(td);
+  if (td) sys_thread_check(td, L);
   if (!res) return 1;
   if (!nr) return 0;
   return sys_seterror(L, 0);
@@ -687,7 +687,7 @@ sys_flush (lua_State *L)
 #endif
   int res;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
 #ifndef _WIN32
   res = -1;
 
@@ -709,7 +709,7 @@ sys_flush (lua_State *L)
 #else
   res = !FlushFileBuffers(fd);
 #endif
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (!res) {
     lua_settop(L, 1);

@@ -192,7 +192,7 @@ evq_modify (struct event *ev, unsigned int flags)
 }
 
 EVQ_API int
-evq_wait (struct event_queue *evq, msec_t timeout)
+evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
 {
   struct event *ev_ready;
   struct kevent *kev = evq->kev_list;
@@ -214,9 +214,9 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     tsp = &ts;
   }
 
-  sys_vm_leave();
+  if (td) sys_vm2_leave(td);
   nready = kevent(evq->kqueue_fd, kev, evq->nchanges, kev, NEVENT, tsp);
-  sys_vm_enter();
+  if (td) sys_vm2_enter(td);
 
   evq->nchanges = 0;
   evq->now = sys_milliseconds();

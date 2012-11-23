@@ -335,7 +335,7 @@ mem_map (lua_State *L)
   int is_anon = 0;
 #endif
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   /* length */
   if (!len) {
     struct stat sb;
@@ -372,7 +372,7 @@ mem_map (lua_State *L)
   if (ptr == MAP_FAILED) goto err;
 
 #else
-  sys_vm_leave();
+  sys_vm_leave(L);
   /* length */
   if (!len) {
     DWORD size_hi, size_lo;
@@ -410,7 +410,7 @@ mem_map (lua_State *L)
     if (!ptr) goto err;
   }
 #endif /* !Win32 */
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   mb->flags |= MEM_MAP;
   mb->len = len;
@@ -418,7 +418,7 @@ mem_map (lua_State *L)
   lua_settop(L, 1);
   return 1;
  err:
-  sys_vm_enter();
+  sys_vm_enter(L);
   return sys_seterror(L, 0);
 }
 
@@ -432,13 +432,13 @@ mem_sync (lua_State *L)
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
   int res;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
 #ifndef _WIN32
   res = msync(mb->data, mb->len, MS_SYNC);
 #else
   res = !FlushViewOfFile(mb->data, 0);
 #endif
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   return !res ? 1 : 0;
 }

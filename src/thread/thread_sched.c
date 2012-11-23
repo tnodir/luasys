@@ -366,7 +366,7 @@ sched_loop (lua_State *L)
         res = thread_cond_wait_vm(&sched->cond, td, timeout);
         sched->nwaiters--;
 
-        sys_thread_check(td);
+        sys_thread_check(td, L);
         if (res) {
           err = (res == 1) ? SYS_ERR_TIMEOUT : SYS_ERR_SYSTEM;
           break;
@@ -843,7 +843,7 @@ sched_preempt_tasks (lua_State *L)
   thread_critsect_t *csp = &sched->cs;
   unsigned int old_tick = 0;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   while (!sched->stop) {
     unsigned int tick;
 
@@ -862,7 +862,7 @@ sched_preempt_tasks (lua_State *L)
 
     old_tick = tick;
   }
-  sys_vm_enter();
+  sys_vm_enter(L);
   return 0;
 }
 

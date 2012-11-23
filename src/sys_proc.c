@@ -31,9 +31,9 @@ sys_run (lua_State *L)
 #ifndef _WIN32
   int res;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   res = system(cmd);
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (res != -1) {
 #else
@@ -52,9 +52,9 @@ sys_run (lua_State *L)
     ++arg;  /* skip space */
   }
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   res = ShellExecuteA(NULL, NULL, cmd, arg, NULL, 0);
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (res > (HINSTANCE) 32) {
 #endif
@@ -399,7 +399,7 @@ proc_wait (lua_State *L)
   struct sys_pid *pidp = checkudata(L, 1, PID_TYPENAME);
   int status;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
 #ifndef _WIN32
   while ((waitpid(pidp->id, &status, 0)) == -1 && sys_eintr())
     continue;
@@ -408,7 +408,7 @@ proc_wait (lua_State *L)
   WaitForSingleObject(pidp->h, INFINITE);
   GetExitCodeProcess(pidp->h, (DWORD *) &status);
 #endif
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   lua_pushinteger(L, status);
   return 1;

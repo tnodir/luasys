@@ -146,7 +146,7 @@ evq_modify (struct event *ev, unsigned int flags)
 }
 
 EVQ_API int
-evq_wait (struct event_queue *evq, msec_t timeout)
+evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
 {
   struct event *ev_ready;
   fd_set work_readset = evq->readset;
@@ -181,9 +181,9 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     evq->max_fd = max_fd;
   }
 
-  sys_vm_leave();
+  if (td) sys_vm2_leave(td);
   nready = select(max_fd + 1, &work_readset, &work_writeset, NULL, tvp);
-  sys_vm_enter();
+  if (td) sys_vm2_enter(td);
 
   evq->now = sys_milliseconds();
 

@@ -103,7 +103,7 @@ lisapi_init (void)
 
     g_ISAPI.nthreads = 0;
     g_ISAPI.L = L;
-    sys_vm_leave();
+    sys_vm_leave(L);
     sys_thread_set(NULL);
     return 0;
   }

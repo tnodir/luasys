@@ -75,8 +75,10 @@ levq_control_wait (struct event_queue *evq, const int stop)
 {
   if (stop) {
     if (!evq->nactives++ && (evq->flags & EVQ_FLAG_WAITING)) {
+      struct sys_thread *td = sys_thread_get();
+
       evq_signal(evq, EVQ_SIGEVQ);
-      do sys_thread_switch(0);
+      do sys_thread_switch(td);
       while (evq->flags & EVQ_FLAG_WAITING);
     }
   } else {
@@ -771,19 +773,25 @@ sys_evq_loop (lua_State *L, struct event_queue *evq,
         break;
 
       if (td) {
-        while (evq->nactives || (evq->flags & EVQ_FLAG_WAITING)) {
+        for (; ; ) {
+          sys_thread_check(td, L);
+
+          if (!(evq->nactives || (evq->flags & EVQ_FLAG_WAITING)))
+            break;
+
           evq->nidles++;
           res = thread_event_wait(&evq->wait_tev, td, TIMEOUT_INFINITE);
           evq->nidles--;
 
-          sys_thread_check(td);
           if (res || evq->ev_ready || (evq->flags & EVQ_FLAG_STOP))
             goto no_wait;
         }
       }
+
       evq->flags |= EVQ_FLAG_WAITING;
-      res = evq_wait(evq, timeout);
+      res = evq_wait(evq, td, timeout);
       evq->flags &= ~EVQ_FLAG_WAITING;
+
  no_wait:
       if (res) break;
     }

@@ -86,7 +86,7 @@ dpool_put (lua_State *L)
         const int res = thread_event_wait(&dp->tev, td,
          TIMEOUT_INFINITE);
 
-        sys_thread_check(td);
+        sys_thread_check(td, L);
         if (res) return sys_seterror(L, 0);
       } while (dp->n >= dp->max);
     }
@@ -97,7 +97,7 @@ dpool_put (lua_State *L)
     dp->L = L;
     dp->nput = nput;
     thread_event_signal(&dp->tev);
-    sys_thread_switch(0);
+    sys_thread_switch(td);
     dp->L = NULL;
     if (!dp->nput) return 0;  /* moved to thread */
     dp->nput = 0;
@@ -179,7 +179,7 @@ dpool_get (lua_State *L)
       res = thread_event_wait(&dp->tev, td, timeout);
       dp->nwaits--;
 
-      sys_thread_check(td);
+      sys_thread_check(td, L);
       if (res) {
         if (res == 1) {
           lua_pushboolean(L, 0);

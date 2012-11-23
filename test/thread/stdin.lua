@@ -53,7 +53,7 @@ do
     if err and not (thread.self():interrupted()
         and err == thread.interrupt_error()) then
       print("Error:", err)
-      err = nill
+      err = nil
     end
     if not err then
       error("Thread Interrupt Error expected")

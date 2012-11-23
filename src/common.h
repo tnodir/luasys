@@ -217,17 +217,17 @@ struct sys_thread;
 void sys_thread_set (struct sys_thread *td);
 struct sys_thread *sys_thread_get (void);
 
-struct lua_State *sys_thread_tolua (struct sys_thread *);
+struct lua_State *sys_thread_tolua (struct sys_thread *td);
 
-void sys_thread_switch (const int check_thread);
+void sys_thread_switch (struct sys_thread *td);
 
-void sys_thread_check (struct sys_thread *td);
+void sys_thread_check (struct sys_thread *td, lua_State *L);
 
 void sys_vm2_enter (struct sys_thread *td);
 void sys_vm2_leave (struct sys_thread *td);
 
-void sys_vm_enter (void);
-void sys_vm_leave (void);
+void sys_vm_enter (lua_State *L);
+void sys_vm_leave (lua_State *L);
 
 struct sys_thread *sys_thread_new (lua_State *L,
                                    struct sys_thread *vmtd,

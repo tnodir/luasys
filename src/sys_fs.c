@@ -38,7 +38,7 @@ sys_stat (lua_State *L)
 #endif
   int res;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
 #ifndef _WIN32
   res = stat(path, &st);
 #else
@@ -52,7 +52,7 @@ sys_stat (lua_State *L)
     free(os_path);
   }
 #endif
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (!res) {
     /* is directory? */
@@ -141,9 +141,9 @@ sys_statfs (lua_State *L)
 #ifndef _WIN32
   struct statvfs buf;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   res = statvfs(path, &buf);
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   ntotal = buf.f_blocks * buf.f_frsize;
   nfree = buf.f_bfree * buf.f_bsize;
@@ -157,13 +157,13 @@ sys_statfs (lua_State *L)
     if (!os_path)
       return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
-    sys_vm_leave();
+    sys_vm_leave(L);
     res = is_WinNT
      ? !GetDiskFreeSpaceExW(os_path, &na, &nt, &nf)
      : !GetDiskFreeSpaceExA(os_path, &na, &nt, &nf);
 
     free(os_path);
-    sys_vm_enter();
+    sys_vm_enter(L);
   }
 
   ntotal = (int64_t) nt.QuadPart;
@@ -190,22 +190,22 @@ sys_remove (lua_State *L)
   int res;
 
 #ifndef _WIN32
-  sys_vm_leave();
+  sys_vm_leave(L);
   res = remove(path);
-  sys_vm_enter();
+  sys_vm_enter(L);
 #else
   {
     void *os_path = utf8_to_filename(path);
     if (!os_path)
       return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
-    sys_vm_leave();
+    sys_vm_leave(L);
     res = is_WinNT
      ? !DeleteFileW(os_path)
      : !DeleteFileA(os_path);
 
     free(os_path);
-    sys_vm_enter();
+    sys_vm_enter(L);
   }
 #endif
 
@@ -228,9 +228,9 @@ sys_rename (lua_State *L)
   int res;
 
 #ifndef _WIN32
-  sys_vm_leave();
+  sys_vm_leave(L);
   res = rename(old, new);
-  sys_vm_enter();
+  sys_vm_enter(L);
 #else
   {
     void *os_old = utf8_to_filename(old);
@@ -241,14 +241,14 @@ sys_rename (lua_State *L)
       return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
     }
 
-    sys_vm_leave();
+    sys_vm_leave(L);
     res = is_WinNT
      ? !MoveFileW(os_old, os_new)
      : !MoveFileA(os_old, os_new);
 
     free(os_old);
     free(os_new);
-    sys_vm_enter();
+    sys_vm_enter(L);
   }
 #endif
 
@@ -373,22 +373,22 @@ sys_mkdir (lua_State *L)
 #ifndef _WIN32
   mode_t perm = (mode_t) lua_tointeger(L, 2);
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   res = mkdir(path, perm);
-  sys_vm_enter();
+  sys_vm_enter(L);
 #else
   {
     void *os_path = utf8_to_filename(path);
     if (!os_path)
       return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
-    sys_vm_leave();
+    sys_vm_leave(L);
     res = is_WinNT
      ? !CreateDirectoryW(os_path, NULL)
      : !CreateDirectoryA(os_path, NULL);
 
     free(os_path);
-    sys_vm_enter();
+    sys_vm_enter(L);
   }
 #endif
   if (!res) {
@@ -409,22 +409,22 @@ sys_rmdir (lua_State *L)
   int res;
 
 #ifndef _WIN32
-  sys_vm_leave();
+  sys_vm_leave(L);
   res = rmdir(path);
-  sys_vm_enter();
+  sys_vm_enter(L);
 #else
   {
     void *os_path = utf8_to_filename(path);
     if (!os_path)
       return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
-    sys_vm_leave();
+    sys_vm_leave(L);
     res = is_WinNT
      ? !RemoveDirectoryW(os_path)
      : !RemoveDirectoryA(os_path);
 
     free(os_path);
-    sys_vm_enter();
+    sys_vm_enter(L);
   }
 #endif
   if (!res) {
@@ -447,9 +447,9 @@ sys_dir_open (lua_State *L, const int idx, struct dir *dp)
   if (dp->data)
     closedir(dp->data);
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   dp->data = opendir(*dir == '\0' ? "/" : dir);
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (dp->data) return 1;
 #else
@@ -485,13 +485,13 @@ sys_dir_open (lua_State *L, const int idx, struct dir *dp)
       if (!os_path)
         return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
-      sys_vm_leave();
+      sys_vm_leave(L);
       dp->h = is_WinNT
        ? FindFirstFileW(os_path, &dp->data)
        : FindFirstFileA(os_path, (WIN32_FIND_DATAA *) &dp->data);
 
       free(os_path);
-      sys_vm_enter();
+      sys_vm_enter(L);
     }
 
     if (dp->h != INVALID_HANDLE_VALUE) {
@@ -569,9 +569,9 @@ sys_dir_next (lua_State *L)
     if (!dp->data)
       return 0;
     do {
-      sys_vm_leave();
+      sys_vm_leave(L);
       entry = readdir(dp->data);
-      sys_vm_enter();
+      sys_vm_enter(L);
 
       if (!entry) {
         closedir(dp->data);
@@ -627,11 +627,11 @@ sys_dir_next (lua_State *L)
         free(path);
       }
 
-      sys_vm_leave();
+      sys_vm_leave(L);
       res = is_WinNT
        ? FindNextFileW(dp->h, &dp->data)
        : FindNextFileA(dp->h, (WIN32_FIND_DATAA *) &dp->data);
-      sys_vm_enter();
+      sys_vm_enter(L);
 
       if (!res) {
         FindClose(dp->h);

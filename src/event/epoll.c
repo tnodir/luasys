@@ -141,7 +141,7 @@ evq_modify (struct event *ev, unsigned int flags)
 }
 
 EVQ_API int
-evq_wait (struct event_queue *evq, msec_t timeout)
+evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
 {
   struct epoll_event ep_events[NEVENT];
   struct epoll_event *epev;
@@ -156,9 +156,9 @@ evq_wait (struct event_queue *evq, msec_t timeout)
     }
   }
 
-  sys_vm_leave();
+  if (td) sys_vm2_leave(td);
   nready = epoll_wait(evq->epoll_fd, ep_events, NEVENT, (int) timeout);
-  sys_vm_enter();
+  if (td) sys_vm2_enter(td);
 
   evq->now = sys_milliseconds();
 

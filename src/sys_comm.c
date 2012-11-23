@@ -358,7 +358,7 @@ comm_wait (lua_State *L)
     }
   }
 
-  sys_vm_leave();
+  sys_vm_leave(L);
 #ifndef _WIN32
   do {
 #ifdef TIOCMIWAIT
@@ -371,7 +371,7 @@ comm_wait (lua_State *L)
 #else
   res = SetCommMask(fd, flags) && WaitCommEvent(fd, &status, NULL);
 #endif
-  sys_vm_enter();
+  sys_vm_enter(L);
 
   if (res) {
     if (flags & TIOCM_CAR)

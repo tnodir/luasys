@@ -256,24 +256,19 @@ thread_exit (struct sys_thread *td)
 }
 
 void
-sys_thread_switch (const int check_thread)
+sys_thread_switch (struct sys_thread *td)
 {
-  struct sys_thread *td = sys_thread_get();
-
-  if (td) sys_vm2_leave(td);
+  sys_vm2_leave(td);
 #ifndef _WIN32
   sched_yield();
 #else
   SwitchToThread();
 #endif
-  if (td) {
-    sys_vm2_enter(td);
-    if (check_thread) sys_thread_check(td);
-  }
+  sys_vm2_enter(td);
 }
 
 void
-sys_thread_check (struct sys_thread *td)
+sys_thread_check (struct sys_thread *td, lua_State *L)
 {
   lua_assert(td);
 
@@ -284,9 +279,9 @@ sys_thread_check (struct sys_thread *td)
       td->flags = SYS_THREAD_KILLED;
       thread_exit(td);
     } else if (flags == SYS_THREAD_INTERRUPT) {
-      lua_rawgetp(td->L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
-      lua_rawgeti(td->L, -1, THREAD_TABLE_EINTR);
-      lua_error(td->L);
+      lua_rawgetp(L, LUA_REGISTRYINDEX, THREAD_KEY_ADDRESS);
+      lua_rawgeti(L, -1, THREAD_TABLE_EINTR);
+      lua_error(L);
     }
   }
 }
@@ -310,7 +305,7 @@ sys_vm2_leave (struct sys_thread *td)
 }
 
 void
-sys_vm_enter (void)
+sys_vm_enter (lua_State *L)
 {
   if (g_TLSIndex != INVALID_TLS_INDEX) {
     struct sys_thread *td = sys_thread_get();
@@ -319,14 +314,16 @@ sys_vm_enter (void)
       thread_critsect_enter(td->vmcsp);
       sys_vm2_postenter(td);
 
-      if (td->flags) sys_thread_check(td);
+      if (td->flags) sys_thread_check(td, L);
     }
   }
 }
 
 void
-sys_vm_leave (void)
+sys_vm_leave (lua_State *L)
 {
+  (void) L;
+
   if (g_TLSIndex != INVALID_TLS_INDEX) {
     struct sys_thread *td = sys_thread_get();
 
@@ -927,18 +924,23 @@ thread_sleep (lua_State *L)
   const int msec = lua_tointeger(L, 1);
   const int not_intr = lua_toboolean(L, 2);
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   sys_thread_sleep(msec, not_intr);
-  sys_vm_enter();
+  sys_vm_enter(L);
   return 0;
 }
 
 static int
 thread_switch_wrap (lua_State *L)
 {
+  struct sys_thread *td = sys_thread_get();
+
   (void) L;
 
-  sys_thread_switch(1);
+  if (td) {
+    sys_thread_switch(td);
+    sys_thread_check(td, L);
+  }
   return 0;
 }
 
@@ -947,13 +949,13 @@ thread_yield (lua_State *L)
 {
   (void) L;
 
-  sys_vm_leave();
+  sys_vm_leave(L);
 #ifndef _WIN32
   sched_yield();
 #else
   Sleep(0);
 #endif
-  sys_vm_enter();
+  sys_vm_enter(L);
   return 0;
 }
 
@@ -1041,7 +1043,7 @@ thread_set_interrupt (lua_State *L)
 
   td->flags = SYS_THREAD_INTERRUPT;
   if (td == sys_thread_get())
-    sys_thread_switch(1);
+    sys_thread_check(td, L);
   else
     (void) thread_cancel_syncio(td->tid);
 
@@ -1096,12 +1098,12 @@ thread_wait (lua_State *L)
 #ifndef _WIN32
     do {
       res = thread_cond_wait_vm(&td->cond, td, timeout);
-      sys_thread_check(td);
+      sys_thread_check(td, L);
     } while (td->flags != SYS_THREAD_KILLED && !res);
 #else
-    sys_vm_leave();
+    sys_vm_leave(L);
     res = thread_handle_wait(td->tid, timeout);
-    sys_vm_enter();
+    sys_vm_enter(L);
 #endif
   }
 

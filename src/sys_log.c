@@ -131,9 +131,9 @@ log_report (lua_State *L)
   const char *msg = luaL_checkstring(L, 2);
 
 #ifndef _WIN32
-  sys_vm_leave();
+  sys_vm_leave(L);
   syslog(logp->type, "%s", msg);
-  sys_vm_enter();
+  sys_vm_enter(L);
 #else
   WCHAR *buf[9];
 
@@ -142,7 +142,7 @@ log_report (lua_State *L)
   if (!buf[0])
     return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
-  sys_vm_leave();
+  sys_vm_leave(L);
   if (is_WinNT) {
     ReportEventW(logp->h, (short) logp->type,
      0, 3299, NULL, sizeof(buf) / sizeof(buf[0]), 0,
@@ -154,7 +154,7 @@ log_report (lua_State *L)
   }
 
   free(buf[0]);
-  sys_vm_enter();
+  sys_vm_enter(L);
 #endif
   lua_settop(L, 1);
   return 1;
