@@ -276,7 +276,8 @@ period_get (lua_State *L)
     te.tv_sec--;
     te.tv_nsec += 1000000000L;
   }
-  usec = (lua_Number) (te.tv_sec * 1000000000L + te.tv_nsec) / 1000;
+  usec = (lua_Number) ((int64_t) te.tv_sec * 1000000000L + te.tv_nsec) / 1000;
+printf("usec=%f\n", usec);
 #elif defined(SYS_MONOTONIC_MACH)
   const uint64_t *ts = checkudata(L, 1, PERIOD_TYPENAME);
   const uint64_t elapsed = (int64_t) mach_absolute_time() - (int64_t) *ts;
@@ -293,7 +294,7 @@ period_get (lua_State *L)
     te.tv_sec--;
     te.tv_usec += 1000000L;
   }
-  usec = (lua_Number) (te.tv_sec * 1000000L + te.tv_usec);
+  usec = (lua_Number) ((int64_t) te.tv_sec * 1000000L + te.tv_usec);
 #endif
 #else
   struct period *p = checkudata(L, 1, PERIOD_TYPENAME);
