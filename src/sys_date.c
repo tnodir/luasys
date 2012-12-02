@@ -2,6 +2,8 @@
 
 #define PERIOD_TYPENAME	"sys.period"
 
+typedef float	period_t;
+
 #ifndef _WIN32
 
 #if defined(_POSIX_MONOTONIC_CLOCK) && (_POSIX_MONOTONIC_CLOCK >= 0)
@@ -20,7 +22,7 @@
 
 struct period {
   LARGE_INTEGER start;
-  lua_Number cycle;
+  period_t cycle;
 };
 
 #include "win32/strptime.c"
@@ -225,7 +227,7 @@ sys_period (lua_State *L)
   LARGE_INTEGER freq;
 
   QueryPerformanceFrequency(&freq);
-  p->cycle = (lua_Number) 1000000.0 / freq.QuadPart;
+  p->cycle = (period_t) 1000000.0 / freq.QuadPart;
 #endif
   luaL_getmetatable(L, PERIOD_TYPENAME);
   lua_setmetatable(L, -2);
@@ -262,11 +264,12 @@ period_start (lua_State *L)
 static int
 period_get (lua_State *L)
 {
-  lua_Number usec;
+  int64_t elapsed;
 
 #ifndef _WIN32
 #if defined(SYS_MONOTONIC_CLOCKID)
   struct timespec te, *ts = checkudata(L, 1, PERIOD_TYPENAME);
+  const period_t cycle = 1.0 / 1000.0;
 
   clock_gettime(SYS_MONOTONIC_CLOCKID, &te);
 
@@ -276,15 +279,16 @@ period_get (lua_State *L)
     te.tv_sec--;
     te.tv_nsec += 1000000000L;
   }
-  usec = (lua_Number) ((int64_t) te.tv_sec * 1000000000L + te.tv_nsec) / 1000;
-printf("usec=%f\n", usec);
+  elapsed = (int64_t) te.tv_sec * 1000000000L + te.tv_nsec;
 #elif defined(SYS_MONOTONIC_MACH)
   const uint64_t *ts = checkudata(L, 1, PERIOD_TYPENAME);
-  const uint64_t elapsed = (int64_t) mach_absolute_time() - (int64_t) *ts;
+  const period_t cycle = 1.0 / 1000.0;
 
-  usec = sys_absolutetonanos(elapsed) / 1000;
+  elapsed = (int64_t) mach_absolute_time() - (int64_t) *ts;
+  elapsed = (int64_t) sys_absolutetonanos((uint64_t) elapsed);
 #else
   struct timeval te, *ts = checkudata(L, 1, PERIOD_TYPENAME);
+  const period_t cycle = 1;
 
   gettimeofday(&te, NULL);
 
@@ -294,16 +298,17 @@ printf("usec=%f\n", usec);
     te.tv_sec--;
     te.tv_usec += 1000000L;
   }
-  usec = (lua_Number) ((int64_t) te.tv_sec * 1000000L + te.tv_usec);
+  elapsed = (int64_t) te.tv_sec * 1000000L + te.tv_usec;
 #endif
 #else
   struct period *p = checkudata(L, 1, PERIOD_TYPENAME);
   LARGE_INTEGER stop;
+  const period_t cycle = p->cycle;
 
   QueryPerformanceCounter(&stop);
-  usec = (lua_Number) (stop.QuadPart - p->start.QuadPart) * p->cycle;
+  elapsed = (int64_t) stop.QuadPart - (int64_t) p->start.QuadPart;
 #endif
-  lua_pushnumber(L, usec);
+  lua_pushnumber(L, (lua_Number) ((period_t) elapsed * cycle));
   return 1;
 }
 
