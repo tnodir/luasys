@@ -8,7 +8,7 @@ print"-- Directory Watch"
 do
   local evq = assert(sys.event_queue())
 
-  local filename = "test.txt"
+  local filename = "test.tmp"
   local fd = sys.handle()
 
   local function on_change(evq, evid, path, ev)
@@ -17,10 +17,11 @@ do
     assert(ev ~= 't', "file change notification expected")
   end
 
+  sys.remove(filename)
   assert(evq:add_dirwatch(".", on_change, false, 100, true))
   assert(fd:create(filename))
 
-  evq:loop()
+  assert(evq:loop())
   print"OK"
 end
 
@@ -56,7 +57,7 @@ do
 
   pipe1[2]:write("e")
 
-  evq:loop()
+  assert(evq:loop())
   print"OK"
 end
 
@@ -86,7 +87,7 @@ do
   evq:add_socket(sd0, 'r', ev_cb)
   evq:add_socket(sd1, 'w', ev_cb)
 
-  evq:loop()
+  assert(evq:loop())
   print"OK"
 end
 
@@ -116,7 +117,7 @@ do
     assert(coroutine.resume(co, co, i))
   end
 
-  evq:loop()
+  assert(evq:loop())
   print"OK"
 end
 
