@@ -99,6 +99,7 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
    | FILE_NOTIFY_CHANGE_LAST_WRITE
    | FILE_NOTIFY_CHANGE_CREATION
    | FILE_NOTIFY_CHANGE_SECURITY;
+
   const unsigned int filter = (ev->flags >> EVENT_EOF_SHIFT_RES)
    ? FILE_NOTIFY_CHANGE_LAST_WRITE : flags;
   HANDLE fd;
@@ -361,18 +362,17 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
 
       if (res) {
         ev->flags |= res;
-        if (ev->flags & EVENT_ACTIVE)
-          continue;
+        if (!(ev->flags & EVENT_ACTIVE)) {
+          ev->flags |= EVENT_ACTIVE;
+          if (ev_flags & EVENT_ONESHOT) {
+            win32thr_del(wth, ev);
+            --i, --n, --hp;
+          } else if (ev->tq && !(ev_flags & EVENT_TIMEOUT_MANUAL))
+            timeout_reset(ev, timeout);
 
-        ev->flags |= EVENT_ACTIVE;
-        if (ev_flags & EVENT_ONESHOT) {
-          win32thr_del(wth, ev);
-          --i, --n, --hp;
-        } else if (ev->tq && !(ev_flags & EVENT_TIMEOUT_MANUAL))
-          timeout_reset(ev, timeout);
-
-        ev->next_ready = ev_ready;
-        ev_ready = ev;
+          ev->next_ready = ev_ready;
+          ev_ready = ev;
+        }
       }
 
       /* skip inactive events */

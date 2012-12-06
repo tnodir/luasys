@@ -221,12 +221,10 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
     if ((ev_flags & EVENT_WRITE) && FD_ISSET(ev->fd, &work_writeset))
       res |= EVENT_WRITE_RES;
 
-    if (res) {
-      --nready;
-      ev->flags |= res;
-      if (ev->flags & EVENT_ACTIVE)
-        continue;
+    if (!res) continue;
 
+    ev->flags |= res;
+    if (!(ev->flags & EVENT_ACTIVE)) {
       ev->flags |= EVENT_ACTIVE;
       if (ev_flags & EVENT_ONESHOT)
         evq_del(ev, 1);
@@ -236,6 +234,7 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
       ev->next_ready = ev_ready;
       ev_ready = ev;
     }
+    --nready;
   }
   if (!ev_ready) return 0;
  end:

@@ -263,17 +263,16 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
     ev->flags |= (filter == EVFILT_READ ? EVENT_READ_RES : EVENT_WRITE_RES)
      | ((flags & EV_EOF) ? EVENT_EOF_RES : 0);
 
-    if (ev->flags & EVENT_ACTIVE)
-      continue;
+    if (!(ev->flags & EVENT_ACTIVE)) {
+      ev->flags |= EVENT_ACTIVE;
+      if (ev->flags & EVENT_ONESHOT)
+        evq_del(ev, 1);
+      else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL))
+        timeout_reset(ev, timeout);
 
-    ev->flags |= EVENT_ACTIVE;
-    if (ev->flags & EVENT_ONESHOT)
-      evq_del(ev, 1);
-    else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL))
-      timeout_reset(ev, timeout);
-
-    ev->next_ready = ev_ready;
-    ev_ready = ev;
+      ev->next_ready = ev_ready;
+      ev_ready = ev;
+    }
   }
   if (!ev_ready) return 0;
  end:

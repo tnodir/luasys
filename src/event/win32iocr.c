@@ -254,17 +254,16 @@ win32iocr_process (struct event_queue *evq, struct win32overlapped *ov,
       ev->flags &= ~EVENT_WPENDING;  /* have to set write request */
     }
 
-    if (ev->flags & EVENT_ACTIVE)
-      continue;
+    if (!(ev->flags & EVENT_ACTIVE)) {
+      ev->flags |= EVENT_ACTIVE;
+      if (ev->flags & EVENT_ONESHOT)
+        evq_del(ev, 1);
+      else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL))
+        timeout_reset(ev, now);
 
-    ev->flags |= EVENT_ACTIVE;
-    if (ev->flags & EVENT_ONESHOT)
-      evq_del(ev, 1);
-    else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL))
-      timeout_reset(ev, now);
-
-    ev->next_ready = ev_ready;
-    ev_ready = ev;
+      ev->next_ready = ev_ready;
+      ev_ready = ev;
+    }
   }
   return ev_ready;
 }
