@@ -91,7 +91,12 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
 
   ev->flags &= ~EVENT_EOF_MASK_RES;
 
+#ifdef IN_NONBLOCK
+  ev->fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
+#else
   ev->fd = inotify_init();
+  fcntl(ev->fd, F_SETFL, O_NONBLOCK);
+#endif
   if (ev->fd == -1) return -1;
 
   if (inotify_add_watch(ev->fd, path, filter) == -1) {
