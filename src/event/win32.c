@@ -348,8 +348,9 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
           DWORD status;
           GetExitCodeProcess(ev->fd, &status);
           res = (status << EVENT_EOF_SHIFT_RES);
-        } else
+        } else if (!(ev_flags & EVENT_DIRWATCH)) {
           ResetEvent(ev->fd);  /* all events must be manual-reset */
+        }
         res |= EVENT_READ_RES;
       } else if (!WSAEnumNetworkEvents((int) ev->fd, *hp, &ne)) {
         if ((ev_flags & EVENT_READ) && (ne.lNetworkEvents & WFD_READ))
