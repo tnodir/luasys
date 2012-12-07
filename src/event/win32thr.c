@@ -229,6 +229,8 @@ win32thr_del (struct win32thr *wth, struct event *ev)
     CloseHandle(hEvent);
   } else if (ev->flags & EVENT_DIRWATCH) {
     res = !FindCloseChangeNotification(ev->fd);
+  } else if (ev->flags & EVENT_REGWATCH) {
+    CloseHandle(ev->fd);
   }
 
   if (i < n) {

@@ -91,6 +91,9 @@ struct win32iocr {
   struct win32overlapped *ov_free;  /* head of free overlaps */		\
   struct win32overlapped *ov_buffers[WIN32OV_BUF_SIZE];
 
+EVQ_API int evq_add_regwatch (struct event_queue *evq, struct event *ev,
+                              HKEY hk);
+
 #define event_get_evq(ev)	(ev)->wth->evq
 #define event_get_tq_head(ev)	(ev)->wth->tq
 #define event_deleted(ev)	((ev)->wth == NULL)
@@ -99,14 +102,6 @@ struct win32iocr {
 /* Have to initialize the event source */
 #define EVQ_POST_INIT
 
-#define evq_post_init(ev)						\
-  do {									\
-    if (((ev)->flags & (EVENT_AIO | EVENT_PENDING | EVENT_ACTIVE)) == EVENT_AIO) \
-      win32iocr_set((ev), (ev)->flags);					\
-    else if ((ev)->flags & EVENT_DIRWATCH)				\
-      FindNextChangeNotification((ev)->fd);				\
-  } while (0)
-
-EVQ_API int win32iocr_set (struct event *ev, const unsigned int ev_flags);
+EVQ_API int evq_post_init (struct event *ev);
 
 #endif

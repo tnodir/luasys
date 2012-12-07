@@ -100,11 +100,9 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
    | FILE_NOTIFY_CHANGE_CREATION
    | FILE_NOTIFY_CHANGE_SECURITY;
 
-  const unsigned int filter = (ev->flags >> EVENT_EOF_SHIFT_RES)
+  const DWORD filter = (ev->flags & EVENT_WATCH_MODIFY)
    ? FILE_NOTIFY_CHANGE_LAST_WRITE : flags;
   HANDLE fd;
-
-  ev->flags &= ~EVENT_EOF_MASK_RES;
 
   {
     void *os_path = utf8_to_filename(path);
@@ -123,6 +121,41 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
   ev->fd = fd;
   if (evq_add(evq, ev)) {
     FindCloseChangeNotification(fd);
+    return -1;
+  }
+  return 0;
+}
+
+static int
+evq_set_regwatch (struct event *ev)
+{
+  const DWORD flags = REG_NOTIFY_CHANGE_NAME
+   | REG_NOTIFY_CHANGE_ATTRIBUTES
+   | REG_NOTIFY_CHANGE_LAST_SET
+   | REG_NOTIFY_CHANGE_SECURITY;
+
+  const DWORD filter = (ev->flags & EVENT_WATCH_MODIFY)
+   ? REG_NOTIFY_CHANGE_LAST_SET : flags;
+  const int watch_subtree = (ev->flags & EVENT_WATCH_SUBTREE);
+  HKEY hk = (HKEY) ev->next_object;
+  HANDLE hEvent = (HANDLE) ev->fd;
+
+  return RegNotifyChangeKeyValue(hk, watch_subtree, filter, hEvent, 1);
+}
+
+EVQ_API int
+evq_add_regwatch (struct event_queue *evq, struct event *ev, HKEY hk)
+{
+  HANDLE hEvent;
+
+  hEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+  if (hEvent == NULL)
+    return -1;
+
+  ev->fd = hEvent;
+  ev->next_object = (struct event *) hk;
+  if (evq_set_regwatch(ev) || evq_add(evq, ev)) {
+    CloseHandle(hEvent);
     return -1;
   }
   return 0;
@@ -161,6 +194,24 @@ evq_add_timer (struct event_queue *evq, struct event *ev, const msec_t msec)
 }
 
 EVQ_API int
+evq_post_init (struct event *ev)
+{
+  const unsigned int ev_flags = ev->flags;
+
+  if ((ev_flags & (EVENT_AIO | EVENT_AIO_PENDING | EVENT_ACTIVE))
+   == EVENT_AIO)
+    return win32iocr_set(ev, ev_flags);
+
+  if (ev_flags & EVENT_DIRWATCH)
+    return !FindNextChangeNotification(ev->fd);
+
+  if (ev_flags & EVENT_REGWATCH)
+    return evq_set_regwatch(ev);
+
+  return 0;
+}
+
+EVQ_API int
 evq_del (struct event *ev, const int reuse_fd)
 {
   struct win32thr *wth = ev->wth;
@@ -177,7 +228,7 @@ evq_del (struct event *ev, const int reuse_fd)
     evq->nevents--;
 
     if (ev_flags & EVENT_AIO) {
-      if (ev_flags & EVENT_PENDING)
+      if (ev_flags & EVENT_AIO_PENDING)
         win32iocr_cancel(evq, ev, (EVENT_READ | EVENT_WRITE));
       return 0;
     }
@@ -204,7 +255,7 @@ evq_modify (struct event *ev, unsigned int flags)
   const unsigned int ev_flags = ev->flags;
 
   if (ev_flags & EVENT_AIO) {
-    if (ev_flags & EVENT_PENDING)
+    if (ev_flags & EVENT_AIO_PENDING)
       win32iocr_cancel(ev->wth->evq, ev, (ev_flags & ~flags));
     return win32iocr_set(ev, flags);
   } else {
@@ -347,7 +398,7 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
         if (ev_flags & EVENT_PID) {
           DWORD status;
           GetExitCodeProcess(ev->fd, &status);
-          res = (status << EVENT_EOF_SHIFT_RES);
+          res = (status << EVENT_STATUS_SHIFT);
         } else if (!(ev_flags & EVENT_DIRWATCH)) {
           ResetEvent(ev->fd);  /* all events must be manual-reset */
         }

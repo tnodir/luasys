@@ -99,10 +99,9 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
   const int flags = NOTE_DELETE | NOTE_WRITE | NOTE_EXTEND | NOTE_ATTRIB
    | NOTE_LINK | NOTE_RENAME | NOTE_REVOKE;
 
-  const unsigned int filter = (ev->flags >> EVENT_EOF_SHIFT_RES)
+  const unsigned int filter = (ev->flags & EVENT_WATCH_MODIFY)
    ? NOTE_WRITE : flags;
 
-  ev->flags &= ~EVENT_EOF_MASK_RES;
   ev->evq = evq;
 
   ev->fd = open(path, O_RDONLY);

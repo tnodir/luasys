@@ -705,13 +705,16 @@ sched_event_add (lua_State *L, const int type)
 
 static int
 sched_wait_obj (lua_State *L, const int type, const int cb_idx,
-                const int narg)
+                const int oneshot_idx, const int narg)
 {
   lua_settop(L, narg);
-  lua_pushboolean(L, 1);  /* one_shot */
 
   lua_pushthread(L);  /* callback function: coroutine */
   lua_insert(L, cb_idx);
+
+  lua_pushboolean(L, 1);  /* one_shot */
+  if (oneshot_idx <= narg + 1)
+    lua_insert(L, oneshot_idx);
 
   return lua_yield(L, sched_event_add(L, type));
 }
@@ -723,7 +726,7 @@ sched_wait_obj (lua_State *L, const int type, const int cb_idx,
 static int
 sched_wait_event (lua_State *L)
 {
-  return sched_wait_obj(L, EVQ_SCHED_OBJ, 5, 5);
+  return sched_wait_obj(L, EVQ_SCHED_OBJ, 5, 7, 5);
 }
 
 /*
@@ -732,7 +735,7 @@ sched_wait_event (lua_State *L)
 static int
 sched_wait_timer (lua_State *L)
 {
-  return sched_wait_obj(L, EVQ_SCHED_TIMER, 3, 3);
+  return sched_wait_obj(L, EVQ_SCHED_TIMER, 3, 5, 3);
 }
 
 /*
@@ -742,18 +745,31 @@ sched_wait_timer (lua_State *L)
 static int
 sched_wait_pid (lua_State *L)
 {
-  return sched_wait_obj(L, EVQ_SCHED_PID, 4, 4);
+  return sched_wait_obj(L, EVQ_SCHED_PID, 4, 6, 4);
 }
 
 /*
  * Arguments: sched_udata, evq_udata, path (string),
- *	[modify (boolean), timeout (milliseconds)]
+ *	[timeout (milliseconds), modify (boolean)]
  */
 static int
 sched_wait_dirwatch (lua_State *L)
 {
-  return sched_wait_obj(L, EVQ_SCHED_DIRWATCH, 4, 5);
+  return sched_wait_obj(L, EVQ_SCHED_DIRWATCH, 4, 6, 5);
 }
+
+#ifdef _WIN32
+/*
+ * Arguments: sched_udata, evq_udata, reg_udata,
+ *	[timeout (milliseconds), modify (boolean),
+ *	watch_subtree (boolean)]
+ */
+static int
+sched_wait_regwatch (lua_State *L)
+{
+  return sched_wait_obj(L, EVQ_SCHED_REGWATCH, 4, 6, 6);
+}
+#endif
 
 /*
  * Arguments: sched_udata, evq_udata, signal (string),
@@ -762,7 +778,7 @@ sched_wait_dirwatch (lua_State *L)
 static int
 sched_wait_signal (lua_State *L)
 {
-  return sched_wait_obj(L, EVQ_SCHED_SIGNAL, 4, 4);
+  return sched_wait_obj(L, EVQ_SCHED_SIGNAL, 4, 6, 4);
 }
 
 /*
@@ -773,7 +789,7 @@ sched_wait_signal (lua_State *L)
 static int
 sched_wait_socket (lua_State *L)
 {
-  return sched_wait_obj(L, EVQ_SCHED_SOCKET, 5, 5);
+  return sched_wait_obj(L, EVQ_SCHED_SOCKET, 5, 7, 5);
 }
 
 /*
@@ -912,6 +928,9 @@ static luaL_Reg sched_meth[] = {
   {"wait_timer",	sched_wait_timer},
   {"wait_pid",		sched_wait_pid},
   {"wait_dirwatch",	sched_wait_dirwatch},
+#ifdef _WIN32
+  {"wait_regwatch",	sched_wait_regwatch},
+#endif
   {"wait_signal",	sched_wait_signal},
   {"wait_socket",	sched_wait_socket},
   {"preempt_tasks",	sched_preempt_tasks},

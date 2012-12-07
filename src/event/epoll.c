@@ -86,10 +86,8 @@ evq_add (struct event_queue *evq, struct event *ev)
 EVQ_API int
 evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
 {
-  const unsigned int filter = (ev->flags >> EVENT_EOF_SHIFT_RES)
+  const unsigned int filter = (ev->flags & EVENT_WATCH_MODIFY)
    ? IN_MODIFY : IN_ALL_EVENTS ^ IN_ACCESS;
-
-  ev->flags &= ~EVENT_EOF_MASK_RES;
 
 #ifdef IN_NONBLOCK
   ev->fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);

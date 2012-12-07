@@ -222,8 +222,8 @@ signal_process_child (struct event *ev)
   while (pid == -1 && errno == EINTR);
 
   if (pid == fd) {
-    ev->flags |= !WIFEXITED(status) ? EVENT_EOF_MASK_RES
-     : ((unsigned int) WEXITSTATUS(status) << EVENT_EOF_SHIFT_RES);
+    ev->flags |= !WIFEXITED(status) ? EVENT_STATUS_MASK
+     : ((unsigned int) WEXITSTATUS(status) << EVENT_STATUS_SHIFT);
     return 0;
   }
   return -1;

@@ -258,6 +258,9 @@ enum {
   EVQ_SCHED_TIMER,
   EVQ_SCHED_PID,
   EVQ_SCHED_DIRWATCH,
+#ifdef _WIN32
+  EVQ_SCHED_REGWATCH,
+#endif
   EVQ_SCHED_SIGNAL,
   EVQ_SCHED_SOCKET
 };
@@ -297,6 +300,11 @@ extern PCancelIoEx pCancelIoEx;
 #else
 extern int is_WinNT;
 #endif
+
+
+/* Windows Registry */
+
+#define WREG_TYPENAME	"sys.win32.registry"
 
 
 /*

@@ -247,11 +247,11 @@ win32iocr_process (struct event_queue *evq, struct win32overlapped *ov,
     else if (ov == ev->w.iocr.rov) {
       ev->w.iocr.rov = NULL;
       ev->flags |= EVENT_READ_RES;
-      ev->flags &= ~EVENT_RPENDING;  /* have to set read request */
+      ev->flags &= ~EVENT_AIO_RPENDING;  /* have to set read request */
     } else {
       ev->w.iocr.wov = NULL;
       ev->flags |= EVENT_WRITE_RES;
-      ev->flags &= ~EVENT_WPENDING;  /* have to set write request */
+      ev->flags &= ~EVENT_AIO_WPENDING;  /* have to set write request */
     }
 
     if (!(ev->flags & EVENT_ACTIVE)) {
@@ -280,7 +280,7 @@ win32iocr_cancel (struct event_queue *evq, struct event *ev,
   ov = ev->w.iocr.rov;
   if ((rw_flags & EVENT_READ) && ov) {
     ov->ev = NULL;
-    ev->flags &= ~EVENT_RPENDING;
+    ev->flags &= ~EVENT_AIO_RPENDING;
     ev->w.iocr.rov = NULL;
 
     if (pCancelIoEx)
@@ -292,7 +292,7 @@ win32iocr_cancel (struct event_queue *evq, struct event *ev,
   ov = ev->w.iocr.wov;
   if ((rw_flags & EVENT_WRITE) && ov) {
     ov->ev = NULL;
-    ev->flags &= ~EVENT_WPENDING;
+    ev->flags &= ~EVENT_AIO_WPENDING;
     ev->w.iocr.wov = NULL;
 
     if (pCancelIoEx)
@@ -302,7 +302,7 @@ win32iocr_cancel (struct event_queue *evq, struct event *ev,
   }
 }
 
-EVQ_API int
+static int
 win32iocr_set (struct event *ev, const unsigned int rw_flags)
 {
   struct event_queue *evq = ev->wth->evq;
@@ -314,7 +314,7 @@ win32iocr_set (struct event *ev, const unsigned int rw_flags)
     ov->rw_flags = EVENT_READ;
     ov->ev = ev;
     ev->w.iocr.rov = ov;
-    ev->flags |= EVENT_RPENDING;  /* read request is installed */
+    ev->flags |= EVENT_AIO_RPENDING;  /* read request is installed */
     win32iocr_list_put(evq->iocr.ov_list, ov);
   }
   if ((rw_flags & EVENT_WRITE) && !ev->w.iocr.wov) {
@@ -324,7 +324,7 @@ win32iocr_set (struct event *ev, const unsigned int rw_flags)
     ov->rw_flags = EVENT_WRITE;
     ov->ev = ev;
     ev->w.iocr.wov = ov;
-    ev->flags |= EVENT_WPENDING;  /* write request is installed */
+    ev->flags |= EVENT_AIO_WPENDING;  /* write request is installed */
     win32iocr_list_put(evq->iocr.ov_list, ov);
   }
   return 0;

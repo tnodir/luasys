@@ -1,7 +1,5 @@
 /* Lua System: Win32 specifics: Registry */
 
-#define WREG_TYPENAME	"sys.win32.registry"
-
 #define REG_KEY_SZ	256
 #define REG_DATA_SZ	16384
 

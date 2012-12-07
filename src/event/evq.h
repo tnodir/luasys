@@ -23,9 +23,6 @@ struct event_queue;
 #include "signal.h"
 #include "timeout.h"
 
-/* Directory watcher filter flags */
-#define EVQ_DIRWATCH_MODIFY	0x01
-
 struct event {
   struct event *next_ready, *next_object;
 
@@ -44,24 +41,28 @@ struct event {
 #define EVENT_SIGNAL		0x00000080
 #define EVENT_WINMSG		0x00000100
 #define EVENT_DIRWATCH		0x00000200  /* directory watcher */
-#define EVENT_TIMEOUT_MANUAL	0x00000400  /* don't auto-reset timeout on event */
-#define EVENT_AIO		0x00000800
-#define EVENT_SOCKET_ACC_CONN	0x00001000  /* socket is listening or connecting */
-#define EVENT_CALLBACK		0x00002000  /* callback exists */
-#define EVENT_CALLBACK_CORO	0x00004000  /* callback is coroutine */
-#define EVENT_CALLBACK_SCHED	0x00008000  /* callback is scheduler */
-#define EVENT_RPENDING		0x00010000  /* AIO: read request not completed */
-#define EVENT_WPENDING		0x00020000  /* AIO: write request not completed */
-#define EVENT_PENDING		(EVENT_RPENDING | EVENT_WPENDING)
-#define EVENT_MASK		0x000FFFFF
+#define EVENT_REGWATCH		0x00000400  /* Windows registry watcher */
+#define EVENT_TIMEOUT_MANUAL	0x00000800  /* don't auto-reset timeout on event */
+#define EVENT_AIO		0x00001000
+#define EVENT_SOCKET_ACC_CONN	0x00002000  /* socket is listening or connecting */
+#define EVENT_CALLBACK		0x00010000  /* callback exists */
+#define EVENT_CALLBACK_CORO	0x00020000  /* callback is coroutine */
+#define EVENT_CALLBACK_SCHED	0x00040000  /* callback is scheduler */
 /* triggered events (result of waiting) */
 #define EVENT_READ_RES		0x00100000
 #define EVENT_WRITE_RES		0x00200000
 #define EVENT_TIMEOUT_RES	0x00400000
 #define EVENT_ACTIVE		0x00800000
 #define EVENT_EOF_RES		0x01000000
-#define EVENT_EOF_MASK_RES	0xFF000000
-#define EVENT_EOF_SHIFT_RES	24  /* last byte is error status */
+#define EVENT_MASK_RES		0x01F00000
+/* events options | process status (result of oneshot waiting) */
+#define EVENT_WATCH_MODIFY	0x01000000  /* watch only content changes */
+#define EVENT_WATCH_SUBTREE	0x02000000
+#define EVENT_AIO_RPENDING	0x04000000  /* AIO: read request not completed */
+#define EVENT_AIO_WPENDING	0x08000000  /* AIO: write request not completed */
+#define EVENT_AIO_PENDING	(EVENT_AIO_RPENDING | EVENT_AIO_WPENDING)
+#define EVENT_STATUS_MASK	0xFF000000
+#define EVENT_STATUS_SHIFT	24  /* last byte is process status */
   unsigned int flags;
 
   int ev_id;

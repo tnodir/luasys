@@ -14,11 +14,11 @@ do
   local function on_change(evq, evid, path, ev)
     fd:close()
     sys.remove(filename)
-    assert(ev ~= 't', "file change notification expected")
+    assert(ev == 'r', "file change notification expected")
   end
 
   sys.remove(filename)
-  assert(evq:add_dirwatch(".", on_change, false, 100, true))
+  assert(evq:add_dirwatch(".", on_change, 100, true, false))
   assert(fd:create(filename))
 
   assert(evq:loop())
@@ -141,6 +141,37 @@ do
   assert(evq:ignore_signal("INT", true))
 
   evq:loop(30000)
+  print"OK"
+end
+
+
+-- WIN32
+local win32 = sys.win32
+
+if not win32 then return end
+
+
+print"-- Registry Watch"
+do
+  local evq = assert(sys.event_queue())
+
+  local keyname = "test.tmp"
+  local hk = win32.registry()
+
+  assert(hk:open("HKEY_CURRENT_USER",
+    [[Software\Microsoft\Windows\CurrentVersion]], 'rw'))
+
+  local function on_change(evq, evid, hk, ev)
+    hk:del_value(keyname)
+    hk:close()
+    assert(ev == 'r', "registry key change notification expected")
+  end
+
+  hk:del_value(keyname)
+  assert(evq:add_regwatch(hk, on_change, 100, true, false))
+  assert(hk:set(keyname, 1234))
+
+  assert(evq:loop())
   print"OK"
 end
 

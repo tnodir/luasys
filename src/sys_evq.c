@@ -269,17 +269,24 @@ levq_add (lua_State *L)
   const msec_t timeout = lua_isnoneornil(L, 5)
    ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 5);
   const char *dirwatch_path = NULL;
+#ifdef _WIN32
+  HKEY *regwatch_hkp = NULL;
+#endif
   struct event *ev;
   int res;
 
   ev = levq_new_event(evq);
 
-  if (!(ev_flags & (EVENT_TIMER | EVENT_DIRWATCH))) {
+  if (!(ev_flags & (EVENT_TIMER | EVENT_DIRWATCH | EVENT_REGWATCH))) {
     fd_t *fdp = lua_touserdata(L, 2);
     ev->fd = fdp ? *fdp
      : (fd_t) (size_t) lua_tointeger(L, 2);  /* signo */
   } else if (ev_flags & EVENT_DIRWATCH) {
     dirwatch_path = luaL_checkstring(L, 2);
+#ifdef _WIN32
+  } else if (ev_flags & EVENT_REGWATCH) {
+    regwatch_hkp = checkudata(L, 2, WREG_TYPENAME);
+#endif
   }
 
   if (!(ev_flags & (EVENT_READ | EVENT_WRITE))) {
@@ -310,6 +317,10 @@ levq_add (lua_State *L)
   } else {
     if (ev_flags & EVENT_DIRWATCH) {
       res = evq_add_dirwatch(evq, ev, dirwatch_path);
+#ifdef _WIN32
+    } else if (ev_flags & EVENT_REGWATCH) {
+      res = evq_add_regwatch(evq, ev, *regwatch_hkp);
+#endif
     } else {
       res = evq_add(evq, ev);
     }
@@ -391,21 +402,41 @@ levq_add_winmsg (lua_State *L)
 
 /*
  * Arguments: evq_udata, path (string), callback (function),
- *	[modify (boolean), timeout (milliseconds), one_shot (boolean)]
+ *	[timeout (milliseconds), one_shot (boolean), modify (boolean)]
  * Returns: [ev_ludata]
  */
 static int
 levq_add_dirwatch (lua_State *L)
 {
-  const unsigned int filter = lua_toboolean(L, 4) ? EVQ_DIRWATCH_MODIFY : 0;
+  const unsigned int filter = lua_toboolean(L, 6) ? EVENT_WATCH_MODIFY : 0;
 
-  lua_settop(L, 6);
-  lua_remove(L, 4);
+  lua_settop(L, 5);
   lua_pushinteger(L, EVENT_READ | EVENT_DIRWATCH
-   | (filter << EVENT_EOF_SHIFT_RES));  /* event_flags */
+   | filter);  /* event_flags */
   lua_insert(L, 3);
   return levq_add(L);
 }
+
+#ifdef _WIN32
+/*
+ * Arguments: evq_udata, reg_udata, callback (function),
+ *	[timeout (milliseconds), one_shot (boolean),
+ *	modify (boolean), watch_subtree (boolean)]
+ * Returns: [ev_ludata]
+ */
+static int
+levq_add_regwatch (lua_State *L)
+{
+  const unsigned int filter = (lua_toboolean(L, 6) ? EVENT_WATCH_MODIFY : 0)
+   | (lua_toboolean(L, 7) ? EVENT_WATCH_SUBTREE : 0);
+
+  lua_settop(L, 5);
+  lua_pushinteger(L, EVENT_READ | EVENT_REGWATCH
+   | filter);  /* event_flags */
+  lua_insert(L, 3);
+  return levq_add(L);
+}
+#endif
 
 /*
  * Arguments: evq_udata, signal (string), callback (function),
@@ -808,7 +839,7 @@ sys_evq_loop (lua_State *L, struct event_queue *evq,
       const unsigned int ev_flags = ev->flags;
 
       /* clear EVENT_ACTIVE and EVENT_*_RES flags */
-      ev->flags &= EVENT_MASK;
+      ev->flags &= ~EVENT_MASK_RES;
       evq->ev_ready = ev->next_ready;
 
       if (ev_flags & EVENT_DELETE) {
@@ -830,9 +861,11 @@ sys_evq_loop (lua_State *L, struct event_queue *evq,
            (ev_flags & EVENT_READ_RES) ? "r"
            : (ev_flags & EVENT_WRITE_RES) ? "w"
            : (ev_flags & EVENT_TIMEOUT_RES) ? "t" : "e");
-          if (ev_flags & (EVENT_EOF_RES | EVENT_EOF_MASK_RES))
+          if (ev_flags & EVENT_EOF_RES)
+            lua_pushboolean(L, 1);
+          else if (ev_flags & EVENT_PID)
             lua_pushinteger(L,
-             (int) ev_flags >> EVENT_EOF_SHIFT_RES);
+             (int) ev_flags >> EVENT_STATUS_SHIFT);
           else
             lua_pushnil(L);
         }
@@ -881,7 +914,7 @@ sys_evq_loop (lua_State *L, struct event_queue *evq,
 
 #ifdef EVQ_POST_INIT
         if (!event_deleted(ev))
-          evq_post_init(ev);
+          (void) evq_post_init(ev);
 #endif
         if (res) break;  /* error */
       }
@@ -1035,6 +1068,11 @@ sys_evq_sched_add (lua_State *L, const int evq_idx, const int type)
   case EVQ_SCHED_DIRWATCH:
     func = levq_add_dirwatch;
     break;
+#ifdef _WIN32
+  case EVQ_SCHED_REGWATCH:
+    func = levq_add_regwatch;
+    break;
+#endif
   case EVQ_SCHED_SIGNAL:
     func = levq_add_signal;
     break;
@@ -1106,6 +1144,9 @@ static luaL_Reg evq_meth[] = {
   {"add_pid",		levq_add_pid},
   {"add_winmsg",	levq_add_winmsg},
   {"add_dirwatch",	levq_add_dirwatch},
+#ifdef _WIN32
+  {"add_regwatch",	levq_add_regwatch},
+#endif
   {"add_signal",	levq_add_signal},
   {"ignore_signal",	levq_ignore_signal},
   {"signal",		levq_signal},
