@@ -761,8 +761,7 @@ sched_wait_dirwatch (lua_State *L)
 #ifdef _WIN32
 /*
  * Arguments: sched_udata, evq_udata, reg_udata,
- *	[timeout (milliseconds), modify (boolean),
- *	watch_subtree (boolean)]
+ *	[timeout (milliseconds), modify (boolean), recursive (boolean)]
  */
 static int
 sched_wait_regwatch (lua_State *L)

@@ -421,14 +421,14 @@ levq_add_dirwatch (lua_State *L)
 /*
  * Arguments: evq_udata, reg_udata, callback (function),
  *	[timeout (milliseconds), one_shot (boolean),
- *	modify (boolean), watch_subtree (boolean)]
+ *	modify (boolean), recursive (boolean)]
  * Returns: [ev_ludata]
  */
 static int
 levq_add_regwatch (lua_State *L)
 {
   const unsigned int filter = (lua_toboolean(L, 6) ? EVENT_WATCH_MODIFY : 0)
-   | (lua_toboolean(L, 7) ? EVENT_WATCH_SUBTREE : 0);
+   | (lua_toboolean(L, 7) ? EVENT_WATCH_RECURSIVE : 0);
 
   lua_settop(L, 5);
   lua_pushinteger(L, EVENT_READ | EVENT_REGWATCH

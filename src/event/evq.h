@@ -49,18 +49,20 @@ struct event {
 #define EVENT_CALLBACK_CORO	0x00020000  /* callback is coroutine */
 #define EVENT_CALLBACK_SCHED	0x00040000  /* callback is scheduler */
 /* triggered events (result of waiting) */
+#define EVENT_ACTIVE		0x00080000
 #define EVENT_READ_RES		0x00100000
 #define EVENT_WRITE_RES		0x00200000
 #define EVENT_TIMEOUT_RES	0x00400000
-#define EVENT_ACTIVE		0x00800000
-#define EVENT_EOF_RES		0x01000000
-#define EVENT_MASK_RES		0x01F00000
-/* events options | process status (result of oneshot waiting) */
+#define EVENT_EOF_RES		0x00800000
+#define EVENT_MASK_RES		0x00F80000
+/* options: directory/registry watcher */
 #define EVENT_WATCH_MODIFY	0x01000000  /* watch only content changes */
-#define EVENT_WATCH_SUBTREE	0x02000000
-#define EVENT_AIO_RPENDING	0x04000000  /* AIO: read request not completed */
-#define EVENT_AIO_WPENDING	0x08000000  /* AIO: write request not completed */
+#define EVENT_WATCH_RECURSIVE	0x02000000  /* watch directories recursively */
+/* options: AIO requests */
+#define EVENT_AIO_RPENDING	0x01000000  /* AIO read request not completed */
+#define EVENT_AIO_WPENDING	0x02000000  /* AIO write request not completed */
 #define EVENT_AIO_PENDING	(EVENT_AIO_RPENDING | EVENT_AIO_WPENDING)
+/* options: process status (result of oneshot waiting) */
 #define EVENT_STATUS_MASK	0xFF000000
 #define EVENT_STATUS_SHIFT	24  /* last byte is process status */
   unsigned int flags;

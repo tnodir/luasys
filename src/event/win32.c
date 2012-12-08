@@ -136,11 +136,11 @@ evq_set_regwatch (struct event *ev)
 
   const DWORD filter = (ev->flags & EVENT_WATCH_MODIFY)
    ? REG_NOTIFY_CHANGE_LAST_SET : flags;
-  const int watch_subtree = (ev->flags & EVENT_WATCH_SUBTREE);
+  const int recursive = (ev->flags & EVENT_WATCH_RECURSIVE);
   HKEY hk = (HKEY) ev->next_object;
   HANDLE hEvent = (HANDLE) ev->fd;
 
-  return RegNotifyChangeKeyValue(hk, watch_subtree, filter, hEvent, 1);
+  return RegNotifyChangeKeyValue(hk, recursive, filter, hEvent, 1);
 }
 
 EVQ_API int
