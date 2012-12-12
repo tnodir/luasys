@@ -5,6 +5,15 @@ local sys = require("sys")
 local sock = require("sys.sock")
 
 
+print"-- file:isatty()"
+do
+  local f = assert(sys.handle():open("test_sys.lua"))
+  assert(not f:isatty())
+  assert(sys.stdin:isatty())
+  print("OK")
+end
+
+
 print"-- sys.handle <-> io.file"
 do
   local file = assert(io.open("test", "w"))

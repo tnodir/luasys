@@ -441,6 +441,24 @@ sys_set_std (lua_State *L)
 }
 
 /*
+ * Arguments: fd_udata
+ * Returns: boolean
+ */
+static int
+sys_isatty (lua_State *L)
+{
+  fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
+
+#ifndef _WIN32
+  const int is_con = isatty(fd);
+#else
+  DWORD is_con = GetConsoleMode(fd, &is_con);
+#endif
+  lua_pushboolean(L, is_con);
+  return 1;
+}
+
+/*
  * Arguments: fd_udata, offset (number),
  *	[whence (string: "set", "cur", "end")]
  * Returns: offset
@@ -824,6 +842,7 @@ static luaL_Reg fd_meth[] = {
   {"fdopen",		sys_fdopen},
   {"fileno",		sys_fileno},
   {"set_std",		sys_set_std},
+  {"isatty",		sys_isatty},
   {"seek",		sys_seek},
   {"set_end",		sys_set_end},
   {"lock",		sys_lock},
