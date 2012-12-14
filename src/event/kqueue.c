@@ -2,6 +2,10 @@
 
 #include <sys/wait.h>
 
+#ifndef O_EVTONLY
+#define O_EVTONLY	O_RDONLY
+#endif
+
 EVQ_API int
 evq_init (struct event_queue *evq)
 {
@@ -104,7 +108,7 @@ evq_add_dirwatch (struct event_queue *evq, struct event *ev, const char *path)
 
   ev->evq = evq;
 
-  ev->fd = open(path, O_RDONLY);
+  ev->fd = open(path, O_EVTONLY);
   if (ev->fd == -1) return -1;
 
   {
