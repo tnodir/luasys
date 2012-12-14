@@ -10,6 +10,8 @@
 
 #define SHUT_WR		SD_SEND
 
+#define SO_LOOPBACK	0x98000010  /* SIO_LOOPBACK_FAST_PATH */
+
 typedef int		socklen_t;
 
 #else
@@ -71,6 +73,11 @@ sock_pair (int type, sd_t sv[2])
 
   if ((sd = WSASocket(AF_INET, type, 0, NULL, 0, IS_OVERLAPPED))
    != INVALID_SOCKET) {
+    int optval = 1;
+    DWORD nr;
+
+    WSAIoctl(sd, SO_LOOPBACK, &optval, sizeof(int), NULL, 0, &nr, 0, 0);
+
     if (!bind(sd, (struct sockaddr *) &sa, len)
      && !listen(sd, 1)
      && !getsockname(sd, (struct sockaddr *) &sa, &len)
@@ -78,6 +85,8 @@ sock_pair (int type, sd_t sv[2])
       != INVALID_SOCKET) {
       struct sockaddr_in sa2;
       int len2;
+
+      WSAIoctl(sv[0], SO_LOOPBACK, &optval, sizeof(int), NULL, 0, &nr, 0, 0);
 
       sv[1] = (sd_t) -1;
       if (!connect(sv[0], (struct sockaddr *) &sa, len)
@@ -245,9 +254,9 @@ sock_sockopt (lua_State *L)
     SO_REUSEADDR, SO_TYPE, SO_ERROR, SO_DONTROUTE,
     SO_SNDBUF, SO_RCVBUF, SO_SNDLOWAT, SO_RCVLOWAT,
     SO_BROADCAST, SO_KEEPALIVE, SO_OOBINLINE, SO_LINGER,
-#define OPTNAMES_TCP	12
+#define OPT_INDEX_TCP	12
     TCP_NODELAY,
-#define OPTNAMES_IP	13
+#define OPT_INDEX_IP	13
     IP_MULTICAST_TTL, IP_MULTICAST_IF, IP_MULTICAST_LOOP
   };
   static const char *const opt_names[] = {
@@ -260,8 +269,8 @@ sock_sockopt (lua_State *L)
 
   sd_t sd = (sd_t) lua_unboxinteger(L, 1, SD_TYPENAME);
   const int optname = luaL_checkoption(L, OPT_START, NULL, opt_names);
-  const int level = (optname < OPTNAMES_TCP) ? SOL_SOCKET
-   : (optname < OPTNAMES_IP ? IPPROTO_TCP : IPPROTO_IP);
+  const int level = (optname < OPT_INDEX_TCP) ? SOL_SOCKET
+   : (optname < OPT_INDEX_IP ? IPPROTO_TCP : IPPROTO_IP);
   int optflag = opt_flags[optname];
   int optval[4];
   socklen_t optlen = sizeof(int);
@@ -319,6 +328,8 @@ sock_sockopt (lua_State *L)
   }
   return sys_seterror(L, 0);
 }
+#undef OPT_INDEX_TCP
+#undef OPT_INDEX_IP
 #undef OPT_START
 
 /*
@@ -375,6 +386,26 @@ sock_membership (lua_State *L)
     return 1;
   }
   return sys_seterror(L, 0);
+}
+
+/*
+ * Arguments: sd_udata, [loopback (boolean)]
+ * Returns: [sd_udata]
+ */
+static int
+sock_loopback (lua_State *L)
+{
+#ifdef _WIN32
+  sd_t sd = (sd_t) lua_unboxinteger(L, 1, SD_TYPENAME);
+  int optval = lua_isnoneornil(L, 2) || lua_toboolean(L, 2);
+  DWORD nr;
+
+  if (WSAIoctl(sd, SO_LOOPBACK, &optval, sizeof(int), NULL, 0, &nr, 0, 0))
+    return sys_seterror(L, 0);
+#endif
+
+  lua_settop(L, 1);
+  return 1;
 }
 
 /*
@@ -862,6 +893,7 @@ static luaL_Reg sock_meth[] = {
   {"nonblocking",	sock_nonblocking},
   {"sockopt",		sock_sockopt},
   {"membership",	sock_membership},
+  {"loopback",		sock_loopback},
   {"bind",		sock_bind},
   {"listen",		sock_listen},
   {"accept",		sock_accept},
