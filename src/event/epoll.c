@@ -69,11 +69,8 @@ evq_add (struct event_queue *evq, struct event *ev)
     struct epoll_event epev;
 
     memset(&epev, 0, sizeof(struct epoll_event));
-    if (ev_flags & EVENT_READ)
-      epev.events = EPOLLIN;
-    if (ev_flags & EVENT_WRITE)
-      epev.events |= EPOLLOUT;
-    epev.events |= (ev_flags & EVENT_ONESHOT) ? EPOLLONESHOT : 0;
+    epev.events = ((ev_flags & EVENT_READ) ? EPOLLIN : EPOLLOUT)
+     | ((ev_flags & EVENT_ONESHOT) ? EPOLLONESHOT : 0);
     epev.data.ptr = ev;
     if (epoll_ctl(evq->epoll_fd, EPOLL_CTL_ADD, ev->fd, &epev) == -1)
       return -1;
@@ -135,10 +132,7 @@ evq_modify (struct event *ev, unsigned int flags)
   struct epoll_event epev;
 
   memset(&epev, 0, sizeof(struct epoll_event));
-  if (flags & EVENT_READ)
-    epev.events = EPOLLIN;
-  if (flags & EVENT_WRITE)
-    epev.events |= EPOLLOUT;
+  epev.events = (flags & EVENT_READ) ? EPOLLIN : EPOLLOUT;
   epev.data.ptr = ev;
   return epoll_ctl(ev->evq->epoll_fd, EPOLL_CTL_MOD, ev->fd, &epev);
 }
@@ -197,7 +191,7 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
       continue;
     }
 
-    res = 0;
+    res = (revents & EPOLLHUP) ? EVENT_EOF_RES : 0;
     if ((revents & EPOLLFD_READ) && (ev->flags & EVENT_READ)) {
       res |= EVENT_READ_RES;
 
@@ -207,11 +201,9 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
         do n = read(ev->fd, buf, sizeof(buf));
         while (n == -1 && errno == EINTR);
       }
-    }
-    if ((revents & EPOLLFD_WRITE) && (ev->flags & EVENT_WRITE))
+    } else if ((revents & EPOLLFD_WRITE) && (ev->flags & EVENT_WRITE)) {
       res |= EVENT_WRITE_RES;
-    if (revents & EPOLLHUP)
-      res |= EVENT_EOF_RES;
+    }
 
     ev->flags |= res;
     if (!(ev->flags & EVENT_ACTIVE)) {

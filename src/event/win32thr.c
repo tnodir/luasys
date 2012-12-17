@@ -176,7 +176,7 @@ win32thr_add (struct win32thr *wth, struct event *ev)
 {
   struct event_queue *evq = wth->evq;
   HANDLE hEvent;
-  unsigned int res, i = wth->n;
+  unsigned int i = wth->n;
 
   ev->wth = wth;
 
@@ -184,18 +184,17 @@ win32thr_add (struct win32thr *wth, struct event *ev)
     hEvent = ev->fd;
   else {
     const unsigned int ev_flags = ev->flags;
+    unsigned int event;
 
     hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);  /* manual-reset */
     if (hEvent == NULL)
       return -1;
 
-    res = 0;
-    if (ev_flags & EVENT_READ)
-      res = (ev_flags & EVENT_SOCKET_ACC_CONN) ? FD_ACCEPT : WFD_READ;
-    if (ev_flags & EVENT_WRITE)
-      res |= (ev_flags & EVENT_SOCKET_ACC_CONN) ? FD_CONNECT : WFD_WRITE;
+    event = (ev_flags & EVENT_READ)
+     ? ((ev_flags & EVENT_SOCKET_ACC_CONN) ? FD_ACCEPT : WFD_READ)
+     : ((ev_flags & EVENT_SOCKET_ACC_CONN) ? FD_CONNECT : WFD_WRITE);
 
-    if (WSAEventSelect((int) ev->fd, hEvent, res) == SOCKET_ERROR) {
+    if (WSAEventSelect((int) ev->fd, hEvent, event) == SOCKET_ERROR) {
       CloseHandle(hEvent);
       return -1;
     }

@@ -82,15 +82,9 @@ evq_add (struct event_queue *evq, struct event *ev)
 
   {
     struct pollfd *fdp = &evq->fdset[npolls];
-    int event = 0;
-
-    if (ev->flags & EVENT_READ)
-      event = POLLIN;
-    if (ev->flags & EVENT_WRITE)
-      event |= POLLOUT;
 
     fdp->fd = ev->fd;
-    fdp->events = event;
+    fdp->events = (ev->flags & EVENT_READ) ? POLLIN : POLLOUT;
     fdp->revents = 0;
   }
 
@@ -159,11 +153,7 @@ evq_modify (struct event *ev, unsigned int flags)
 {
   short *eventp = &ev->evq->fdset[ev->index].events;
 
-  *eventp = 0;
-  if (flags & EVENT_READ)
-    *eventp = POLLIN;
-  if (flags & EVENT_WRITE)
-    *eventp |= POLLOUT;
+  *eventp = (flags & EVENT_READ) ? POLLIN : POLLOUT;
   return 0;
 }
 
@@ -225,13 +215,11 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
     fdset[i].revents = 0;
     ev = events[i];
 
-    res = 0;
+    res = (revents & POLLHUP) ? EVENT_EOF_RES : 0;
     if ((revents & POLLFD_READ) && (ev->flags & EVENT_READ))
       res |= EVENT_READ_RES;
-    if ((revents & POLLFD_WRITE) && (ev->flags & EVENT_WRITE))
+    else if ((revents & POLLFD_WRITE) && (ev->flags & EVENT_WRITE))
       res |= EVENT_WRITE_RES;
-    if (revents & POLLHUP)
-      res |= EVENT_EOF_RES;
 
     ev->flags |= res;
     if (!(ev->flags & EVENT_ACTIVE)) {

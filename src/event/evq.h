@@ -59,9 +59,7 @@ struct event {
 #define EVENT_WATCH_MODIFY	0x01000000  /* watch only content changes */
 #define EVENT_WATCH_RECURSIVE	0x02000000  /* watch directories recursively */
 /* options: AIO requests */
-#define EVENT_AIO_RPENDING	0x01000000  /* AIO read request not completed */
-#define EVENT_AIO_WPENDING	0x02000000  /* AIO write request not completed */
-#define EVENT_AIO_PENDING	(EVENT_AIO_RPENDING | EVENT_AIO_WPENDING)
+#define EVENT_AIO_PENDING	0x01000000  /* AIO read/write request not completed */
 /* options: process status (result of oneshot waiting) */
 #define EVENT_STATUS_MASK	0xFF000000
 #define EVENT_STATUS_SHIFT	24  /* last byte is process status */

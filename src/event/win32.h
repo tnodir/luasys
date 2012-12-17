@@ -69,9 +69,7 @@ struct win32iocr {
   struct win32thr *wth;							\
   union {								\
     unsigned int index;							\
-    struct {								\
-      struct win32overlapped *rov, *wov;  /* IOCR overlaps */		\
-    } iocr;								\
+    struct win32overlapped *ov;  /* IOCR overlap */			\
   } w;
 
 #define WIN32OV_BUF_IDX		6  /* initial buffer size on power of 2 */
@@ -81,11 +79,11 @@ struct win32iocr {
 #define EVQ_EXTRA							\
   HANDLE ack_event;							\
   struct event *win_msg;  /* window messages handler */			\
-  struct win32iocr iocr;						\
   struct win32thr * volatile wth_ready;					\
-  struct win32thr head;							\
   int volatile nwakeup;  /* number of the re-polling threads */		\
   int volatile sig_ready;  /* triggered signals */			\
+  struct win32thr head;							\
+  struct win32iocr iocr;						\
   int ov_buf_nevents;  /* number of used overlaps of cur. buffer */	\
   int ov_buf_index;  /* index of current buffer */			\
   struct win32overlapped *ov_free;  /* head of free overlaps */		\

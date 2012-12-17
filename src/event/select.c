@@ -51,7 +51,7 @@ evq_add (struct event_queue *evq, struct event *ev)
   fd = (unsigned int) ev->fd;
   if (ev->flags & EVENT_READ)
     FD_SET(fd, &evq->readset);
-  if (ev->flags & EVENT_WRITE)
+  else
     FD_SET(fd, &evq->writeset);
 
   if ((int) evq->max_fd != -1 && evq->max_fd < fd)
@@ -97,7 +97,7 @@ evq_del (struct event *ev, int reuse_fd)
 
     if (ev_flags & EVENT_READ)
       FD_CLR(fd, &evq->readset);
-    if (ev_flags & EVENT_WRITE)
+    else
       FD_CLR(fd, &evq->writeset);
 
     if (evq->max_fd == fd)
@@ -119,29 +119,17 @@ evq_modify (struct event *ev, unsigned int flags)
 {
   struct event_queue *evq = ev->evq;
   const unsigned int fd = (unsigned int) ev->fd;
-  unsigned int rw;
 
-  rw = (ev->flags ^ flags) & flags;
-  if (rw) {
-    if (rw & EVENT_READ)
-      FD_SET(fd, &evq->readset);
-    if (rw & EVENT_WRITE)
-      FD_SET(fd, &evq->writeset);
+  if (ev->flags & EVENT_READ)
+    FD_CLR(fd, &evq->readset);
+  else
+    FD_CLR(fd, &evq->writeset);
 
-    if ((int) evq->max_fd != -1 && evq->max_fd < fd)
-      evq->max_fd = fd;
-  }
+  if (flags & EVENT_READ)
+    FD_SET(fd, &evq->readset);
+  else
+    FD_SET(fd, &evq->writeset);
 
-  rw = ev->flags & (ev->flags ^ flags);
-  if (rw) {
-    if (rw & EVENT_READ)
-      FD_CLR(fd, &evq->readset);
-    if (rw & EVENT_WRITE)
-      FD_CLR(fd, &evq->writeset);
-
-    if (evq->max_fd == fd)
-      evq->max_fd = -1;
-  }
   return 0;
 }
 
@@ -213,12 +201,11 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
 
   for (i = 1; i < npolls && nready; i++) {
     struct event *ev = events[i];
-    unsigned int res, ev_flags = ev->flags;
+    unsigned int res = 0;
 
-    res = 0;
-    if ((ev_flags & EVENT_READ) && FD_ISSET(ev->fd, &work_readset))
+    if ((ev->flags & EVENT_READ) && FD_ISSET(ev->fd, &work_readset))
       res |= EVENT_READ_RES;
-    if ((ev_flags & EVENT_WRITE) && FD_ISSET(ev->fd, &work_writeset))
+    else if ((ev->flags & EVENT_WRITE) && FD_ISSET(ev->fd, &work_writeset))
       res |= EVENT_WRITE_RES;
 
     if (!res) continue;
@@ -226,9 +213,9 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
     ev->flags |= res;
     if (!(ev->flags & EVENT_ACTIVE)) {
       ev->flags |= EVENT_ACTIVE;
-      if (ev_flags & EVENT_ONESHOT)
+      if (ev->flags & EVENT_ONESHOT)
         evq_del(ev, 1);
-      else if (ev->tq && !(ev_flags & EVENT_TIMEOUT_MANUAL))
+      else if (ev->tq && !(ev->flags & EVENT_TIMEOUT_MANUAL))
         timeout_reset(ev, timeout);
 
       ev->next_ready = ev_ready;

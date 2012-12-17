@@ -229,7 +229,7 @@ evq_del (struct event *ev, const int reuse_fd)
 
     if (ev_flags & EVENT_AIO) {
       if (ev_flags & EVENT_AIO_PENDING)
-        win32iocr_cancel(evq, ev, (EVENT_READ | EVENT_WRITE));
+        win32iocr_cancel(evq, ev);
       return 0;
     }
 
@@ -256,22 +256,16 @@ evq_modify (struct event *ev, unsigned int flags)
 
   if (ev_flags & EVENT_AIO) {
     if (ev_flags & EVENT_AIO_PENDING)
-      win32iocr_cancel(ev->wth->evq, ev, (ev_flags & ~flags));
+      win32iocr_cancel(ev->wth->evq, ev);
     return win32iocr_set(ev, flags);
   } else {
     struct win32thr *wth = ev->wth;
-    int event = 0;
 
     if (!(ev_flags & EVENT_ACTIVE))
       win32thr_sleep(wth);
 
-    if (flags & EVENT_READ)
-      event = WFD_READ;
-    if (flags & EVENT_WRITE)
-      event |= WFD_WRITE;
-
-    if (WSAEventSelect((int) ev->fd, wth->handles[ev->w.index], event)
-     == SOCKET_ERROR)
+    if (WSAEventSelect((int) ev->fd, wth->handles[ev->w.index],
+     ((flags & EVENT_READ) ? WFD_READ : WFD_WRITE)) == SOCKET_ERROR)
       return -1;
   }
   return 0;
@@ -404,9 +398,9 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
         }
         res |= EVENT_READ_RES;
       } else if (!WSAEnumNetworkEvents((int) ev->fd, *hp, &ne)) {
-        if ((ev_flags & EVENT_READ) && (ne.lNetworkEvents & WFD_READ))
+        if ((ne.lNetworkEvents & WFD_READ) && (ev_flags & EVENT_READ))
           res = EVENT_READ_RES;
-        if ((ev_flags & EVENT_WRITE) && (ne.lNetworkEvents & WFD_WRITE))
+        else if ((ne.lNetworkEvents & WFD_WRITE) && (ev_flags & EVENT_WRITE))
           res |= EVENT_WRITE_RES;
         if (ne.lNetworkEvents & FD_CLOSE)
           res |= EVENT_EOF_RES;

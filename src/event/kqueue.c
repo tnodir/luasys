@@ -85,12 +85,8 @@ evq_add (struct event_queue *evq, struct event *ev)
   if (ev_flags & EVENT_SIGNAL)
     return signal_add(evq, ev);
 
-  if ((ev_flags & EVENT_READ)
-   && kqueue_set(evq, ev, EVFILT_READ, EV_ADD))
-    return -1;
-
-  if ((ev_flags & EVENT_WRITE)
-   && kqueue_set(evq, ev, EVFILT_WRITE, EV_ADD))
+  if (kqueue_set(evq, ev,
+   ((ev_flags & EVENT_READ) ? EVFILT_READ : EVFILT_WRITE), EV_ADD))
     return -1;
 
   evq->nevents++;
@@ -156,42 +152,21 @@ evq_del (struct event *ev, const int reuse_fd)
 
   if (!reuse_fd) return 0;
 
-  return ((ev_flags & EVENT_READ)
-    ? kqueue_set(evq, ev, EVFILT_READ, EV_DELETE) : 0)
-   | ((ev_flags & EVENT_WRITE)
-    ? kqueue_set(evq, ev, EVFILT_WRITE, EV_DELETE) : 0);
+  return kqueue_set(evq, ev,
+   ((ev_flags & EVENT_READ) ? EVFILT_READ : EVFILT_WRITE), EV_DELETE);
 }
 
 EVQ_API int
 evq_modify (struct event *ev, unsigned int flags)
 {
   struct event_queue *evq = ev->evq;
-  const unsigned int ev_flags = ev->flags;
 
-  if (ev_flags & EVENT_READ) {
-    if (flags & EVENT_READ)
-      flags &= ~EVENT_READ;
-    else
-      if (kqueue_set(evq, ev, EVFILT_READ, EV_DELETE))
-        return -1;
-  }
-  if (ev_flags & EVENT_WRITE) {
-    if (flags & EVENT_WRITE)
-      flags &= ~EVENT_WRITE;
-    else
-      if (kqueue_set(evq, ev, EVFILT_WRITE, EV_DELETE))
-        return -1;
-  }
-
-  if ((flags & EVENT_READ)
-   && kqueue_set(evq, ev, EVFILT_READ, EV_ADD))
+  if (kqueue_set(evq, ev,
+   ((ev->flags & EVENT_READ) ? EVFILT_READ : EVFILT_WRITE), EV_DELETE))
     return -1;
 
-  if ((flags & EVENT_WRITE)
-   && kqueue_set(evq, ev, EVFILT_WRITE, EV_ADD))
-    return -1;
-
-  return 0;
+  return kqueue_set(evq, ev,
+   ((flags & EVENT_READ) ? EVFILT_READ : EVFILT_WRITE), EV_ADD);
 }
 
 EVQ_API int
@@ -245,10 +220,11 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
 
   for (; nready--; ++kev) {
     struct event *ev;
-    const int flags = kev->flags;
+    const int kev_flags = kev->flags;
     const int filter = kev->filter;
+    unsigned int res;
 
-    if (flags & EV_ERROR)
+    if (kev_flags & EV_ERROR)
       continue;
 
     if (filter == EVFILT_SIGNAL) {
@@ -263,9 +239,13 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
       continue;
     }
 
-    ev->flags |= (filter == EVFILT_READ ? EVENT_READ_RES : EVENT_WRITE_RES)
-     | ((flags & EV_EOF) ? EVENT_EOF_RES : 0);
+    res = (kev_flags & EV_EOF) ? EVENT_EOF_RES : 0;
+    if ((filter == EVFILT_READ) && (ev->flags & EVENT_READ))
+      res |= EVENT_READ_RES;
+    else if ((filter == EVFILT_WRITE) && (ev->flags & EVENT_WRITE))
+      res |= EVENT_WRITE_RES;
 
+    ev->flags |= res;
     if (!(ev->flags & EVENT_ACTIVE)) {
       ev->flags |= EVENT_ACTIVE;
       if (ev->flags & EVENT_ONESHOT)
