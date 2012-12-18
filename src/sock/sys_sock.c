@@ -6,7 +6,7 @@
 
 #include <ws2tcpip.h>	/* Multicast */
 
-#define IS_OVERLAPPED	(is_WinNT ? WSA_FLAG_OVERLAPPED : 0)
+#define WSA_FLAGS	WSA_FLAG_OVERLAPPED
 
 #define SHUT_WR		SD_SEND
 
@@ -71,7 +71,7 @@ sock_pair (int type, sd_t sv[2])
   sa.sin_port = 0;
   sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-  if ((sd = WSASocket(AF_INET, type, 0, NULL, 0, IS_OVERLAPPED))
+  if ((sd = WSASocket(AF_INET, type, 0, NULL, 0, WSA_FLAGS))
    != INVALID_SOCKET) {
     int optval = 1;
     DWORD nr;
@@ -81,7 +81,7 @@ sock_pair (int type, sd_t sv[2])
     if (!bind(sd, (struct sockaddr *) &sa, len)
      && !listen(sd, 1)
      && !getsockname(sd, (struct sockaddr *) &sa, &len)
-     && (sv[0] = WSASocket(AF_INET, type, 0, NULL, 0, IS_OVERLAPPED))
+     && (sv[0] = WSASocket(AF_INET, type, 0, NULL, 0, WSA_FLAGS))
       != INVALID_SOCKET) {
       struct sockaddr_in sa2;
       int len2;
@@ -153,7 +153,7 @@ sock_socket (lua_State *L)
 #ifndef _WIN32
     sd = socket(domain, type, 0);
 #else
-    sd = WSASocket(domain, type, 0, NULL, 0, IS_OVERLAPPED);
+    sd = WSASocket(domain, type, 0, NULL, 0, WSA_FLAGS);
 #endif
     if (sd != (sd_t) -1) {
       *sdp = sd;
