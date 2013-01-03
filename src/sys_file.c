@@ -518,7 +518,7 @@ sys_set_end (lua_State *L)
   {
     LONG off_hi = INT64_HIGH(off);
     LONG off_lo = INT64_LOW(off);
-    LONG cur_hi = 0L, cur_lo = 0L;
+    LONG cur_hi = 0L, cur_lo;
 
     cur_lo = SetFilePointer(fd, 0L, &cur_hi, SEEK_CUR);
     SetFilePointer(fd, off_lo, &off_hi, SEEK_SET);

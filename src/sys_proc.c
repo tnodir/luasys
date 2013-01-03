@@ -38,7 +38,7 @@ sys_run (lua_State *L)
   if (res != -1) {
 #else
   char path[MAX_PATHNAME];
-  const char *arg = NULL;
+  const char *arg;
   HINSTANCE res;
 
   arg = strchr(cmd, ' ');

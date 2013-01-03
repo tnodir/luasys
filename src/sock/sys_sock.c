@@ -665,17 +665,16 @@ TransmitFileMap (SOCKET sd, HANDLE fd, DWORD n)
     if (size_lo != (DWORD) -1L || SYS_ERRNO == NO_ERROR) {
       LONG off_hi = 0L, off_lo;
       int64_t size;
-      DWORD len;
 
       off_lo = SetFilePointer(fd, 0, &off_hi, SEEK_CUR);
       size_lo = (off_lo & SYS_GRAN_MASK);
       size = INT64_MAKE(size_lo, size_hi) - INT64_MAKE(off_lo, off_hi);
 
-      len = (size < (int64_t) ~((DWORD) 0))
-       ? (DWORD) size : ~((DWORD) 0);
+      if (size > (int64_t) SENDFILE_MAX)
+        size = (int64_t) SENDFILE_MAX;
 
-      if (n <= 0 || n > len) n = len;
-      if (n > SENDFILE_MAX) n = SENDFILE_MAX;
+      if (n == 0 || n > (DWORD) size)
+        n = (DWORD) size;
 
       base = MapViewOfFile(hmap, FILE_MAP_READ,
        off_hi, (off_lo & ~SYS_GRAN_MASK), 0);

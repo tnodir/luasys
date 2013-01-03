@@ -603,16 +603,16 @@ mem_index (lua_State *L)
 
     switch (type) {
     case MEM_TCHAR:
-      lua_pushnumber(L, *((char *) ptr));
+      lua_pushinteger(L, *((char *) ptr));
       break;
     case MEM_TUCHAR:
-      lua_pushnumber(L, *((unsigned char *) ptr));
+      lua_pushinteger(L, *((unsigned char *) ptr));
       break;
     case MEM_TSHORT:
-      lua_pushnumber(L, *((short *) ptr));
+      lua_pushinteger(L, *((short *) ptr));
       break;
     case MEM_TUSHORT:
-      lua_pushnumber(L, *((unsigned short *) ptr));
+      lua_pushinteger(L, *((unsigned short *) ptr));
       break;
     case MEM_TINT:
       lua_pushinteger(L, *((int *) ptr));
