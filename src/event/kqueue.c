@@ -240,7 +240,8 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
     }
 
     res = (kev_flags & EV_EOF) ? EVENT_EOF_RES : 0;
-    if ((filter == EVFILT_READ) && (ev->flags & EVENT_READ))
+    if ((filter == EVFILT_READ || filter == EVFILT_VNODE)
+     && (ev->flags & EVENT_READ))
       res |= EVENT_READ_RES;
     else if ((filter == EVFILT_WRITE) && (ev->flags & EVENT_WRITE))
       res |= EVENT_WRITE_RES;

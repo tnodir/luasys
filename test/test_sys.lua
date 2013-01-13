@@ -7,7 +7,7 @@ local sock = require("sys.sock")
 
 print"-- file:isatty()"
 do
-  local f = assert(sys.handle():open("test_sys.lua"))
+  local f = assert(sys.handle():open("."))
   assert(not f:isatty())
   assert(sys.stdin:isatty())
   print("OK")
