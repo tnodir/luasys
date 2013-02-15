@@ -15,6 +15,18 @@ typedef cpu_set_t	affin_mask_t;
 #define CPU_SIZEOF(p)	sizeof(affin_mask_t)
 #define CPU_COUNTMAX(p)	CPU_SETSIZE
 
+#elif defined(__FreeBSD__)
+
+#include <pthread_np.h>
+
+typedef cpuset_t	affin_mask_t;
+
+#define USE_PTHREAD_AFFIN
+
+#define CPU_NEW()	malloc(sizeof(affin_mask_t))
+#define CPU_DEL(p)	free(p)
+#define CPU_SIZEOF(p)	CPU_SETSIZE
+
 #elif defined(BSD)
 
 typedef cpuset_t	affin_mask_t;

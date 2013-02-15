@@ -25,6 +25,10 @@
 #include <pthread.h>
 #include <sched.h>
 
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+#include <sys/param.h>
+#endif
+
 #endif
 
 
