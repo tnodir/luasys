@@ -7,11 +7,12 @@
 
 @rem Check Windows Version is Vista+
 @ver | findstr /i "Version 6\." > NUL
-@IF %ERRORLEVEL% NEQ 0 goto END_VERSION
-@set WIN32_VERSION=WIN32_VISTA
-@goto END_VERSION
+@if errorlevel 0 goto VERSION_VISTA
 @set WIN32_VERSION=WIN32_COMMON
-:END_VERSION
+@goto VERSION_END
+:VERSION_VISTA
+@set WIN32_VERSION=WIN32_VISTA
+:VERSION_END
 
 %LSCOMPILE% /DLUA_BUILD_AS_DLL /D%WIN32_VERSION% luasys.c sock/sys_sock.c isa/isapi/isapi_dll.c
 @if errorlevel 1 goto :END
