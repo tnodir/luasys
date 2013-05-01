@@ -472,7 +472,7 @@ sys_dir_open (lua_State *L, const int idx, struct dir *dp)
       return 0;
     memcpy(filename, dir, len);
     filename += len - 1;
-    if (*filename != '\\' || *filename != '/')
+    if (*filename != '\\' && *filename != '/')
       *(++filename) = '\\';
     *(++filename) = '*';
     *(++filename) = '\0';
