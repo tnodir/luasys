@@ -30,19 +30,19 @@ struct win32overlapped {
   union {
     DWORD Internal;
     DWORD err;
-  };
+  } il;
   union {
     DWORD InternalHigh;
     DWORD rw_flags;
-  };
+  } ih;
   union {
     LONGLONG Offset;
     struct win32overlapped *ov_next;
-  };
+  } o;
   union {
     HANDLE hEvent;
     struct event *ev;
-  };
+  } e;
 };
 
 /* List of overlaps */

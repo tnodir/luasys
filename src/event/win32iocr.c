@@ -10,7 +10,7 @@
 
 #define win32iocr_list_put(ov_list,ov) \
   do { \
-    (ov)->ov_next = (ov_list).ov_head; \
+    (ov)->o.ov_next = (ov_list).ov_head; \
     if (!(ov_list).ov_head) \
       (ov_list).ov_tail = (ov); \
     (ov_list).ov_head = (ov); \
@@ -18,7 +18,7 @@
 
 #define win32iocr_list_move(ov_list,ov_dest) \
   do { \
-    (ov_list).ov_tail->ov_next = (ov_dest); \
+    (ov_list).ov_tail->o.ov_next = (ov_dest); \
     (ov_dest) = (ov_list).ov_head; \
     (ov_list).ov_head = (ov_list).ov_tail = NULL; \
   } while (0)
@@ -60,7 +60,7 @@ win32iocr_overlapped_new (struct event_queue *evq)
   struct win32overlapped *ov = evq->ov_free;
 
   if (ov)
-    evq->ov_free = ov->ov_next;
+    evq->ov_free = ov->o.ov_next;
   else
     ov = win32iocr_overlapped_alloc(evq);
 
@@ -71,7 +71,7 @@ win32iocr_overlapped_new (struct event_queue *evq)
 static void
 win32iocr_overlapped_del (struct event_queue *evq, struct win32overlapped *ov)
 {
-  ov->ov_next = evq->ov_free;
+  ov->o.ov_next = evq->ov_free;
   evq->ov_free = ov;
 }
 
@@ -107,15 +107,15 @@ win32iocr_set_handle (struct win32iocr_thread *iocr_thr,
 {
   static WSABUF buf = {0, 0};
 
-  struct event *ev = ov->ev;
+  struct event *ev = ov->e.ev;
   unsigned int rw_flags;
   sd_t sd;
 
   if (!ev) goto ready;
 
   sd = (sd_t) ev->fd;
-  rw_flags = ov->rw_flags;
-  ov->rw_flags = 0;
+  rw_flags = ov->ih.rw_flags;
+  ov->ih.rw_flags = 0;
 
   if (rw_flags == EVENT_READ) {
     DWORD flags = 0;
@@ -130,7 +130,7 @@ win32iocr_set_handle (struct win32iocr_thread *iocr_thr,
      || WSAGetLastError() == WSA_IO_PENDING)
       return;
   }
-  ov->err = WSAGetLastError();
+  ov->il.err = WSAGetLastError();
  ready:
   win32iocr_list_put(iocr_thr->ov_list, ov);
 }
@@ -175,7 +175,7 @@ win32iocr_wait (struct event_queue *evq)
     /* handle read/write requests */
     while (ov_set) {
       win32iocr_set_handle(&iocr_thr, ov_set);
-      ov_set = ov_set->ov_next;
+      ov_set = ov_set->o.ov_next;
     }
 
     if (!iocr_thr.ov_list.ov_head)
@@ -231,15 +231,15 @@ win32iocr_process (struct event_queue *evq, struct win32overlapped *ov,
 
   for (; ov; ov = ov_next) {
     struct event *ev;
-    const DWORD err = ov->err;
-    const int cancelled = (err == STATUS_CANCELLED) || !ov->ev;
+    const DWORD err = ov->il.err;
+    const int cancelled = (err == STATUS_CANCELLED) || !ov->e.ev;
 
-    ov_next = ov->ov_next;
+    ov_next = ov->o.ov_next;
     win32iocr_overlapped_del(evq, ov);
     if (cancelled)
       continue;
 
-    ev = ov->ev;
+    ev = ov->e.ev;
     ev->w.ov = NULL;
     ev->flags &= ~EVENT_AIO_PENDING;  /* have to set AIO request */
     ev->flags |= err ? EVENT_EOF_RES
@@ -264,7 +264,7 @@ win32iocr_cancel (struct event_queue *evq, struct event *ev)
 {
   struct win32overlapped *ov = ev->w.ov;
 
-  ov->ev = NULL;
+  ov->e.ev = NULL;
   ev->w.ov = NULL;
   ev->flags &= ~EVENT_AIO_PENDING;
 
@@ -282,8 +282,8 @@ win32iocr_set (struct event *ev, const unsigned int rw_flags)
 
   if (!ov) return -1;
 
-  ov->rw_flags = rw_flags & (EVENT_READ | EVENT_WRITE);
-  ov->ev = ev;
+  ov->ih.rw_flags = rw_flags & (EVENT_READ | EVENT_WRITE);
+  ov->e.ev = ev;
   ev->w.ov = ov;
   ev->flags |= EVENT_AIO_PENDING;  /* AIO request is installed */
   win32iocr_list_put(evq->iocr.ov_list, ov);
