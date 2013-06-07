@@ -41,10 +41,10 @@ end
 -- udp header fields
 local udp_header
 do
-	udp_srcport = 0
-	udp_destport = port
-	udp_len = 8
-	udp_chksum = 0
+	local udp_srcport = 0
+	local udp_destport = port
+	local udp_len = 8
+	local udp_chksum = 0
 
 	udp_header = struct.pack('>HHHH', udp_srcport, udp_destport, udp_len, udp_chksum)
 end
