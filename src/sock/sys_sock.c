@@ -112,7 +112,7 @@ sock_pair (int type, sd_t sv[2])
 
 
 /*
- * Arguments: sd_udata, [type ("stream", "dgram"),
+ * Arguments: sd_udata, [type ("stream", "dgram", "raw"),
  *	domain ("inet", "inet6", "unix"), sd_udata (socketpair)]
  * Returns: [sd_udata]
  */
@@ -122,12 +122,18 @@ sock_socket (lua_State *L)
   sd_t *sdp = checkudata(L, 1, SD_TYPENAME);
   const char *typep = lua_tostring(L, 2);
   const char *domainp = lua_tostring(L, 3);
-  int type = SOCK_STREAM, domain = AF_INET;
+  int type = SOCK_STREAM, domain = AF_INET, proto = 0;
   sd_t *pair_sdp = (lua_gettop(L) > 1 && lua_isuserdata(L, -1))
    ? checkudata(L, -1, SD_TYPENAME) : NULL;
 
-  if (typep && typep[0] == 'd')
-    type = SOCK_DGRAM;
+  if (typep) {
+    if (typep[0] == 'd')
+      type = SOCK_DGRAM;
+    else if (typep[0] == 'r') {
+      type = SOCK_RAW;
+      proto = IPPROTO_RAW;
+    }
+  }
   if (domainp) {
     if (domainp[0] == 'u')
       domain = AF_UNIX;
@@ -151,9 +157,9 @@ sock_socket (lua_State *L)
   } else {
     sd_t sd;
 #ifndef _WIN32
-    sd = socket(domain, type, 0);
+    sd = socket(domain, type, proto);
 #else
-    sd = WSASocket(domain, type, 0, NULL, 0, WSA_FLAGS);
+    sd = WSASocket(domain, type, proto, NULL, 0, WSA_FLAGS);
 #endif
     if (sd != (sd_t) -1) {
       *sdp = sd;
@@ -257,14 +263,16 @@ sock_sockopt (lua_State *L)
 #define OPT_INDEX_TCP	12
     TCP_NODELAY,
 #define OPT_INDEX_IP	13
-    IP_MULTICAST_TTL, IP_MULTICAST_IF, IP_MULTICAST_LOOP
+    IP_MULTICAST_TTL, IP_MULTICAST_IF, IP_MULTICAST_LOOP,
+    IP_HDRINCL
   };
   static const char *const opt_names[] = {
     "reuseaddr", "type", "error", "dontroute",
     "sndbuf", "rcvbuf", "sndlowat", "rcvlowat",
     "broadcast", "keepalive", "oobinline", "linger",
     "tcp_nodelay",
-    "multicast_ttl", "multicast_if", "multicast_loop", NULL
+    "multicast_ttl", "multicast_if", "multicast_loop",
+    "hdrincl", NULL
   };
 
   sd_t sd = (sd_t) lua_unboxinteger(L, 1, SD_TYPENAME);
