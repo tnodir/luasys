@@ -19,6 +19,9 @@
 #define LOG_TINFO	LOG_INFO
 #endif
 
+/* Log environ. table reserved indexes */
+#define SYSLOG_ENV_IDENT	1
+
 struct sys_log {
 #ifdef _WIN32
   HANDLE h;
@@ -34,7 +37,8 @@ struct sys_log {
 static int
 sys_log (lua_State *L)
 {
-  const char *ident = luaL_optstring(L, 1, "lua");
+  const int is_ident = (lua_type(L, 1) == LUA_TSTRING);
+  const char *ident = is_ident ? lua_tostring(L, 1) : "lua";
   struct sys_log *logp = lua_newuserdata(L, sizeof(struct sys_log));
 
 #ifndef _WIN32
@@ -73,6 +77,13 @@ sys_log (lua_State *L)
     logp->type = LOG_TERROR;
     luaL_getmetatable(L, LOG_TYPENAME);
     lua_setmetatable(L, -2);
+
+    if (is_ident) {
+	lua_newtable(L);  /* environ. */
+	lua_pushvalue(L, 1);
+	lua_rawseti(L, -2, SYSLOG_ENV_IDENT);
+	lua_setfenv(L, -2);
+    }
     return 1;
   }
 #ifdef _WIN32
