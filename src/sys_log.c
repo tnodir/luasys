@@ -79,10 +79,10 @@ sys_log (lua_State *L)
     lua_setmetatable(L, -2);
 
     if (is_ident) {
-	lua_newtable(L);  /* environ. */
-	lua_pushvalue(L, 1);
-	lua_rawseti(L, -2, SYSLOG_ENV_IDENT);
-	lua_setfenv(L, -2);
+      lua_newtable(L);  /* environ. */
+      lua_pushvalue(L, 1);
+      lua_rawseti(L, -2, SYSLOG_ENV_IDENT);
+      lua_setfenv(L, -2);
     }
     return 1;
   }
