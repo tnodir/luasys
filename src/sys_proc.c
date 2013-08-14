@@ -64,6 +64,26 @@ sys_run (lua_State *L)
   return sys_seterror(L, 0);
 }
 
+#ifndef _WIN32
+#ifdef BSD
+#define sys_closefrom	closefrom
+#else
+static void
+sys_closefrom (int lowfd)
+{
+#ifdef F_CLOSEM
+  (void) fcntl(lowfd, F_CLOSEM, 0);
+#else
+  int n = sysconf(_SC_OPEN_MAX);
+  if (n < 0) n = MAX_OPEN_FDS;
+  while (n >= lowfd) {
+    (void) close(n--);
+  }
+#endif
+}
+#endif
+#endif
+
 #define MAX_ARGS	32
 /*
  * Arguments: filename (string), [arguments (table: {number => string}),
@@ -119,12 +139,8 @@ sys_spawn (lua_State *L)
     if (out_fdp) dup2(*out_fdp, STDOUT_FILENO);
     if (err_fdp) dup2(*err_fdp, STDERR_FILENO);
     /* close other files */
-    {
-      int n = sysconf(_SC_OPEN_MAX);
-      if (n < 0) n = MAX_OPEN_FDS;
-      while (n > 2)
-        close(n--);
-    }
+    sys_closefrom(3);
+
     execvp(cmd, (void *) argv);
     perror(cmd);
     _exit(127);
