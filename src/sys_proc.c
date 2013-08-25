@@ -65,7 +65,7 @@ sys_run (lua_State *L)
 }
 
 #ifndef _WIN32
-#ifdef BSD
+#if defined(BSD) && !defined(__APPLE__)
 #define sys_closefrom	closefrom
 #else
 static void
