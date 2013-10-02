@@ -666,7 +666,7 @@ TransmitFileMap (SOCKET sd, HANDLE fd, DWORD n)
   DWORD res = 0;
 
   if (hmap) {
-    DWORD size_hi, size_lo;
+    DWORD size_hi, size_lo, map_off;
     char *base = NULL;
 
     size_lo = GetFileSize(fd, &size_hi);
@@ -675,7 +675,6 @@ TransmitFileMap (SOCKET sd, HANDLE fd, DWORD n)
       int64_t size;
 
       off_lo = SetFilePointer(fd, 0, &off_hi, SEEK_CUR);
-      size_lo = (off_lo & SYS_GRAN_MASK);
       size = INT64_MAKE(size_lo, size_hi) - INT64_MAKE(off_lo, off_hi);
 
       if (size > (int64_t) SENDFILE_MAX)
@@ -686,6 +685,8 @@ TransmitFileMap (SOCKET sd, HANDLE fd, DWORD n)
 
       base = MapViewOfFile(hmap, FILE_MAP_READ,
        off_hi, (off_lo & ~SYS_GRAN_MASK), 0);
+
+      map_off = (off_lo & SYS_GRAN_MASK);
     }
     CloseHandle(hmap);
 
@@ -693,7 +694,7 @@ TransmitFileMap (SOCKET sd, HANDLE fd, DWORD n)
       WSABUF wsa_buf;
 
       wsa_buf.len = n;
-      wsa_buf.buf = base + size_lo;
+      wsa_buf.buf = base + map_off;
 
       if (!WSASend(sd, &wsa_buf, 1, &res, 0, NULL, NULL)) {
         LONG off_hi = 0L;
