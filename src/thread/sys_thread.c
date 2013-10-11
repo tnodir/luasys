@@ -1177,7 +1177,7 @@ thread_createmeta (lua_State *L)
   } meta[] = {
     {THREAD_TYPENAME,	thread_meth},
     {DPOOL_TYPENAME,	dpool_meth},
-    {PIPE_TYPENAME,		pipe_meth},
+    {PIPE_TYPENAME,	pipe_meth},
     {SCHED_TYPENAME,	sched_meth},
   };
   int i;
