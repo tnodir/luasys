@@ -3,6 +3,9 @@
 PCancelSynchronousIo pCancelSynchronousIo;
 PCancelIoEx pCancelIoEx;
 
+CRITICAL_SECTION g_CritSect;
+static int volatile g_CritSectInit = 0;
+
 #if !(defined(_WIN32_WCE) || defined(WIN32_VISTA))
 int is_WinNT;
 #endif
@@ -132,6 +135,12 @@ win32_init (lua_State *L)
      GetProcAddress(mh, "CancelSynchronousIo");
     pCancelIoEx = (PCancelIoEx)
      GetProcAddress(mh, "CancelIoEx");
+  }
+
+  // Initialize global critical section
+  if (!g_CritSectInit) {
+    g_CritSectInit = 1;
+    InitCriticalSection(&g_CritSect);
   }
 }
 

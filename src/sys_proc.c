@@ -208,6 +208,9 @@ sys_spawn (lua_State *L)
     si.wShowWindow = SW_MINIMIZE;
     si.hStdInput = si.hStdOutput = si.hStdError = INVALID_HANDLE_VALUE;
 
+    // Avoid handles inheritance by parallel calls
+    EnterCriticalSection(&g_CritSect);
+
     if (!DuplicateHandle(hProc,
      in_fdp ? *in_fdp : GetStdHandle(STD_INPUT_HANDLE),
      hProc, &si.hStdInput, 0, TRUE, DUPLICATE_SAME_ACCESS) && in_fdp)
@@ -230,6 +233,7 @@ sys_spawn (lua_State *L)
     CloseHandle(si.hStdInput);
     CloseHandle(si.hStdOutput);
     CloseHandle(si.hStdError);
+    LeaveCriticalSection(&g_CritSect);
   }
   if (!res) goto err;
   CloseHandle(pi.hThread);
