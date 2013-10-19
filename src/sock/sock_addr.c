@@ -240,7 +240,7 @@ sock_getifaddrs (lua_State *L)
   sys_vm_enter(L);
 #else
   INTERFACE_INFO result[8192], *rp;
-  SOCKET sd = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
+  SOCKET sd = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAGS);
   DWORD n;
 
   sys_vm_leave(L);

@@ -6,7 +6,11 @@
 
 #include <ws2tcpip.h>	/* Multicast */
 
-#define WSA_FLAGS	WSA_FLAG_OVERLAPPED
+#ifndef WSA_FLAG_NO_HANDLE_INHERIT
+#define WSA_FLAG_NO_HANDLE_INHERIT	0
+#endif
+
+#define WSA_FLAGS	(WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT)
 
 #define SHUT_WR		SD_SEND
 
