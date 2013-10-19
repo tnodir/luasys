@@ -19,6 +19,6 @@
 %LSLINK% /DLL /OUT:sys.dll /DEF:isa/isapi/isapi_dll.def *.obj %LUA%/src/lua*.lib kernel32.lib user32.lib winmm.lib shell32.lib advapi32.lib ws2_32.lib
 @if errorlevel 1 goto :END
 
-@del *.obj *.manifest *.lib *.exp
-
 :END
+
+@del *.obj *.manifest *.lib *.exp
