@@ -386,24 +386,23 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
       WSANETWORKEVENTS ne;
       struct event *ev = wth->events[i];
       const int ev_flags = ev->flags;
-      unsigned int res = 0;
+      unsigned int res;
 
       if (!(ev_flags & EVENT_SOCKET)) {
+        res = EVENT_READ_RES;
         if (ev_flags & EVENT_PID) {
           DWORD status;
           GetExitCodeProcess(ev->fd, &status);
-          res = (status << EVENT_STATUS_SHIFT);
+          res |= (status << EVENT_STATUS_SHIFT);
         } else if (!(ev_flags & EVENT_DIRWATCH)) {
           ResetEvent(ev->fd);  /* all events must be manual-reset */
         }
-        res |= EVENT_READ_RES;
       } else if (!WSAEnumNetworkEvents((int) ev->fd, *hp, &ne)) {
+        res = (ne.lNetworkEvents & FD_CLOSE) ? EVENT_EOF_RES : 0;
         if ((ne.lNetworkEvents & WFD_READ) && (ev_flags & EVENT_READ))
-          res = EVENT_READ_RES;
+          res |= EVENT_READ_RES;
         else if ((ne.lNetworkEvents & WFD_WRITE) && (ev_flags & EVENT_WRITE))
           res |= EVENT_WRITE_RES;
-        if (ne.lNetworkEvents & FD_CLOSE)
-          res |= EVENT_EOF_RES;
       }
 
       if (res) {
