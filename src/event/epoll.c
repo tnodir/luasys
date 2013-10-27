@@ -1,6 +1,11 @@
 /* EPoll */
 
-#define EPOLLFD_READ	(EPOLLIN | EPOLLERR | EPOLLHUP)
+#ifndef EPOLLRDHUP
+#define EPOLLRDHUP	0
+#endif
+
+#define EPOLLFD_HUP	(EPOLLRDHUP | EPOLLHUP)
+#define EPOLLFD_READ	(EPOLLIN | EPOLLERR | EPOLLFD_HUP)
 #define EPOLLFD_WRITE	(EPOLLOUT | EPOLLERR | EPOLLHUP)
 
 EVQ_API int
@@ -191,7 +196,7 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
       continue;
     }
 
-    res = (revents & EPOLLHUP) ? EVENT_EOF_RES : 0;
+    res = (revents & EPOLLFD_HUP) ? EVENT_EOF_RES : 0;
     if ((revents & EPOLLFD_READ) && (ev->flags & EVENT_READ)) {
       res |= EVENT_READ_RES;
 
