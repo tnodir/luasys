@@ -15,7 +15,10 @@
 
 #define _GNU_SOURCE	/* pthread_*affinity_np */
 
-#define _FILE_OFFSET_BITS  64
+#ifndef _FILE_OFFSET_BITS
+#define _FILE_OFFSET_BITS	64
+#define _LARGEFILE_SOURCE	1
+#endif
 
 #include <sys/time.h>
 #include <unistd.h>
