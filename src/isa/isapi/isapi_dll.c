@@ -166,6 +166,8 @@ lisapi_close (struct sys_thread *td, int status)
 }
 
 
+BOOL WINAPI DllMain (HANDLE hmodule, DWORD reason, LPVOID reserved);
+
 BOOL WINAPI
 DllMain (HANDLE hmodule, DWORD reason, LPVOID reserved)
 {
@@ -252,6 +254,7 @@ HttpExtensionProc (LPEXTENSION_CONTROL_BLOCK ecb)
     if (status) {
       const char *s;
       size_t len;
+      union sys_rwptr s_ptr;  /* to avoid "const cast" warning */
 
       lua_pushliteral(L, "\n\n<pre>");
       lua_insert(L, -2);
@@ -263,7 +266,8 @@ HttpExtensionProc (LPEXTENSION_CONTROL_BLOCK ecb)
 #endif
 
       ecb->dwHttpStatusCode = 500;
-      ecb->WriteClient(ecb->ConnID, (char *) s, (DWORD *) &len, 0);
+      s_ptr.r = s;
+      ecb->WriteClient(ecb->ConnID, s_ptr.w, (DWORD *) &len, 0);
       lua_pop(L, 1);
     }
   }

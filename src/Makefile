@@ -1,7 +1,7 @@
 
 PLAT= none
 
-LUA= /opt/lua-5.2.2
+LUA= /opt/lua-5.2.3
 
 T= sys.so
 A= libluasys.a

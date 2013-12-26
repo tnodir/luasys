@@ -12,6 +12,7 @@
 @goto VERSION_END
 :VERSION_VISTA
 @set WIN32_VERSION=WIN32_VISTA
+@set LSCOMPILE=%LSCOMPILE% /arch:SSE2
 :VERSION_END
 
 %LSCOMPILE% /DLUA_BUILD_AS_DLL /D%WIN32_VERSION% luasys.c sock/sys_sock.c isa/isapi/isapi_dll.c

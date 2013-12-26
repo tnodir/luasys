@@ -460,6 +460,9 @@ sock_inet_pton (lua_State *L)
   struct sock_addr sa;
   void *inp = sock_addr_get_inp(&sa, af);
   const int in_len = sock_addr_get_inlen(af);
+#ifdef _WIN32
+  union sys_rwptr src_ptr;  /* to avoid "const cast" warning */
+#endif
 
   memset(&sa, 0, sizeof(struct sock_addr));
   if (*src == '*') goto end;
@@ -468,7 +471,8 @@ sock_inet_pton (lua_State *L)
   if (inet_pton(af, src, inp) == 1) {
 #else
   sa.addrlen = sizeof(sa);
-  if (!WSAStringToAddressA((char *) src, af, NULL,
+  src_ptr.r = src;
+  if (!WSAStringToAddressA(src_ptr.w, af, NULL,
    &sa.u.addr, &sa.addrlen)) {
 #endif
  end:

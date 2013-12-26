@@ -195,11 +195,13 @@ msec_t sys_milliseconds (void);
 
 struct membuf;
 
+union sys_rwptr {
+  const char *r;  /* read from buffer */
+  char *w;  /* write to buffer */
+};
+
 struct sys_buffer {
-  union {
-    const char *r;  /* read from buffer */
-    char *w;  /* write to buffer */
-  } ptr;
+  union sys_rwptr ptr;
   size_t size;
   struct membuf *mb;
 };

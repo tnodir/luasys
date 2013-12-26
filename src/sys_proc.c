@@ -208,7 +208,7 @@ sys_spawn (lua_State *L)
     si.wShowWindow = SW_MINIMIZE;
     si.hStdInput = si.hStdOutput = si.hStdError = INVALID_HANDLE_VALUE;
 
-    // Avoid handles inheritance by parallel calls
+    /* Avoid handles inheritance by parallel calls */
     EnterCriticalSection(&g_CritSect);
 
     if (!DuplicateHandle(hProc,

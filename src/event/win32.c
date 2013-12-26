@@ -386,7 +386,7 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
       WSANETWORKEVENTS ne;
       struct event *ev = wth->events[i];
       const int ev_flags = ev->flags;
-      unsigned int res;
+      unsigned int res = 0;
 
       if (!(ev_flags & EVENT_SOCKET)) {
         res = EVENT_READ_RES;

@@ -208,6 +208,7 @@ thread_cond_wait_nolock (thread_cond_t *condp, thread_critsect_t *csp,
    : (res == WAIT_TIMEOUT) ? 1 : -1;
 }
 
+#if 0
 static int
 thread_cond_wait_value (thread_cond_t *condp, thread_critsect_t *csp,
                         volatile unsigned int *signalled,
@@ -227,6 +228,7 @@ thread_cond_wait_value (thread_cond_t *condp, thread_critsect_t *csp,
   }
   return (res == WAIT_TIMEOUT) ? 1 : -1;
 }
+#endif
 
 #endif  /* !defined(USE_PTHREAD_SYNC) */
 

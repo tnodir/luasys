@@ -137,7 +137,7 @@ win32_init (lua_State *L)
      GetProcAddress(mh, "CancelIoEx");
   }
 
-  // Initialize global critical section
+  /* Initialize global critical section */
   if (!g_CritSectInit) {
     g_CritSectInit = 1;
     InitCriticalSection(&g_CritSect);

@@ -70,8 +70,10 @@ ecb_getvar (lua_State *L)
   } else {
     char buf[SYS_BUFSIZE];
     DWORD len = sizeof(buf);
+    union sys_rwptr name_ptr;  /* to avoid "const cast" warning */
 
-    if (ecb->GetServerVariable(ecb->ConnID, (char *) name, buf, &len)) {
+    name_ptr.r = name;
+    if (ecb->GetServerVariable(ecb->ConnID, name_ptr.w, buf, &len)) {
       lua_pushlstring(L, buf, len - 1);
       return 1;
     }
