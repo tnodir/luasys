@@ -150,13 +150,15 @@ thread_cond_wait_vm (thread_cond_t *condp, struct sys_thread *td,
 {
   int res;
 
-  sys_vm2_preleave(td);
 #if defined(USE_PTHREAD_SYNC)
+  sys_vm2_preleave(td);
   res = thread_cond_wait_nolock(condp, td->vmcsp, timeout);
-#else
-  res = thread_handle_wait(*condp, timeout);
-#endif
   sys_vm2_postenter(td);
+#else
+  sys_vm2_leave(td);
+  res = thread_handle_wait(*condp, timeout);
+  sys_vm2_enter(td);
+#endif
 
   return res;
 }
