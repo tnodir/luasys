@@ -144,9 +144,6 @@ sys_thread_tolua (struct sys_thread *td)
   return td ? td->L : NULL;
 }
 
-
-#if defined(USE_PTHREAD_SYNC)
-
 static int
 thread_cond_wait_vm (thread_cond_t *condp, struct sys_thread *td,
                      const msec_t timeout)
@@ -154,30 +151,15 @@ thread_cond_wait_vm (thread_cond_t *condp, struct sys_thread *td,
   int res;
 
   sys_vm2_preleave(td);
+#if defined(USE_PTHREAD_SYNC)
   res = thread_cond_wait_nolock(condp, td->vmcsp, timeout);
+#else
+  res = thread_handle_wait(*condp, timeout);
+#endif
   sys_vm2_postenter(td);
 
   return res;
 }
-
-#else  /* Win32 */
-
-static int
-thread_cond_wait_vm (thread_cond_t *condp, struct sys_thread *td,
-                     const msec_t timeout)
-{
-  int res;
-
-  sys_vm2_leave(td);
-  res = WaitForSingleObject(*condp, timeout);
-  sys_vm2_enter(td);
-
-  return (res == WAIT_OBJECT_0) ? 0
-   : (res == WAIT_TIMEOUT) ? 1 : -1;
-}
-
-#endif  /* !defined(USE_PTHREAD_SYNC) */
-
 
 static int
 thread_waitvm (struct sys_vmthread *vmtd, const msec_t timeout)
