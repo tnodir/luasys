@@ -22,6 +22,7 @@ CWARNS= -W -Wall -Wextra -pedantic \
 	-Wstrict-prototypes \
 	-Wundef \
 	-Wwrite-strings \
+	-Wpadded \
 #	-Wunreachable-code
 
 CFLAGS= $(COPT) $(CWARNS) $(MYCFLAGS) -I$(LUA)/src

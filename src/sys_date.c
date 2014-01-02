@@ -21,8 +21,8 @@ typedef float	period_t;
 #else
 
 struct period {
-  LARGE_INTEGER start;
   period_t cycle;
+  LARGE_INTEGER start;
 };
 
 #include "win32/strptime.c"

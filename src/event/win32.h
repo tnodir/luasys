@@ -36,7 +36,10 @@ struct win32overlapped {
     DWORD rw_flags;
   } ih;
   union {
-    LONGLONG Offset;
+    struct {
+      DWORD Offset;
+      DWORD OffsetHigh;
+    } w;
     struct win32overlapped *ov_next;
   } o;
   union {
