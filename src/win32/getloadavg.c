@@ -4,13 +4,11 @@
 
 #define filetime_int64(ft)	((int64_t) ((LARGE_INTEGER *) &(ft))->QuadPart)
 
-struct win32_times {
-  FILETIME idle;
-  FILETIME kernel;
-  FILETIME user;
-};
-
-static struct win32_times g_OldTimes;
+static struct {
+  int64_t idle;
+  int64_t kernel;
+  int64_t user;
+} g_OldTimes;
 
 
 static int
@@ -20,17 +18,23 @@ getloadavg (double *loadavg)
 
   EnterCriticalSection(&g_CritSect);
   {
-    struct win32_times times;
+    FILETIME idleTime, kernelTime, userTime;
 
-    if (GetSystemTimes(&times.idle, &times.kernel, &times.user)) {
-      const int64_t usr = filetime_int64(times.user) - filetime_int64(g_OldTimes.user);
-      const int64_t kerl = filetime_int64(times.kernel) - filetime_int64(g_OldTimes.kernel);
-      const int64_t idl = filetime_int64(times.idle) - filetime_int64(g_OldTimes.idle);
-      const int64_t sys = kerl + usr;
+    if (GetSystemTimes(&idleTime, &kernelTime, &userTime)) {
+      const int64_t idle = filetime_int64(idleTime);
+      const int64_t kernel = filetime_int64(kernelTime);
+      const int64_t user = filetime_int64(userTime);
 
-      *loadavg = 1.0 - (double) idl / sys;
+      const int64_t idle_delta = idle - g_OldTimes.idle;
+      const int64_t kernel_delta = kernel - g_OldTimes.kernel;
+      const int64_t user_delta = user - g_OldTimes.user;
 
-      g_OldTimes = times;
+      *loadavg = 1.0 - (double) idle_delta / (kernel_delta + user_delta);
+
+      g_OldTimes.idle = idle;
+      g_OldTimes.kernel = kernel;
+      g_OldTimes.user = user;
+
       res = 0;
     }
   }
