@@ -41,6 +41,14 @@ typedef int		socklen_t;
 
 #define ioctlsocket	ioctl
 
+#ifndef TCP_FASTOPEN
+#define TCP_FASTOPEN	23
+#endif
+
+#ifndef MSG_FASTOPEN
+#define MSG_FASTOPEN	0x20000000
+#endif
+
 #endif /* !WIN32 */
 
 
@@ -265,8 +273,8 @@ sock_sockopt (lua_State *L)
     SO_SNDBUF, SO_RCVBUF, SO_SNDLOWAT, SO_RCVLOWAT,
     SO_BROADCAST, SO_KEEPALIVE, SO_OOBINLINE, SO_LINGER,
 #define OPT_INDEX_TCP	12
-    TCP_NODELAY,
-#define OPT_INDEX_IP	13
+    TCP_NODELAY, TCP_FASTOPEN,
+#define OPT_INDEX_IP	14
     IP_MULTICAST_TTL, IP_MULTICAST_IF, IP_MULTICAST_LOOP,
     IP_HDRINCL
   };
@@ -274,7 +282,7 @@ sock_sockopt (lua_State *L)
     "reuseaddr", "type", "error", "dontroute",
     "sndbuf", "rcvbuf", "sndlowat", "rcvlowat",
     "broadcast", "keepalive", "oobinline", "linger",
-    "tcp_nodelay",
+    "tcp_nodelay", "tcp_fastopen",
     "multicast_ttl", "multicast_if", "multicast_loop",
     "hdrincl", NULL
   };
@@ -543,10 +551,10 @@ static int
 sock_send (lua_State *L)
 {
   static const int o_flags[] = {
-    MSG_OOB, MSG_DONTROUTE,
+    MSG_OOB, MSG_DONTROUTE, MSG_FASTOPEN
   };
   static const char *const o_names[] = {
-    "oob", "dontroute", NULL
+    "oob", "dontroute", "fastopen", NULL
   };
   sd_t sd = (sd_t) lua_unboxinteger(L, 1, SD_TYPENAME);
   const struct sock_addr *to = !lua_isuserdata(L, 3) ? NULL
