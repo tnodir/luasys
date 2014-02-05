@@ -1,5 +1,46 @@
 /* Lua System: Win32: loadavg() */
 
+#ifdef WIN32_VISTA
+
+#define filetime_int64(ft)	*((int64_t *) &(ft))
+
+struct win32_times {
+  FILETIME idle;
+  FILETIME kernel;
+  FILETIME user;
+};
+
+static struct win32_times g_OldTimes;
+
+
+static int
+getloadavg (double *loadavg)
+{
+  int res = -1;
+
+  EnterCriticalSection(&g_CritSect);
+  {
+    struct win32_times times;
+
+    if (GetSystemTimes(&times.idle, &times.kernel, &times.user)) {
+      const int64_t usr = filetime_int64(times.user) - filetime_int64(g_OldTimes.user);
+      const int64_t kerl = filetime_int64(times.kernel) - filetime_int64(g_OldTimes.kernel);
+      const int64_t idl = filetime_int64(times.idle) - filetime_int64(g_OldTimes.idle);
+      const int64_t sys = kerl + usr;
+
+      *loadavg = 1.0 - (double) idl / sys;
+
+      g_OldTimes = times;
+      res = 0;
+    }
+  }
+  LeaveCriticalSection(&g_CritSect);
+
+  return res;
+}
+
+#else
+
 typedef struct {
   DWORD status;
   union {
@@ -67,3 +108,5 @@ getloadavg (double *loadavg)
   *loadavg = value.u.vDouble / 100.0;
   return 0;
 }
+
+#endif /* !WIN32_VISTA */
