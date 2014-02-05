@@ -41,6 +41,8 @@ typedef int		socklen_t;
 
 #define ioctlsocket	ioctl
 
+#endif /* !WIN32 */
+
 #ifndef TCP_FASTOPEN
 #define TCP_FASTOPEN	23
 #endif
@@ -48,8 +50,6 @@ typedef int		socklen_t;
 #ifndef MSG_FASTOPEN
 #define MSG_FASTOPEN	0x20000000
 #endif
-
-#endif /* !WIN32 */
 
 
 #define SD_TYPENAME	"sys.sock.handle"
