@@ -2,7 +2,7 @@
 
 #ifdef WIN32_VISTA
 
-#define filetime_int64(ft)	*((int64_t *) &(ft))
+#define filetime_int64(ft)	((int64_t) ((LARGE_INTEGER *) &(ft))->QuadPart)
 
 struct win32_times {
   FILETIME idle;
