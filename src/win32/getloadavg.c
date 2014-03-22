@@ -1,6 +1,6 @@
 /* Lua System: Win32: loadavg() */
 
-#ifdef WIN32_VISTA
+#if defined(SRWLOCK_INIT) && defined(WIN32_VISTA)
 
 #define filetime_int64(ft)	((int64_t) ((LARGE_INTEGER *) &(ft))->QuadPart)
 
