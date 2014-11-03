@@ -134,7 +134,12 @@ sys_thread_get (void)
 #ifndef _WIN32
   return pthread_getspecific(g_TLSIndex);
 #else
-  return TlsGetValue(g_TLSIndex);
+  {
+    const DWORD err = GetLastError();
+    struct sys_thread *td = TlsGetValue(g_TLSIndex);
+    SetLastError(err);
+    return td;
+  }
 #endif
 }
 
