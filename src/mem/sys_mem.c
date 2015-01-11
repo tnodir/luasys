@@ -111,10 +111,9 @@ sys_buffer_read_init (lua_State *L, int idx, struct sys_buffer *sb)
     return 1;
   } else {
     sb->ptr.r = lua_tolstring(L, idx, &sb->size);
-    if (sb->ptr.r) {
-      sb->mb = NULL;
+    sb->mb = NULL;
+    if (sb->ptr.r)
       return 1;
-    }
   }
   return 0;
 }

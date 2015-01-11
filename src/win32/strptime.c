@@ -90,7 +90,7 @@ strptime (const char *buf, const char *fmt, struct tm *tm)
   bp = (const u_char *)buf;
 
   while (bp != NULL && (c = *fmt++) != '\0') {
-    /* Clear `alternate' modifier prior to new conversion. */
+    /* Clear 'alternate' modifier prior to new conversion. */
     alt_format = 0;
     i = 0;
 

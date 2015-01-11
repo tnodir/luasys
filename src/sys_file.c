@@ -675,7 +675,7 @@ sys_read (lua_State *L)
 #endif
     if (td) sys_vm2_enter(td);
     if (nr == -1) break;
-    n -= nr;  /* still have to read `n' bytes */
+    n -= nr;  /* still have to read 'n' bytes */
   } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
    && sys_buffer_write_next(L, &sb, buf, 0));
   if (nr <= 0 && len == n) {
@@ -759,6 +759,47 @@ sys_nonblocking (lua_State *L)
 
   return sys_seterror(L, ERROR_NOT_SUPPORTED);
 #endif
+}
+
+/*
+ * Arguments: fd_udata, code (number),
+ *	[output (membuf_udata), input (membuf_udata)]
+ * Returns: [fd_udata | nil, input_len (number)]
+ */
+static int
+sys_ioctl (lua_State *L)
+{
+  struct sys_buffer out, in;
+  fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
+  const int code = lua_tointeger(L, 2);
+  const int is_input = (lua_gettop(L) > 3);
+  int nr = 0;  /* number of bytes actually read */
+  int res;
+
+  sys_buffer_read_init(L, 3, &out);
+  sys_buffer_write_init(L, 4, &in, (is_input ? NULL : (char *) &nr), 0);
+
+  sys_vm_leave(L);
+#ifndef _WIN32
+  res = -1;
+#else
+  res = !DeviceIoControl(fd, code, out.ptr.w, out.size,
+   in.ptr.w, in.size, &nr, NULL);
+#endif
+  sys_vm_enter(L);
+
+  if (!res) {
+    sys_buffer_read_next(&out, out.size);
+    sys_buffer_write_done(L, &in, NULL, nr);
+
+    lua_settop(L, 1);
+    return 1;
+  } else if (is_input && nr) {
+    lua_pushnil(L);
+    lua_pushinteger(L, nr);
+    return 2;
+  }
+  return sys_seterror(L, 0);
 }
 
 /*
@@ -850,6 +891,7 @@ static luaL_Reg fd_meth[] = {
   {"read",		sys_read},
   {"flush",		sys_flush},
   {"nonblocking",	sys_nonblocking},
+  {"ioctl",		sys_ioctl},
   {"utime",		sys_utime},
   {"__tostring",	sys_tostring},
   {"__gc",		sys_close},

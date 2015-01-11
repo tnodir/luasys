@@ -163,12 +163,12 @@ reg_del_value (lua_State *L)
 static int
 reg_keys (lua_State *L)
 {
-  if (lua_gettop(L) == 1) {  /* `for' start? */
+  if (lua_gettop(L) == 1) {  /* 'for' start? */
     lua_pushcfunction(L, reg_keys);  /* return generator, */
     lua_pushvalue(L, 1);  /* state (reg_udata), */
     lua_pushinteger(L, 0);  /* and initial value */
     return 3;
-  } else {  /* `for' step */
+  } else {  /* 'for' step */
     HKEY hk = lua_unboxpointer(L, 1, WREG_TYPENAME);
     int i = lua_tointeger(L, 2);
     char name[REG_KEY_SZ], class[REG_KEY_SZ];
@@ -211,12 +211,12 @@ reg_pushvalue (lua_State *L, DWORD type, char *data, DWORD cdata)
 static int
 reg_values (lua_State *L)
 {
-  if (lua_gettop(L) == 1) {  /* `for' start? */
+  if (lua_gettop(L) == 1) {  /* 'for' start? */
     lua_pushcfunction(L, reg_values);  /* return generator, */
     lua_pushvalue(L, 1);  /* state (reg_udata), */
     lua_pushinteger(L, 0);  /* and initial value */
     return 3;
-  } else {  /* `for' step */
+  } else {  /* 'for' step */
     HKEY hk = lua_unboxpointer(L, 1, WREG_TYPENAME);
     int i = lua_tointeger(L, 2);
     char name[REG_KEY_SZ], data[REG_DATA_SZ];

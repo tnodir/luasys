@@ -239,7 +239,8 @@ fcgi_decode (lua_State *L)
 
 
 /*
- * Arguments: membuf_udata, request_id (number), prev_offset (number), string
+ * Arguments: membuf_udata, request_id (number), prev_offset (number),
+ *	data (string)
  * Returns: offset (number)
  */
 static int

@@ -122,7 +122,7 @@ ecb_read (lua_State *L)
     }
     if (td) sys_vm2_enter(td);
     if (nr == -1) break;
-    n -= nr;  /* still have to read `n' bytes */
+    n -= nr;  /* still have to read 'n' bytes */
   } while ((n != 0L && nr == (int) rlen)  /* until end of count or eof */
    && sys_buffer_write_next(L, &sb, buf, 0));
   if (nr <= 0 && len == n) {

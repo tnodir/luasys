@@ -556,11 +556,11 @@ sys_dir_next (lua_State *L)
 {
   struct dir *dp = checkudata(L, 1, DIR_TYPENAME);
 
-  if (lua_gettop(L) == 2) {  /* `for' start? */
+  if (lua_gettop(L) == 2) {  /* 'for' start? */
     /* return generator (dir_udata) */
     lua_pushvalue(L, 1);
     return sys_dir_open(L, 2, dp);
-  } else {  /* `for' step */
+  } else {  /* 'for' step */
     char *filename;
 
 #ifndef _WIN32

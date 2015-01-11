@@ -358,7 +358,7 @@ pipe_put (lua_State *L)
           pp->wbuf = wpb;
           pb = wpb;
         } else {
-          /* wait `get' signal */
+          /* wait 'get' signal */
           int res;
 
           pp->signal_on_get++;
@@ -438,7 +438,7 @@ pipe_get (lua_State *L)
         (void) thread_cond_signal(&pp->put_cond);
       }
     } else {
-      /* wait `put' signal */
+      /* wait 'put' signal */
       int res;
 
       pp->signal_on_put++;
