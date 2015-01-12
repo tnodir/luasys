@@ -199,7 +199,7 @@ sys_buffer_write_done (lua_State *L, struct sys_buffer *sb,
   if (mb) {
     mb->offset += tail;
     return 0;
-  } else {
+  } else if (buf) {
     if (sb->ptr.w == buf)
       lua_pushlstring(L, buf, tail);
     else {
