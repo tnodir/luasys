@@ -763,38 +763,38 @@ sys_nonblocking (lua_State *L)
 
 /*
  * Arguments: fd_udata, code (number),
- *	[output (membuf_udata), input (membuf_udata)]
+ *	[input (membuf_udata), output (membuf_udata)]
  * Returns: [fd_udata | nil, input_len (number)]
  */
 static int
 sys_ioctl (lua_State *L)
 {
-  struct sys_buffer out, in;
+  struct sys_buffer in, out;
   fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
   const int code = lua_tointeger(L, 2);
-  const int is_input = (lua_gettop(L) > 3);
+  const int is_out = (lua_gettop(L) > 3);
   int nr = 0;  /* number of bytes actually read */
   int res;
 
-  sys_buffer_read_init(L, 3, &out);
-  sys_buffer_write_init(L, 4, &in, (is_input ? NULL : (char *) &nr), 0);
+  sys_buffer_read_init(L, 3, &in);
+  sys_buffer_write_init(L, 4, &out, (is_out ? NULL : (char *) &nr), 0);
 
   sys_vm_leave(L);
 #ifndef _WIN32
   res = -1;
 #else
-  res = !DeviceIoControl(fd, code, out.ptr.w, out.size,
-   in.ptr.w, in.size, &nr, NULL);
+  res = !DeviceIoControl(fd, code, in.ptr.w, in.size,
+   out.ptr.w, out.size, &nr, NULL);
 #endif
   sys_vm_enter(L);
 
   if (!res) {
-    sys_buffer_read_next(&out, out.size);
-    sys_buffer_write_done(L, &in, NULL, nr);
+    sys_buffer_read_next(&in, in.size);
+    sys_buffer_write_done(L, &out, NULL, nr);
 
     lua_settop(L, 1);
     return 1;
-  } else if (is_input && nr) {
+  } else if (is_out && nr) {
     lua_pushnil(L);
     lua_pushinteger(L, nr);
     return 2;

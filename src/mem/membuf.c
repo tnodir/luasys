@@ -95,7 +95,7 @@ membuf_writeln (lua_State *L)
 }
 
 /*
- * Arguments: membuf_udata, [num_bytes (number)]
+ * Arguments: membuf_udata, [num_bytes (number), offset (number)]
  * Returns: string
  */
 static int
@@ -103,8 +103,9 @@ membuf_tostring (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
   const int len = luaL_optinteger(L, 2, mb->offset);
+  const int off = lua_tointeger(L, 3);
 
-  lua_pushlstring(L, mb->data, len);
+  lua_pushlstring(L, mb->data + off, len);
   return 1;
 }
 
