@@ -449,14 +449,15 @@ sock_getifaddrs (lua_State *L)
 
 
 /*
- * Arguments: text_address (string)
- * Returns: [binary_address (string)]
+ * Arguments: text_address (string), [ip4_tonumber (true)]
+ * Returns: [binary_address (string | number)]
  */
 static int
 sock_inet_pton (lua_State *L)
 {
   const char *src = luaL_checkstring(L, 1);
-  const int af = strchr(src, ':') ? AF_INET6 : AF_INET;
+  const int to_ip4 = lua_toboolean(L, 2);
+  const int af = (!to_ip4 && strchr(src, ':')) ? AF_INET6 : AF_INET;
   struct sock_addr sa;
   void *inp = sock_addr_get_inp(&sa, af);
   const int in_len = sock_addr_get_inlen(af);
@@ -476,22 +477,36 @@ sock_inet_pton (lua_State *L)
    &sa.u.addr, &sa.addrlen)) {
 #endif
  end:
-    lua_pushlstring(L, inp, in_len);
+    if (to_ip4)
+      lua_pushinteger(L, ntohl(*((unsigned long *) inp)));
+    else
+      lua_pushlstring(L, inp, in_len);
     return 1;
   }
   return sys_seterror(L, 0);
 }
 
 /*
- * Arguments: binary_address (string)
+ * Arguments: binary_address (string | number)
  * Returns: [text_address (string)]
  */
 static int
 sock_inet_ntop (lua_State *L)
 {
+  const int is_ip4 = (lua_type(L, 1) == LUA_TNUMBER);
+  unsigned long ip4;
   int in_len, af;
-  const char *src = sock_checkladdr(L, 1, &in_len, &af);
+  const char *src;
   char buf[48];
+
+  if (is_ip4) {
+    in_len = 4;
+    af = AF_INET;
+    ip4 = htonl(lua_tointeger(L, 1));
+    src = &ip4;
+  } else {
+    src = sock_checkladdr(L, 1, &in_len, &af);
+  }
 
 #ifndef _WIN32
   if (inet_ntop(af, src, buf, sizeof(buf)) == NULL)
@@ -508,7 +523,7 @@ sock_inet_ntop (lua_State *L)
     memcpy(inp, src, in_len);
     sa.u.addr.sa_family = (short) af;
 
-    if (WSAAddressToString(&sa.u.addr, sl, NULL, buf, &buflen)
+    if (WSAAddressToStringA(&sa.u.addr, sl, NULL, buf, &buflen)
      || buflen >= sizeof(buf))
       goto err;
   }

@@ -209,6 +209,7 @@ sys_buffer_write_done (lua_State *L, struct sys_buffer *sb,
     }
     return 1;
   }
+  return 0;
 }
 
 
