@@ -86,6 +86,24 @@ win32_beep (lua_State *L)
   return 0;
 }
 
+/*
+ * Arguments: drive_letter (string: A: .. Z:)
+ * Returns: [dos_device_name (string)]
+ */
+static int
+win32_drive_dosname (lua_State *L)
+{
+  const char *drive = luaL_checkstring(L, 1);
+  char buf[MAX_PATHNAME];
+  const int res = QueryDosDeviceA(drive, buf, MAX_PATHNAME);
+
+  if (res) {
+    lua_pushlstring(L, buf, res);
+    return 1;
+  }
+  return sys_seterror(L, 0);
+}
+
 
 #include "win32_reg.c"
 #include "win32_svc.c"
@@ -99,6 +117,7 @@ win32_beep (lua_State *L)
 
 static luaL_Reg win32_lib[] = {
   {"beep",		win32_beep},
+  {"drive_dosname",	win32_drive_dosname},
   {"registry",		reg_new},
   {NULL, NULL}
 };

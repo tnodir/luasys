@@ -549,7 +549,7 @@ sys_dir_close (lua_State *L)
  *
  * Returns: [filename (string), is_directory (boolean)]
  * |
- * Returns (win32): [drive_letter (string: A .. Z), drive_type (string)]
+ * Returns (win32): [drive_letter (string: A: .. Z:), drive_type (string)]
  */
 static int
 sys_dir_next (lua_State *L)
