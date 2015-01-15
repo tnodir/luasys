@@ -30,3 +30,12 @@ do
 end
 
 
+print"-- Drive DOS Names List"
+do
+  for drive, type in sys.dir("/") do
+    print(drive, type, win32.drive_dosname(drive))
+  end
+  print("OK")
+end
+
+
