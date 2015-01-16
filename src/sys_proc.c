@@ -2,6 +2,7 @@
 
 #ifdef _WIN32
 #include <shellapi.h>	/* ShellExecute */
+#include <psapi.h>	/* GetProcessImageFileName */
 #endif
 
 #define PID_TYPENAME	"sys.pid"
@@ -310,25 +311,32 @@ sys_getpid (lua_State *L)
 
 
 /*
- * Arguments: [process_identifier (number)]
+ * Arguments: [process_identifier (number), is_query (boolean)]
  * Returns: pid_udata
  */
 static int
 sys_pid (lua_State *L)
 {
   const int id = luaL_optinteger(L, 1, -1);
+  const int is_query = lua_toboolean(L, 2);
   struct sys_pid *pidp = lua_newuserdata(L, sizeof(struct sys_pid));
 
   luaL_getmetatable(L, PID_TYPENAME);
   lua_setmetatable(L, -2);
 
   pidp->id = id;
-#ifdef _WIN32
+#ifndef _WIN32
+  (void) is_query;
+#else
   if (id != -1) {
     if (id == (int) GetCurrentProcessId()) {
       pidp->h = GetCurrentProcess();
     } else {
-      pidp->h = OpenProcess(PROCESS_ALL_ACCESS, FALSE, id);
+      const DWORD access = is_query
+       ? (PROCESS_QUERY_INFORMATION | PROCESS_VM_READ)
+       : PROCESS_ALL_ACCESS;
+
+      pidp->h = OpenProcess(access, FALSE, id);
       if (pidp->h == NULL)
         return sys_seterror(L, 0);
     }
@@ -458,6 +466,54 @@ proc_kill (lua_State *L)
 
 /*
  * Arguments: pid_udata
+ * Returns: [path (string)]
+ */
+static int
+proc_path (lua_State *L)
+{
+  struct sys_pid *pidp = checkudata(L, 1, PID_TYPENAME);
+  int err = 0;
+
+  if (pidp->id == -1) return 0;
+
+#ifndef _WIN32
+  err = ENOMEM;  /* TODO: Implement */
+#else
+#define PROCESS_PATH_MAX	65536
+  {
+    char *os_path = malloc(PROCESS_PATH_MAX * sizeof(WCHAR));
+    int res;
+
+    if (!os_path)
+      return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
+
+    res = is_WinNT
+     ? GetProcessImageFileNameW(pidp->h, os_path, PROCESS_PATH_MAX)
+     : GetProcessImageFileNameA(pidp->h, os_path, PROCESS_PATH_MAX);
+
+    if (res) {
+      char *path = filename_to_utf8(os_path);
+
+      if (!path) {
+        err = ERROR_NOT_ENOUGH_MEMORY;
+        res = 0;
+      } else {
+        lua_pushstring(L, path);
+        free(path);
+      }
+    }
+
+    free(os_path);
+
+    if (res) return 1;
+  }
+#undef PROCESS_PATH_MAX
+#endif
+  return sys_seterror(L, err);
+}
+
+/*
+ * Arguments: pid_udata
  * Returns: string
  */
 static int
@@ -487,6 +543,7 @@ static luaL_Reg pid_meth[] = {
   {"priority",		proc_priority},
   {"wait",		proc_wait},
   {"kill",		proc_kill},
+  {"path",		proc_path},
   {"__tostring",	proc_tostring},
 #ifdef _WIN32
   {"__gc",		proc_close},
