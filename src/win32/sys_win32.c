@@ -97,8 +97,8 @@ win32_drive_dosname (lua_State *L)
   char buf[MAX_PATHNAME];
   const int res = QueryDosDeviceA(drive, buf, MAX_PATHNAME);
 
-  if (res) {
-    lua_pushlstring(L, buf, res);
+  if (res > 2) {
+    lua_pushlstring(L, buf, res - 2);
     return 1;
   }
   return sys_seterror(L, 0);
