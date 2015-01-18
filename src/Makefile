@@ -53,7 +53,7 @@ ifneq (,$(findstring Windows,$(OS)))
 
     MYCFLAGS= -DLUA_BUILD_AS_DLL
     MYLDFLAGS= -s -shared
-    LIBS= $(LUA)/src/lua51.dll -lkernel32 -luser32 -lwinmm -lshell32 -ladvapi32 -lws2_32
+    LIBS= $(LUA)/src/lua51.dll -lkernel32 -luser32 -lwinmm -lshell32 -ladvapi32 -lws2_32 -lpsapi
     OBJS+= isa/isapi/isapi_dll.o
   endif
 endif
