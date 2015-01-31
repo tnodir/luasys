@@ -308,6 +308,23 @@ mem_realloc (lua_State *L)
   return 1;
 }
 
+/*
+ * Arguments: membuf_udata, num_bytes (number)
+ * Returns: [membuf_udata]
+ */
+static int
+mem_reserve (lua_State *L)
+{
+  struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
+  const int len = luaL_checkinteger(L, 2);
+
+  if (membuf_addlstring(L, mb, NULL, len)) {
+    lua_settop(L, 1);
+    return 1;
+  }
+  return 0;
+}
+
 
 #ifdef USE_MMAP
 
@@ -752,6 +769,7 @@ static luaL_Reg mem_meth[] = {
   {"typesize",		mem_typesize},
   {"alloc",		mem_alloc},
   {"realloc",		mem_realloc},
+  {"reserve",		mem_reserve},
 #ifdef USE_MMAP
   {"map",		mem_map},
   {"sync",		mem_sync},
