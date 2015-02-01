@@ -478,7 +478,7 @@ sock_inet_pton (lua_State *L)
 #endif
  end:
     if (to_ip4)
-      lua_pushinteger(L, ntohl(*((unsigned long *) inp)));
+      lua_pushnumber(L, ntohl(*((unsigned long *) inp)));
     else
       lua_pushlstring(L, inp, in_len);
     return 1;
@@ -502,7 +502,7 @@ sock_inet_ntop (lua_State *L)
   if (is_ip4) {
     in_len = 4;
     af = AF_INET;
-    ip4 = htonl(lua_tointeger(L, 1));
+    ip4 = htonl(lua_tonumber(L, 1));
     src = &ip4;
   } else {
     src = sock_checkladdr(L, 1, &in_len, &af);
