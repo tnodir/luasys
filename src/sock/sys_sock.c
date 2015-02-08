@@ -83,7 +83,7 @@ sock_pair (int type, sd_t sv[2])
   sa.sin_port = 0;
   sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-  if ((sd = WSASocket(AF_INET, type, 0, NULL, 0, WSA_FLAGS))
+  if ((sd = WSASocketW(AF_INET, type, 0, NULL, 0, WSA_FLAGS))
    != INVALID_SOCKET) {
     int optval = 1;
     DWORD nr;
@@ -93,7 +93,7 @@ sock_pair (int type, sd_t sv[2])
     if (!bind(sd, (struct sockaddr *) &sa, len)
      && !listen(sd, 1)
      && !getsockname(sd, (struct sockaddr *) &sa, &len)
-     && (sv[0] = WSASocket(AF_INET, type, 0, NULL, 0, WSA_FLAGS))
+     && (sv[0] = WSASocketW(AF_INET, type, 0, NULL, 0, WSA_FLAGS))
       != INVALID_SOCKET) {
       struct sockaddr_in sa2;
       int len2;
@@ -171,7 +171,7 @@ sock_socket (lua_State *L)
 #ifndef _WIN32
     sd = socket(domain, type, proto);
 #else
-    sd = WSASocket(domain, type, proto, NULL, 0, WSA_FLAGS);
+    sd = WSASocketW(domain, type, proto, NULL, 0, WSA_FLAGS);
 #endif
     if (sd != (sd_t) -1) {
       *sdp = sd;

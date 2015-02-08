@@ -488,7 +488,7 @@ proc_path (lua_State *L)
       return sys_seterror(L, ERROR_NOT_ENOUGH_MEMORY);
 
     res = is_WinNT
-     ? GetProcessImageFileNameW(pidp->h, os_path, PROCESS_PATH_MAX)
+     ? GetProcessImageFileNameW(pidp->h, (LPWSTR) os_path, PROCESS_PATH_MAX)
      : GetProcessImageFileNameA(pidp->h, os_path, PROCESS_PATH_MAX);
 
     if (res) {

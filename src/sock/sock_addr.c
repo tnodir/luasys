@@ -240,7 +240,7 @@ sock_getifaddrs (lua_State *L)
   sys_vm_enter(L);
 #else
   INTERFACE_INFO result[8192], *rp;
-  SOCKET sd = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAGS);
+  SOCKET sd = WSASocketW(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAGS);
   DWORD n;
 
   sys_vm_leave(L);
@@ -502,8 +502,8 @@ sock_inet_ntop (lua_State *L)
   if (is_ip4) {
     in_len = 4;
     af = AF_INET;
-    ip4 = htonl(lua_tonumber(L, 1));
-    src = &ip4;
+    ip4 = htonl((unsigned long) lua_tonumber(L, 1));
+    src = (const char *) &ip4;
   } else {
     src = sock_checkladdr(L, 1, &in_len, &af);
   }
