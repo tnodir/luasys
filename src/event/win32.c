@@ -300,7 +300,7 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
 
   if (td) sys_vm2_leave(td);
   wait_res = MsgWaitForMultipleObjects(n + 1, wth->handles, FALSE, timeout,
-   (evq->win_msg ? QS_ALLEVENTS : 0));
+   (evq->win_msg ? QS_ALLINPUT : 0));
   if (td) sys_vm2_enter(td);
 
   evq->now = sys_milliseconds();
@@ -434,7 +434,7 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
   {
     struct event *ev = evq->win_msg;
 
-    if (ev && GetQueueStatus(QS_ALLEVENTS)) {
+    if (ev && GetQueueStatus(QS_ALLINPUT)) {
       ev->next_ready = ev_ready;
       ev_ready = ev;
     }
