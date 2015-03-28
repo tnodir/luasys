@@ -299,8 +299,8 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
     win32iocr_submit(evq);
 
   if (td) sys_vm2_leave(td);
-  wait_res = MsgWaitForMultipleObjects(n + 1, wth->handles, FALSE, timeout,
-   (evq->win_msg ? QS_ALLINPUT : 0));
+  wait_res = MsgWaitForMultipleObjectsEx(n + 1, wth->handles, timeout,
+   (evq->win_msg ? QS_ALLINPUT : 0), MWMO_INPUTAVAILABLE);
   if (td) sys_vm2_enter(td);
 
   evq->now = sys_milliseconds();
