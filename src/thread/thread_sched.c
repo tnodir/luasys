@@ -179,8 +179,8 @@ static int
 sched_new (lua_State *L)
 {
   const int min_workers = lua_tointeger(L, 2);
-  const int max_workers = luaL_optint(L, 3, min_workers);
-  const msec_t worker_timeout = luaL_optint(L, 4, SCHED_WORKER_TIMEOUT);
+  const int max_workers = luaL_optinteger(L, 3, min_workers);
+  const msec_t worker_timeout = luaL_optinteger(L, 4, SCHED_WORKER_TIMEOUT);
   struct scheduler *sched;
   lua_State *NL;
 
@@ -595,7 +595,7 @@ static int
 sched_terminate (lua_State *L)
 {
   struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
-  const int task_id = luaL_checkint(L, 2);
+  const int task_id = luaL_checkinteger(L, 2);
 
   if (sched_check_task_id(sched, task_id)) {
     struct sched_task *task = sched_id_to_task(sched, task_id);
@@ -644,7 +644,7 @@ static int
 sched_resume (lua_State *L)
 {
   struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
-  const int task_id = luaL_checkint(L, 2);
+  const int task_id = luaL_checkinteger(L, 2);
   struct sched_task *task;
   const int narg = lua_gettop(L) - 2;
 
