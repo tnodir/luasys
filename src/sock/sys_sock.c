@@ -96,7 +96,7 @@ sock_pair (int type, sd_t sv[2])
      && (sv[0] = WSASocketW(AF_INET, type, 0, NULL, 0, WSA_FLAGS))
       != INVALID_SOCKET) {
       struct sockaddr_in sa2;
-      int len2;
+      int len2 = sizeof(struct sockaddr_in);
 
       WSAIoctl(sv[0], SO_LOOPBACK, &optval, sizeof(int), NULL, 0, &nr, 0, 0);
 
