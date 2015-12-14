@@ -637,7 +637,7 @@ thread_error_abort (lua_State *L)
    ? lua_tostring(L, -1) : NULL;
 
   if (!msg) msg = "(error object is not a string)";
-  luai_writestringerror("%s\n", msg);
+  lua_writestringerror("%s\n", msg);
   abort();
 }
 

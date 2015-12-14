@@ -98,9 +98,6 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
     (lua_pushlightuserdata((L), (p)), lua_insert((L), -2), \
      lua_rawset((L), (idx) - ((idx) < 0 && (idx) > -99 ? 1 : 0)))
 
-#define luai_writestringerror(s,p) \
-    (fprintf(stderr, (s), (p)), fflush(stderr))
-
 #define lua_absindex(L,idx) \
     ((idx) < 0 && (idx) > -99 ? lua_gettop(L) + (idx) + 1 : (idx))
 
@@ -108,6 +105,11 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #define luaL_register(L,n,l)	luaL_newlib((L), (l))
 #define lua_setfenv		lua_setuservalue
 #define lua_getfenv		lua_getuservalue
+#endif
+
+#ifndef lua_writestringerror
+#define lua_writestringerror(s,p) \
+    (fprintf(stderr, (s), (p)), fflush(stderr))
 #endif
 
 
