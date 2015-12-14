@@ -7,8 +7,6 @@ local sock = require("sys.sock")
 
 print"-- file:isatty()"
 do
-  local f = assert(sys.handle():open("."))
-  assert(not f:isatty())
   assert(sys.stdin:isatty())
   print("OK")
 end
@@ -32,7 +30,7 @@ end
 print"-- Logs"
 do
   local log = assert(sys.log())
-  assert(log:error("Error"):warn("Warning"))
+  assert(log:warn("Warning"))
   print("OK")
 end
 

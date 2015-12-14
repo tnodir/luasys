@@ -43,7 +43,7 @@ do
       assert(evq:add_pid(pid, on_child))
     else
       print("Status:", err or 0)
-      if err then
+      if err and err ~= 0 then
         print("Subprocess killed.")
       else
         print("Subprocess output:", fdi:read())
