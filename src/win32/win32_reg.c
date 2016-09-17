@@ -47,11 +47,18 @@ static REGSAM
 reg_mode2sam (lua_State *L, int idx)
 {
   const char *mode = lua_tostring(L, idx);
+  REGSAM sam = KEY_READ;
   if (mode) {
-    if (mode[0] == 'w') return KEY_WRITE;
-    if (mode[0] == 'r' && mode[1] == 'w') return KEY_ALL_ACCESS;
+    if (mode[0] == 'w')
+      sam = KEY_WRITE;
+    if (mode[0] == 'r' && mode[1] == 'w')
+      sam = KEY_ALL_ACCESS;
+    if (strchr(mode, 's'))  /* short mode */
+      sam |= KEY_WOW64_32KEY;
+    if (strchr(mode, 'l'))  /* long mode */
+      sam |= KEY_WOW64_64KEY;
   }
-  return KEY_READ;
+  return sam;
 }
 
 /*
