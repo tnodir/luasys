@@ -2,7 +2,7 @@
 
 @setlocal
 @set LUA=../../luajit-2.0
-@set LSCOMPILE=cl /nologo /c /LD /MD /O2 /W3 /D_CRT_SECURE_NO_DEPRECATE /I%LUA%/src
+@set LSCOMPILE=cl /nologo /c /LD /MD /O2 /W3 /D_CRT_SECURE_NO_DEPRECATE /D_CRT_SECURE_NO_WARNINGS /D_SCL_SECURE_NO_WARNINGS /I%LUA%/src
 @set LSLINK=link /nologo
 
 @rem Check Windows Version is Vista+
