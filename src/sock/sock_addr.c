@@ -573,7 +573,7 @@ sock_addr_inet (lua_State *L)
       return 0;
     return 2;
   } else {
-    const int port = lua_tointeger(L, 2);
+    const int port = (int) lua_tointeger(L, 2);
     int in_len = SOCK_ADDR_LEN, af = AF_INET;
     const char *addr = lua_isnoneornil(L, 3) ? NULL
      : sock_checkladdr(L, 3, &in_len, &af);

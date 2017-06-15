@@ -177,7 +177,7 @@ reg_keys (lua_State *L)
     return 3;
   } else {  /* 'for' step */
     HKEY hk = lua_unboxpointer(L, 1, WREG_TYPENAME);
-    int i = lua_tointeger(L, 2);
+    int i = (int) lua_tointeger(L, 2);
     char name[REG_KEY_SZ], class[REG_KEY_SZ];
     DWORD cname = REG_KEY_SZ, cclass = REG_KEY_SZ;
     int res;
@@ -225,7 +225,7 @@ reg_values (lua_State *L)
     return 3;
   } else {  /* 'for' step */
     HKEY hk = lua_unboxpointer(L, 1, WREG_TYPENAME);
-    int i = lua_tointeger(L, 2);
+    int i = (int) lua_tointeger(L, 2);
     char name[REG_KEY_SZ], data[REG_DATA_SZ];
     DWORD cname = REG_KEY_SZ, cdata = REG_DATA_SZ;
     DWORD type;
@@ -282,10 +282,10 @@ reg_set (lua_State *L)
 
     type = REG_SZ;
     data = (const unsigned char *) lua_tolstring(L, 3, &len);
-    cdata = len + 1;  /* + terminating null character */
+    cdata = (DWORD) len + 1;  /* + terminating null character */
   } else {
     type = REG_DWORD;
-    data_num = lua_tointeger(L, 3);
+    data_num = (DWORD) lua_tointeger(L, 3);
     data = (const unsigned char *) &data_num;
     cdata = sizeof(DWORD);
   }

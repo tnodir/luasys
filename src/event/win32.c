@@ -264,7 +264,7 @@ evq_modify (struct event *ev, unsigned int flags)
     if (!(ev_flags & EVENT_ACTIVE))
       win32thr_sleep(wth);
 
-    if (WSAEventSelect((int) ev->fd, wth->handles[ev->w.index],
+    if (WSAEventSelect((SOCKET) ev->fd, wth->handles[ev->w.index],
      ((flags & EVENT_READ) ? WFD_READ : WFD_WRITE)) == SOCKET_ERROR)
       return -1;
   }
@@ -397,7 +397,7 @@ evq_wait (struct event_queue *evq, struct sys_thread *td, msec_t timeout)
         } else if (!(ev_flags & EVENT_DIRWATCH)) {
           ResetEvent(ev->fd);  /* all events must be manual-reset */
         }
-      } else if (!WSAEnumNetworkEvents((int) ev->fd, *hp, &ne)) {
+      } else if (!WSAEnumNetworkEvents((SOCKET) ev->fd, *hp, &ne)) {
         res = (ne.lNetworkEvents & FD_CLOSE) ? EVENT_EOF_RES : 0;
         if ((ne.lNetworkEvents & WFD_READ) && (ev_flags & EVENT_READ))
           res |= EVENT_READ_RES;

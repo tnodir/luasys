@@ -44,7 +44,7 @@ sys_run (lua_State *L)
 
   arg = strchr(cmd, ' ');
   if (arg) {
-    unsigned int n = arg - cmd;
+    unsigned int n = (unsigned int) (arg - cmd);
     if (n >= sizeof(path))
       return 0;
     memcpy(path, cmd, n);
@@ -161,7 +161,7 @@ sys_spawn (lua_State *L)
   /* fill command line */
   {
     char *cp = line;
-    int len = lua_rawlen(L, 1);
+    int len = (int) lua_rawlen(L, 1);
 
     /* filename */
     if (len >= (int) sizeof(line) - 2)
@@ -259,7 +259,7 @@ sys_spawn (lua_State *L)
 static int
 sys_exit (lua_State *L)
 {
-  const int status = !lua_isboolean(L, 1) ? lua_tointeger(L, 1)
+  const int status = !lua_isboolean(L, 1) ? (int) lua_tointeger(L, 1)
    : (lua_toboolean(L, 1) ? EXIT_SUCCESS : EXIT_FAILURE);
 
   if (lua_toboolean(L, 2))
@@ -317,7 +317,7 @@ sys_getpid (lua_State *L)
 static int
 sys_pid (lua_State *L)
 {
-  const int id = luaL_optinteger(L, 1, -1);
+  const int id = luaL_optint(L, 1, -1);
   const int is_query = lua_toboolean(L, 2);
   struct sys_pid *pidp = lua_newuserdata(L, sizeof(struct sys_pid));
 

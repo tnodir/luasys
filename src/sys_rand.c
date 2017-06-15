@@ -70,10 +70,11 @@ static int
 rand_next (lua_State *L)
 {
   const int is_udata = lua_isuserdata(L, 2);
-  const unsigned int ub = is_udata ? 0 : lua_tointeger(L, 2);
+  const unsigned int ub = is_udata ? 0
+   : (unsigned int) lua_tointeger(L, 2);
   unsigned int num;
   unsigned char *buf = is_udata ? lua_touserdata(L, 2) : &num;
-  const int len = is_udata ? luaL_checkinteger(L, 3) : (int) sizeof(num);
+  const int len = is_udata ? luaL_checkint(L, 3) : (int) sizeof(num);
 #ifndef _WIN32
   fd_t fd = (fd_t) lua_unboxinteger(L, 1, RAND_TYPENAME);
   int nr;

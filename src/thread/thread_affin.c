@@ -48,8 +48,8 @@ typedef size_t		affin_mask_t;
 #define CPU_DEL(p)	free(p)
 #define CPU_SIZEOF(p)	sizeof(affin_mask_t)
 #define CPU_ZERO(p)	(*(p) = 0)
-#define CPU_SET(i,p)	(*(p) |= (1 << (i)))
-#define CPU_ISSET(i,p)	((*(p) & (1 << (i))) != 0)
+#define CPU_SET(i,p)	(*(p) |= ((affin_mask_t) 1 << (i)))
+#define CPU_ISSET(i,p)	((*(p) & ((affin_mask_t) 1 << (i))) != 0)
 
 #endif
 

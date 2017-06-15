@@ -93,7 +93,7 @@ date_getfield (lua_State *L, const char *key, int value)
       luaL_error(L, "date: \"%s\" expected", key);
     res = value;
   } else
-    res = lua_tointeger(L, -1);
+    res = (int) lua_tointeger(L, -1);
   lua_pop(L, 1);
   return res;
 }

@@ -13,7 +13,7 @@ static int
 svc_install (lua_State *L)
 {
   const char *name = luaL_checkstring(L, 1);
-  int pathlen = lua_rawlen(L, 2);
+  int pathlen = (int) lua_rawlen(L, 2);
   const int manual = lua_toboolean(L, 3);
   SC_HANDLE mngr = OpenSCManager(NULL, NULL, SC_MANAGER_CREATE_SERVICE);
   SC_HANDLE sc = NULL;
@@ -259,7 +259,7 @@ static int
 svc_wait (lua_State *L)
 {
   HANDLE he = (HANDLE) lua_unboxpointer(L, 1, WSVC_TYPENAME);
-  DWORD res = luaL_optinteger(L, 2, INFINITE);
+  DWORD res = (DWORD) luaL_optinteger(L, 2, INFINITE);
 
   sys_vm_leave(L);
   res = WaitForSingleObject(he, res);

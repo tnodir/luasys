@@ -96,7 +96,7 @@ evq_ignore_signal (struct event_queue *evq, const int signo, const int ignore)
 static int
 signal_add (struct event_queue *evq, struct event *ev)
 {
-  const int signo = (int) ev->fd;
+  const int signo = (int) ((lua_Integer) ev->fd);
   struct event **sig_evp = signal_gethead(signo);
 
   if (!sig_evp) return -1;
@@ -123,7 +123,7 @@ signal_add (struct event_queue *evq, struct event *ev)
 static int
 signal_del (struct event *ev)
 {
-  const int signo = (int) ev->fd;
+  const int signo = (int) ((lua_Integer) ev->fd);
   struct event **sig_evp = signal_gethead(signo);
   int res = 0;
 

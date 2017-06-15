@@ -167,7 +167,7 @@ levq_done (lua_State *L)
   /* delete object events */
   lua_pushnil(NL);
   while (lua_next(NL, EVQ_CORO_UDATA)) {
-    const int ev_id = lua_tointeger(NL, -2);
+    const int ev_id = (int) lua_tointeger(NL, -2);
     const int buf_idx = getmaxbit(
      (ev_id | ((1 << EVQ_ENV_BUF_IDX) - 1)) + 1);
     const int nmax = (1 << buf_idx);
@@ -264,7 +264,7 @@ static int
 levq_add (lua_State *L)
 {
   struct event_queue *evq = checkudata(L, 1, EVQ_TYPENAME);
-  unsigned int ev_flags = lua_tointeger(L, 3)
+  unsigned int ev_flags = (int) lua_tointeger(L, 3)
    | (lua_toboolean(L, 6) ? EVENT_ONESHOT : 0);
   const msec_t timeout = lua_isnoneornil(L, 5)
    ? TIMEOUT_INFINITE : (msec_t) lua_tointeger(L, 5);

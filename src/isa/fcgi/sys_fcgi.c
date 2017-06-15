@@ -247,8 +247,8 @@ static int
 fcgi_encode (lua_State *L)
 {
   struct sys_buffer sb;
-  const unsigned int request_id = lua_tointeger(L, 2);
-  int prev_offset = lua_tointeger(L, 3);
+  const unsigned int request_id = (unsigned int) lua_tointeger(L, 2);
+  int prev_offset = (int) lua_tointeger(L, 3);
   int prev_len = 0, prev_padding_len = 0;
   size_t len;
   const char *s = lua_tolstring(L, 4, &len);
@@ -276,7 +276,7 @@ fcgi_encode (lua_State *L)
     data_len = 2 * FCGI_HEADER_LEN + FCGI_END_REQUEST_LEN;
     prev_offset = 0;
   } else {
-    data_len = len;
+    data_len = (int) len;
     if (!prev_offset || (prev_len + len) > FCGI_MAX_CONTENT_LEN) {
       data_len += FCGI_HEADER_LEN;
       prev_offset = 0;
@@ -286,7 +286,7 @@ fcgi_encode (lua_State *L)
   }
 
   if (data_len <= 0) {
-    padding_len = prev_padding_len - len;  /* fits to previous padding */
+    padding_len = prev_padding_len - (int) len;  /* fits to previous padding */
     data_len = 0;
   } else {
     padding_len = 8 - data_len % 8;

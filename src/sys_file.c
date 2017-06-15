@@ -326,7 +326,7 @@ sys_close (lua_State *L)
 
   if (*fdp != (fd_t) -1) {
     luaL_getmetatable(L, FD_TYPENAME);
-    lua_rawgeti(L, -1, (int) *fdp);  /* don't close std. handles */
+    lua_rawgeti(L, -1, *((int *) fdp));  /* don't close std. handles */
     if (lua_isnil(L, -1) || close_std) {
       sys_vm_leave(L);
 #ifndef _WIN32
@@ -377,9 +377,9 @@ sys_fdopen (lua_State *L)
   const char *mode = luaL_optstring(L, 3, "r");
 
 #ifndef _WIN32
-  *fp = fdopen((int) *fdp, mode);
+  *fp = fdopen(*((int *) fdp), mode);
 #else
-  *fp = _fdopen(_open_osfhandle((long) *fdp, 0), mode);
+  *fp = _fdopen(_open_osfhandle(*((long *) fdp), 0), mode);
 #endif
   if (*fp) {
     *fdp = (fd_t) -1;
@@ -402,7 +402,7 @@ sys_fileno (lua_State *L)
 #ifndef _WIN32
   *fdp = fileno(*fp);
 #else
-  const long int res = _get_osfhandle(_fileno(*fp));
+  const intptr_t res = _get_osfhandle(_fileno(*fp));
   *fdp = (fd_t) res;
 #endif
   *fp = NULL;
@@ -617,11 +617,11 @@ sys_write (lua_State *L)
         const UINT old_cp = GetConsoleOutputCP();
 
         SetConsoleOutputCP(65001);  /* CP_UTF8 */
-        nw = WriteFile(fd, sb.ptr.r, sb.size, &l, NULL)
+        nw = WriteFile(fd, sb.ptr.r, (DWORD) sb.size, &l, NULL)
          ? (int) sb.size : -1;
         SetConsoleOutputCP(old_cp);
       } else {
-        nw = WriteFile(fd, sb.ptr.r, sb.size, &l, NULL)
+        nw = WriteFile(fd, sb.ptr.r, (DWORD) sb.size, &l, NULL)
          ? (int) l : -1;
       }
     }
@@ -669,7 +669,7 @@ sys_read (lua_State *L)
 #else
     {
       DWORD l;
-      nr = ReadFile(fd, sb.ptr.w, rlen, &l, NULL)
+      nr = ReadFile(fd, sb.ptr.w, (DWORD) rlen, &l, NULL)
        ? (int) l : -1;
     }
 #endif
@@ -771,7 +771,7 @@ sys_ioctl (lua_State *L)
 {
   struct sys_buffer in, out;
   fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
-  const int code = lua_tointeger(L, 2);
+  const int code = (int) lua_tointeger(L, 2);
   const int is_out = (lua_gettop(L) > 3);
   int nr = 0;  /* number of bytes actually read */
   int res;
@@ -783,8 +783,8 @@ sys_ioctl (lua_State *L)
 #ifndef _WIN32
   res = -1;
 #else
-  res = !DeviceIoControl(fd, code, in.ptr.w, in.size,
-   out.ptr.w, out.size, &nr, NULL);
+  res = !DeviceIoControl(fd, code, in.ptr.w, (DWORD) in.size,
+   out.ptr.w, (DWORD) out.size, &nr, NULL);
 #endif
   sys_vm_enter(L);
 
@@ -810,7 +810,7 @@ static int
 sys_utime (lua_State *L)
 {
   fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
-  const long modtime = luaL_optinteger(L, 2, -1L);
+  const long modtime = luaL_optlong(L, 2, -1L);
 
 #ifndef _WIN32
   struct timeval tv[2], *tvp;
@@ -857,10 +857,10 @@ sys_utime (lua_State *L)
 static int
 sys_tostring (lua_State *L)
 {
-  fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
+  const int fd = (int) lua_unboxinteger(L, 1, FD_TYPENAME);
 
-  if (fd != (fd_t) -1)
-    lua_pushfstring(L, FD_TYPENAME " (%d)", (int) fd);
+  if (fd != -1)
+    lua_pushfstring(L, FD_TYPENAME " (%d)", fd);
   else
     lua_pushliteral(L, FD_TYPENAME " (closed)");
   return 1;

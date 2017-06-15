@@ -129,7 +129,7 @@ sys_buffer_read_next (struct sys_buffer *sb, const size_t n)
     mb->offset = 0;
   else {
     /* move tail */
-    mb->offset -= n;
+    mb->offset -= (int) n;
     memmove(mb->data, mb->data + n, mb->offset);
   }
 }
@@ -197,7 +197,7 @@ sys_buffer_write_done (lua_State *L, struct sys_buffer *sb,
   struct membuf *mb = sb->mb;
 
   if (mb) {
-    mb->offset += tail;
+    mb->offset += (int) tail;
     return 0;
   } else if (buf) {
     if (sb->ptr.w == buf)
@@ -227,7 +227,7 @@ mem_new (lua_State *L)
   mb->flags = MEM_TCHAR;
   if (len) {
     mb->data = (char *) (mb + 1);
-    mb->len = len;
+    mb->len = (int) len;
     mb->flags |= MEM_UDATA;
   }
 
@@ -279,7 +279,7 @@ static int
 mem_alloc (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-  const int len = luaL_optinteger(L, 2, BUFF_INITIALSIZE);
+  const int len = luaL_optint(L, 2, BUFF_INITIALSIZE);
   const int zerofill = lua_isboolean(L, -1) && lua_toboolean(L, -1);
 
   mb->flags |= MEM_ALLOC;
@@ -298,7 +298,7 @@ static int
 mem_realloc (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-  const int len = luaL_checkinteger(L, 2);
+  const int len = luaL_checkint(L, 2);
   void *p = realloc(mb->data, len);
 
   if (!p) return 0;
@@ -316,7 +316,7 @@ static int
 mem_reserve (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-  const int len = luaL_checkinteger(L, 2);
+  const int len = luaL_checkint(L, 2);
 
   if (membuf_addlstring(L, mb, NULL, len)) {
     lua_settop(L, 1);
@@ -419,7 +419,7 @@ mem_map (lua_State *L)
   {
     const DWORD off_hi = INT64_HIGH(off);
     const DWORD off_lo = INT64_LOW(off);
-    HANDLE hmap = CreateFileMapping(fd, NULL, prot, 0, len, NULL);
+    HANDLE hmap = CreateFileMapping(fd, NULL, prot, 0, (DWORD) len, NULL);
 
     if (!hmap) goto err;
     ptr = MapViewOfFile(hmap, flags, off_hi, off_lo, len);
@@ -430,7 +430,7 @@ mem_map (lua_State *L)
   sys_vm_enter(L);
 
   mb->flags |= MEM_MAP;
-  mb->len = len;
+  mb->len = (int) len;
   mb->data = ptr;
   lua_settop(L, 1);
   return 1;
@@ -504,7 +504,7 @@ mem_memcpy (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
   struct membuf *src = checkudata(L, 2, MEM_TYPENAME);
-  const int len = luaL_checkinteger(L, 3);
+  const int len = luaL_checkint(L, 3);
 
   lua_settop(L, 1);
   return memcpy(mb->data, src->data, len) ? 1 : 0;
@@ -518,8 +518,8 @@ static int
 mem_memset (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-  const int ch = lua_tointeger(L, 2);
-  const int len = luaL_checkinteger(L, 3);
+  const int ch = (int) lua_tointeger(L, 2);
+  const int len = luaL_checkint(L, 3);
 
   lua_settop(L, 1);
   return memset(mb->data, ch, len) ? 1 : 0;
@@ -540,7 +540,7 @@ mem_length (lua_State *L)
     if (mb->flags & MEM_MAP)
       luaL_argerror(L, 1, "membuf is mapped");
 
-    mb->len = lua_tointeger(L, 2);
+    mb->len = (int) lua_tointeger(L, 2);
     lua_settop(L, 1);
   }
   return 1;
@@ -554,7 +554,7 @@ static int
 mem_getptr (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-  const int off = lua_tointeger(L, 2);
+  const int off = (int) lua_tointeger(L, 2);
   void *ptr = mb->data + memtypesize(mb) * off;
 
   lua_pushlightuserdata(L, ptr);
@@ -570,7 +570,7 @@ mem_setptr (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
   char *ptr = lua_touserdata(L, 2);
-  const int off = lua_tointeger(L, 3);
+  const int off = (int) lua_tointeger(L, 3);
 
   if (memisptr(mb)) {
     mb->data = ptr;
@@ -589,7 +589,7 @@ static int
 mem_call (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-  const int off = lua_tointeger(L, 2);
+  const int off = (int) lua_tointeger(L, 2);
   void *ptr = mb->data + memtypesize(mb) * off;
 
   if (lua_gettop(L) < 3)
@@ -614,7 +614,7 @@ mem_index (lua_State *L)
 {
   if (lua_type(L, 2) == LUA_TNUMBER) {
     struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-    const int off = lua_tointeger(L, 2);
+    const int off = (int) lua_tointeger(L, 2);
     const int type = memtype(mb);
     char *ptr = mb->data + memlen(type, off);
 
@@ -671,7 +671,7 @@ static int
 mem_newindex (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-  const int off = lua_tointeger(L, 2);
+  const int off = (int) lua_tointeger(L, 2);
   const int type = memtype(mb);
   char *ptr = mb->data + memlen(type, off);
 

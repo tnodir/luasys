@@ -154,7 +154,7 @@ dpool_get (lua_State *L)
       int i;
 
       lua_rawgeti(L, 1, idx);
-      nput = lua_tointeger(L, -1);
+      nput = (int) lua_tointeger(L, -1);
       lua_pushnil(L);
       lua_rawseti(L, 1, idx);
       dp->idx = idx + nput;
@@ -212,7 +212,7 @@ dpool_max (lua_State *L)
   if (lua_isnoneornil(L, 2))
     lua_pushinteger(L, dp->max);
   else {
-    dp->max = luaL_checkinteger(L, 2);
+    dp->max = (unsigned int) luaL_checkint(L, 2);
     lua_settop(L, 1);
   }
   return 1;

@@ -555,7 +555,7 @@ find_string (const u_char *bp, int *tgt, const char * const *n1,
   /* check full name - then abbreviated ones */
   for (; n1 != NULL; n1 = n2, n2 = NULL) {
     for (i = 0; i < c; i++, n1++) {
-      len = strlen(*n1);
+      len = (unsigned int) strlen(*n1);
       if (strncasecmp(*n1, (const char *)bp, len) == 0) {
         *tgt = i;
         return bp + len;

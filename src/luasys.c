@@ -28,7 +28,7 @@
 static int
 sys_strerror (lua_State *L)
 {
-  const int err = luaL_optinteger(L, -1, SYS_ERRNO);
+  const int err = luaL_optint(L, -1, SYS_ERRNO);
 
 #ifndef _WIN32
 #if defined(BSD) || (_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600)
@@ -306,7 +306,7 @@ createmeta (lua_State *L)
       lua_boxinteger(L, fd);
       lua_pushvalue(L, -3);  /* metatable */
       lua_pushboolean(L, 1);
-      lua_rawseti(L, -2, (int) fd);  /* don't close std. handles */
+      lua_rawseti(L, -2, (int) ((lua_Integer) fd));  /* don't close std. handles */
       lua_setmetatable(L, -2);
       lua_rawset(L, top);
     }

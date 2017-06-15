@@ -194,7 +194,7 @@ win32thr_add (struct win32thr *wth, struct event *ev)
      ? ((ev_flags & EVENT_SOCKET_ACC_CONN) ? FD_ACCEPT : WFD_READ)
      : ((ev_flags & EVENT_SOCKET_ACC_CONN) ? FD_CONNECT : WFD_WRITE);
 
-    if (WSAEventSelect((int) ev->fd, hEvent, event) == SOCKET_ERROR) {
+    if (WSAEventSelect((SOCKET) ev->fd, hEvent, event) == SOCKET_ERROR) {
       CloseHandle(hEvent);
       return -1;
     }
@@ -224,7 +224,7 @@ win32thr_del (struct win32thr *wth, struct event *ev)
   i = ev->w.index;
   if (ev->flags & EVENT_SOCKET) {
     HANDLE hEvent = wth->handles[i];
-    WSAEventSelect((int) ev->fd, hEvent, 0);
+    WSAEventSelect((SOCKET) ev->fd, hEvent, 0);
     CloseHandle(hEvent);
   } else if (ev->flags & EVENT_DIRWATCH) {
     res = !FindCloseChangeNotification(ev->fd);

@@ -52,7 +52,7 @@ comm_init (lua_State *L)
 #endif
 
     if (lua_isnumber(L, i)) {
-      const int baud_rate = lua_tointeger(L, i);
+      const int baud_rate = (int) lua_tointeger(L, i);
 #ifndef _WIN32
       switch (baud_rate) {
       case 9600: flag = B9600; break;
@@ -247,7 +247,7 @@ static int
 comm_timeout (lua_State *L)
 {
   const fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
-  const int rtime = lua_tointeger(L, 2);
+  const int rtime = (int) lua_tointeger(L, 2);
 
 #ifndef _WIN32
   struct termios tio;
@@ -287,8 +287,8 @@ comm_queues (lua_State *L)
   if (1) {
 #else
   const fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
-  const int rqueue = lua_tointeger(L, 2);
-  const int wqueue = lua_tointeger(L, 3);
+  const int rqueue = (int) lua_tointeger(L, 2);
+  const int wqueue = (int) lua_tointeger(L, 3);
 
   if (SetupComm(fd, rqueue, wqueue)) {
 #endif

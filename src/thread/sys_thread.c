@@ -593,7 +593,7 @@ thread_done (lua_State *L)
 static int
 thread_init (lua_State *L)
 {
-  const size_t stack_size = luaL_optinteger(L, 1, THREAD_STACK_SIZE);
+  const size_t stack_size = (size_t) luaL_optinteger(L, 1, THREAD_STACK_SIZE);
   struct sys_thread *td;
 
   /* TLS Index */
@@ -698,7 +698,8 @@ sys_thread_create (struct sys_thread *td, const int is_affin)
   errno = res;
 #else
   unsigned int tid;
-  const unsigned long hThr = _beginthreadex(NULL, td->vmtd->stack_size,
+  const uintptr_t hThr = _beginthreadex(NULL,
+   (unsigned int) td->vmtd->stack_size,
    (thread_func_t) thread_start, td, 0, &tid);
 
   (void) is_affin;
@@ -754,7 +755,7 @@ thread_runvm (lua_State *L)
     /* CPU affinity */
     lua_getfield(L, 1, "cpu");
     if (lua_type(L, -1) == LUA_TNUMBER) {
-      cpu = lua_tointeger(L, -1);
+      cpu = (int) lua_tointeger(L, -1);
       is_affin = 1;
     }
     lua_pop(L, 1);
@@ -910,7 +911,7 @@ sys_thread_sleep (const int msec, const int not_intr)
 static int
 thread_sleep (lua_State *L)
 {
-  const int msec = lua_tointeger(L, 1);
+  const int msec = (int) lua_tointeger(L, 1);
   const int not_intr = lua_toboolean(L, 2);
 
   sys_vm_leave(L);

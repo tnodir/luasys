@@ -246,10 +246,10 @@ pipe_msg_build (lua_State *L, struct message *msg, int idx)
       luaL_argerror(L, idx, "primitive type expected");
     }
     item->type = type;
-    item->len = len;
+    item->len = (int) len;
     cp += (len + (MSG_ITEM_ALIGN-1)) & ~(MSG_ITEM_ALIGN-1);
   }
-  msg->size = offsetof(struct message, items) + cp - msg->items;
+  msg->size = (unsigned short) (offsetof(struct message, items) + cp - msg->items);
 }
 
 /*

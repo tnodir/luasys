@@ -52,13 +52,13 @@ membuf_addlstring (lua_State *L, struct membuf *mb, const char *s,
       continue;
     if (!(flags & MEM_ALLOC) || !(p = realloc(mb->data, len)))
       return 0;
-    mb->len = len;
+    mb->len = (int) len;
     mb->data = p;
   }
  end:
   if (s != NULL) {
     memcpy(mb->data + offset, s, size);
-    mb->offset = offset + size;
+    mb->offset = offset + (int) size;
   }
   return 1;
 }
@@ -102,8 +102,8 @@ static int
 membuf_tostring (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-  const int len = luaL_optinteger(L, 2, mb->offset);
-  const int off = lua_tointeger(L, 3);
+  const int len = luaL_optint(L, 2, mb->offset);
+  const int off = (int) lua_tointeger(L, 3);
 
   lua_pushlstring(L, mb->data + off, len);
   return 1;
@@ -119,7 +119,7 @@ membuf_seek (lua_State *L)
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
 
   if (lua_gettop(L) > 1) {
-    mb->offset = lua_tointeger(L, 2);
+    mb->offset = (int) lua_tointeger(L, 2);
     lua_settop(L, 1);
   } else
     lua_pushinteger(L, mb->offset);
@@ -218,7 +218,7 @@ read_bytes (lua_State *L, struct membuf *mb, size_t l)
   if (l) {
     char *p = mb->data;  /* avoid warning */
     lua_pushlstring(L, p, l);
-    n -= l;
+    n -= (int) l;
     mb->offset = n;
     if (n) memmove(p, p + l, n);
   } else
@@ -237,7 +237,7 @@ read_line (lua_State *L, struct membuf *mb)
     l = nl - p;
     lua_pushlstring(L, p, l);
     n -= l + 1;
-    mb->offset = n;
+    mb->offset = (int) n;
     if (n) memmove(p, nl + 1, n);
     return 1;
   }

@@ -465,7 +465,7 @@ sys_dir_open (lua_State *L, const int idx, struct dir *dp)
     dp->is_root = 1;
     return 1;
   } else {
-    const int len = lua_rawlen(L, idx);
+    const int len = (int) lua_rawlen(L, idx);
 
     /* build search path */
     if (len >= MAX_PATH - 2)  /* concat "\\*" */

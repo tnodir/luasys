@@ -21,8 +21,8 @@ win32_mailslot (lua_State *L)
 {
   fd_t fd, *fdp = checkudata(L, 1, FD_TYPENAME);
   const char *path = luaL_checkstring(L, 2);
-  const DWORD max_size = lua_tointeger(L, 3);
-  const DWORD timeout = luaL_optinteger(L, 4, MAILSLOT_WAIT_FOREVER);
+  const DWORD max_size = (DWORD) lua_tointeger(L, 3);
+  const DWORD timeout = (DWORD) luaL_optinteger(L, 4, MAILSLOT_WAIT_FOREVER);
 
   fd = CreateMailslotA(path, max_size, timeout, NULL);
 
@@ -42,7 +42,7 @@ static int
 win32_set_mailslot_info (lua_State *L)
 {
   fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
-  const DWORD timeout = luaL_optinteger(L, 2, MAILSLOT_WAIT_FOREVER);
+  const DWORD timeout = (DWORD) luaL_optinteger(L, 2, MAILSLOT_WAIT_FOREVER);
 
   if (SetMailslotInfo(fd, timeout)) {
     lua_settop(L, 1);
@@ -79,8 +79,8 @@ win32_get_mailslot_info (lua_State *L)
 static int
 win32_beep (lua_State *L)
 {
-  const int freq = luaL_optinteger(L, 1, 1000);
-  const int dur = luaL_optinteger(L, 2, 100);
+  const int freq = luaL_optint(L, 1, 1000);
+  const int dur = luaL_optint(L, 2, 100);
 
   Beep(freq, dur);
   return 0;

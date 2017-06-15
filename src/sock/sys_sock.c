@@ -316,9 +316,9 @@ sock_sockopt (lua_State *L)
 #ifdef _WIN32
     if (is_success) goto set_success;
 #endif
-    optval[0] = lua_tointeger(L, OPT_START + 1);
+    optval[0] = (int) lua_tointeger(L, OPT_START + 1);
     if (narg > OPT_START + 1) {
-      optval[1] = lua_tointeger(L, OPT_START + 2);
+      optval[1] = (int) lua_tointeger(L, OPT_START + 2);
       optlen *= 2;
     }
     if (!setsockopt(sd, level, optflag, (char *) &optval, optlen)) {
@@ -453,7 +453,7 @@ static int
 sock_listen (lua_State *L)
 {
   sd_t sd = (sd_t) lua_unboxinteger(L, 1, SD_TYPENAME);
-  const int backlog = luaL_optinteger(L, 2, SOMAXCONN);
+  const int backlog = luaL_optint(L, 2, SOMAXCONN);
 
   if (!listen(sd, backlog)) {
     lua_settop(L, 1);
@@ -569,8 +569,8 @@ sock_send (lua_State *L)
     flags |= o_flags[luaL_checkoption(L, i, NULL, o_names)];
   }
   sys_vm_leave(L);
-  do nw = !to ? send(sd, sb.ptr.r, sb.size, flags)
-   : sendto(sd, sb.ptr.r, sb.size, flags, &to->u.addr, to->addrlen);
+  do nw = !to ? send(sd, sb.ptr.r, (int) sb.size, flags)
+   : sendto(sd, sb.ptr.r, (int) sb.size, flags, &to->u.addr, to->addrlen);
 #ifndef _WIN32
   while (nw == -1 && sys_eintr());
 #else
@@ -642,7 +642,7 @@ sock_recv (lua_State *L)
     do nr = recvfrom(sd, sb.ptr.w, rlen, flags, sap, slp);
     while (nr == -1 && sys_eintr());
 #else
-    nr = recvfrom(sd, sb.ptr.w, rlen, flags, sap, slp);
+    nr = recvfrom(sd, sb.ptr.w, (int) rlen, flags, sap, slp);
 #endif
     if (td) sys_vm2_enter(td);
     if (nr == -1) break;
@@ -770,7 +770,7 @@ sock_sendfile (lua_State *L)
       return 1;
     }
 #else
-  res = TransmitFileMap(sd, fd, n);
+  res = TransmitFileMap(sd, fd, (DWORD) n);
   sys_vm_enter(L);
 
   if (res != 0L) {
@@ -810,7 +810,7 @@ sock_write (lua_State *L)
       WSABUF wsa_buf;
       DWORD l;
 
-      wsa_buf.len = sb.size;
+      wsa_buf.len = (ULONG) sb.size;
       wsa_buf.buf = sb.ptr.w;
 
       nw = !WSASend(sd, &wsa_buf, 1, &l, 0, NULL, NULL)
@@ -862,7 +862,7 @@ sock_read (lua_State *L)
       WSABUF wsa_buf;
       DWORD l, flags = 0;
 
-      wsa_buf.len = rlen;
+      wsa_buf.len = (ULONG) rlen;
       wsa_buf.buf = sb.ptr.w;
 
       nr = !WSARecv(sd, &wsa_buf, 1, &l, &flags, NULL, NULL)

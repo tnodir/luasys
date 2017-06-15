@@ -171,7 +171,7 @@ ecb_write (lua_State *L)
       continue;
     sys_vm_leave(L);
     {
-      DWORD l = sb.size;
+      DWORD l = (DWORD) sb.size;
       nw = ecb->WriteClient(ecb->ConnID, sb.ptr.w, &l, 0)
        ? (int) l : -1;
     }

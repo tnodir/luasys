@@ -86,10 +86,12 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #define lua_resume(L,from,n)	lua_resume((L), (n))
 #define luaL_setfuncs(L,l,n)	luaL_register((L), NULL, (l))
 
+#ifndef luaL_newlib
 #define luaL_newlibtable(L,l) \
     lua_createtable(L, 0, sizeof(l) / sizeof((l)[0]) - 1)
 #define luaL_newlib(L,l) \
     (luaL_newlibtable((L), (l)), luaL_setfuncs((L), (l), 0))
+#endif
 
 #define lua_rawgetp(L,idx,p) \
     (lua_pushlightuserdata((L), (p)), \

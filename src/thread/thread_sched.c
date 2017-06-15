@@ -71,7 +71,7 @@ struct sched_context {
     (&(sched)->buffer[task_id])
 
 #define sched_task_to_id(sched,task) \
-    (task - (sched)->buffer)
+    (int) (task - (sched)->buffer)
 
 #define sched_tasklist_add(sched,list_idp,task) \
   do { \
@@ -178,9 +178,9 @@ sched_task_del (lua_State *L, struct scheduler *sched,
 static int
 sched_new (lua_State *L)
 {
-  const int min_workers = lua_tointeger(L, 2);
-  const int max_workers = luaL_optinteger(L, 3, min_workers);
-  const msec_t worker_timeout = luaL_optinteger(L, 4, SCHED_WORKER_TIMEOUT);
+  const int min_workers = (int) lua_tointeger(L, 2);
+  const int max_workers = luaL_optint(L, 3, min_workers);
+  const msec_t worker_timeout = (msec_t) luaL_optinteger(L, 4, SCHED_WORKER_TIMEOUT);
   struct scheduler *sched;
   lua_State *NL;
 
@@ -595,7 +595,7 @@ static int
 sched_terminate (lua_State *L)
 {
   struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
-  const int task_id = luaL_checkinteger(L, 2);
+  const int task_id = luaL_checkint(L, 2);
 
   if (sched_check_task_id(sched, task_id)) {
     struct sched_task *task = sched_id_to_task(sched, task_id);
@@ -644,7 +644,7 @@ static int
 sched_resume (lua_State *L)
 {
   struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
-  const int task_id = luaL_checkinteger(L, 2);
+  const int task_id = luaL_checkint(L, 2);
   struct sched_task *task;
   const int narg = lua_gettop(L) - 2;
 
@@ -798,7 +798,7 @@ void
 sys_sched_event_added (lua_State *co, void *ev)
 {
   struct scheduler *sched = lua_touserdata(co, 1);
-  const int task_id = lua_tointeger(co, 2);
+  const int task_id = (int) lua_tointeger(co, 2);
   struct sched_task *task = sched_id_to_task(sched, task_id);
 
   task->ev_op = ev;
@@ -816,7 +816,7 @@ void
 sys_sched_event_ready (lua_State *co, void *ev)
 {
   struct scheduler *sched = lua_touserdata(co, 1);
-  const int task_id = lua_tointeger(co, 2);
+  const int task_id = (int) lua_tointeger(co, 2);
   struct sched_task *task = sched_id_to_task(sched, task_id);
 
   if (!task || task->ev_op != ev)
@@ -854,7 +854,7 @@ static int
 sched_preempt_tasks (lua_State *L)
 {
   struct scheduler *sched = checkudata(L, 1, SCHED_TYPENAME);
-  const int msec = lua_tointeger(L, 2);
+  const int msec = (int) lua_tointeger(L, 2);
   thread_critsect_t *csp = &sched->cs;
   unsigned int old_tick = 0;
 
