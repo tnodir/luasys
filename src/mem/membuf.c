@@ -102,7 +102,7 @@ static int
 membuf_tostring (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-  const int len = luaL_optint(L, 2, mb->offset);
+  const int len = (int)luaL_optinteger(L, 2, mb->offset);
   const int off = (int) lua_tointeger(L, 3);
 
   lua_pushlstring(L, mb->data + off, len);

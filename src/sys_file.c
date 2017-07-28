@@ -773,7 +773,7 @@ sys_ioctl (lua_State *L)
   fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
   const int code = (int) lua_tointeger(L, 2);
   const int is_out = (lua_gettop(L) > 3);
-  int nr = 0;  /* number of bytes actually read */
+  unsigned long nr = 0;  /* number of bytes actually read */
   int res;
 
   sys_buffer_read_init(L, 3, &in);
@@ -810,7 +810,7 @@ static int
 sys_utime (lua_State *L)
 {
   fd_t fd = (fd_t) lua_unboxinteger(L, 1, FD_TYPENAME);
-  const long modtime = luaL_optlong(L, 2, -1L);
+  const long modtime = (long)luaL_optinteger(L, 2, -1L);
 
 #ifndef _WIN32
   struct timeval tv[2], *tvp;

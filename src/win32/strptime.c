@@ -529,6 +529,7 @@ conv_num (const unsigned char *buf, int *dest,
   return buf;
 }
 
+#ifndef strncasecmp
 static int
 strncasecmp (const char *s1, const char *s2, size_t n)
 {
@@ -544,6 +545,7 @@ strncasecmp (const char *s1, const char *s2, size_t n)
   return tolower(*(const unsigned char *) s1)
     - tolower(*(const unsigned char *) s2);
 }
+#endif
 
 static const u_char *
 find_string (const u_char *bp, int *tgt, const char * const *n1,

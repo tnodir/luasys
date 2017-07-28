@@ -279,7 +279,7 @@ static int
 mem_alloc (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-  const int len = luaL_optint(L, 2, BUFF_INITIALSIZE);
+  const int len = (int)luaL_optinteger(L, 2, BUFF_INITIALSIZE);
   const int zerofill = lua_isboolean(L, -1) && lua_toboolean(L, -1);
 
   mb->flags |= MEM_ALLOC;
@@ -298,7 +298,7 @@ static int
 mem_realloc (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-  const int len = luaL_checkint(L, 2);
+  const int len = (int)luaL_checkinteger(L, 2);
   void *p = realloc(mb->data, len);
 
   if (!p) return 0;
@@ -316,7 +316,7 @@ static int
 mem_reserve (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
-  const int len = luaL_checkint(L, 2);
+  const int len = (int)luaL_checkinteger(L, 2);
 
   if (membuf_addlstring(L, mb, NULL, len)) {
     lua_settop(L, 1);
@@ -504,7 +504,7 @@ mem_memcpy (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
   struct membuf *src = checkudata(L, 2, MEM_TYPENAME);
-  const int len = luaL_checkint(L, 3);
+  const int len = (int)luaL_checkinteger(L, 3);
 
   lua_settop(L, 1);
   return memcpy(mb->data, src->data, len) ? 1 : 0;
@@ -519,7 +519,7 @@ mem_memset (lua_State *L)
 {
   struct membuf *mb = checkudata(L, 1, MEM_TYPENAME);
   const int ch = (int) lua_tointeger(L, 2);
-  const int len = luaL_checkint(L, 3);
+  const int len = (int)luaL_checkinteger(L, 3);
 
   lua_settop(L, 1);
   return memset(mb->data, ch, len) ? 1 : 0;

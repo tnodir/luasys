@@ -79,8 +79,8 @@ win32_get_mailslot_info (lua_State *L)
 static int
 win32_beep (lua_State *L)
 {
-  const int freq = luaL_optint(L, 1, 1000);
-  const int dur = luaL_optint(L, 2, 100);
+  const int freq = (int)luaL_optinteger(L, 1, 1000);
+  const int dur = (int)luaL_optinteger(L, 2, 100);
 
   Beep(freq, dur);
   return 0;
