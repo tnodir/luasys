@@ -453,7 +453,7 @@ static int
 sock_listen (lua_State *L)
 {
   sd_t sd = (sd_t) lua_unboxinteger(L, 1, SD_TYPENAME);
-  const int backlog = luaL_optint(L, 2, SOMAXCONN);
+  const int backlog = (int)luaL_optinteger(L, 2, SOMAXCONN);
 
   if (!listen(sd, backlog)) {
     lua_settop(L, 1);

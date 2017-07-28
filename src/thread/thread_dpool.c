@@ -212,7 +212,7 @@ dpool_max (lua_State *L)
   if (lua_isnoneornil(L, 2))
     lua_pushinteger(L, dp->max);
   else {
-    dp->max = (unsigned int) luaL_checkint(L, 2);
+    dp->max = (unsigned int) luaL_checkinteger(L, 2);
     lua_settop(L, 1);
   }
   return 1;

@@ -317,7 +317,7 @@ sys_getpid (lua_State *L)
 static int
 sys_pid (lua_State *L)
 {
-  const int id = luaL_optint(L, 1, -1);
+  const int id = (int)luaL_optinteger(L, 1, -1);
   const int is_query = lua_toboolean(L, 2);
   struct sys_pid *pidp = lua_newuserdata(L, sizeof(struct sys_pid));
 
