@@ -114,6 +114,11 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
     (fprintf(stderr, (s), (p)), fflush(stderr))
 #endif
 
+#ifndef luaL_checkint
+#define luaL_checkint(L,n)	((int)luaL_checkinteger(L, (n)))
+#define luaL_optint(L,n,d)	((int)luaL_optinteger(L, (n), (d)))
+#endif
+
 
 #ifdef NO_CHECK_UDATA
 #define checkudata(L,i,tname)	lua_touserdata(L, i)
