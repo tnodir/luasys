@@ -117,6 +117,7 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 #ifndef luaL_checkint
 #define luaL_checkint(L,n)	((int)luaL_checkinteger(L, (n)))
 #define luaL_optint(L,n,d)	((int)luaL_optinteger(L, (n), (d)))
+#define luaL_optlong(L,n,d)	((long)luaL_optinteger(L, (n), (d)))
 #endif
 
 
