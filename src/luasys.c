@@ -10,7 +10,9 @@
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
+#if defined(BSD)
 #include <sys/sysctl.h>
+#endif
 
 #define SYS_FILE_PERMISSIONS	0644  /* default file permissions */
 
