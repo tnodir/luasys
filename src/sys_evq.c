@@ -886,11 +886,12 @@ sys_evq_loop (lua_State *L, struct event_queue *evq,
           sys_sched_event_ready(co, ev);
         } else if (ev_flags & EVENT_CALLBACK_CORO) {
           lua_State *co = lua_tothread(L, evq_idx + ARG_EXTRAS + 1);
+          int nresults;
 
           lua_xmove(L, co, 5);
           lua_pop(L, 1);  /* pop coroutine */
 
-          switch (lua_resume(co, L, 5)) {
+          switch (lua_resume(co, L, 5, &nresults)) {
           case 0:
             lua_settop(co, 0);
             if (!event_deleted(ev)) {

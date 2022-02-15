@@ -82,8 +82,8 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
 
 
 #if LUA_VERSION_NUM < 502
+
 #define lua_rawlen		lua_objlen
-#define lua_resume(L,from,n)	lua_resume((L), (n))
 #define luaL_setfuncs(L,l,n)	luaL_register((L), NULL, (l))
 
 #ifndef luaL_newlib
@@ -104,10 +104,24 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
     ((idx) < 0 && (idx) > -99 ? lua_gettop(L) + (idx) + 1 : (idx))
 
 #else
+
 #define luaL_register(L,n,l)	luaL_newlib((L), (l))
 #define lua_setfenv		lua_setuservalue
 #define lua_getfenv		lua_getuservalue
+
 #endif
+
+
+#if LUA_VERSION_NUM < 504
+#if LUA_VERSION_NUM < 502
+#define lua_resume(L,from,nargs,nresults) \
+    lua_resume((L), (nargs))
+#else
+#define lua_resume(L,from,nargs,nresults) \
+    lua_resume((L), (from), (nargs))
+#endif
+#endif
+
 
 #ifndef lua_writestringerror
 #define lua_writestringerror(s,p) \

@@ -318,6 +318,7 @@ sched_loop (lua_State *L)
   const int once = lua_toboolean(L, 4);  /* process only one event */
   thread_critsect_t *csp = &sched->cs;
   struct sched_context sched_ctx;
+  int nresults;
   int err = 0;
 
   if (!td) luaL_argerror(L, 0, "Threading not initialized");
@@ -397,7 +398,7 @@ sched_loop (lua_State *L)
     sched->tick++;
     thread_critsect_leave(csp);
 
-    res = lua_resume(co, L, narg);  /* call coroutine */
+    res = lua_resume(co, L, narg, &nresults);  /* call coroutine */
 
     thread_critsect_enter(csp);
     sched_ctx.co = NULL;
