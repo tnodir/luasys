@@ -104,6 +104,12 @@ typedef SIZE_T		ULONG_PTR, DWORD_PTR;
     ((idx) < 0 && (idx) > -99 ? lua_gettop(L) + (idx) + 1 : (idx))
 
 #else
+
+#if LUA_VERSION_NUM >= 504
+static int nresultsResume;
+#define lua_resume(L,from,n)	lua_resume(L,from,n,&nresultsResume)
+#endif
+
 #define luaL_register(L,n,l)	luaL_newlib((L), (l))
 #define lua_setfenv		lua_setuservalue
 #define lua_getfenv		lua_getuservalue
