@@ -368,7 +368,10 @@ static const char *const stdlib_names[] = {
   LUA_TABLIBNAME, LUA_IOLIBNAME, LUA_OSLIBNAME,
   LUA_STRLIBNAME, LUA_MATHLIBNAME, LUA_DBLIBNAME,
 #if LUA_VERSION_NUM >= 502
-  LUA_COLIBNAME, LUA_BITLIBNAME,
+  LUA_COLIBNAME,
+#endif
+#if (LUA_VERSION_NUM >= 502) && (LUA_VERSION_NUM < 504)
+  LUA_BITLIBNAME,
 #endif
 #ifdef LUA_JITLIBNAME
   LUA_JITLIBNAME, LUA_BITLIBNAME, LUA_FFILIBNAME,
@@ -379,7 +382,10 @@ static const lua_CFunction stdlib_funcs[] = {
   luaopen_table, luaopen_io, luaopen_os,
   luaopen_string, luaopen_math, luaopen_debug,
 #if LUA_VERSION_NUM >= 502
-  luaopen_coroutine, luaopen_bit32,
+  luaopen_coroutine,
+#endif
+#if (LUA_VERSION_NUM >= 502) && (LUA_VERSION_NUM < 504)
+ luaopen_bit32,
 #endif
 #ifdef LUA_JITLIBNAME
   luaopen_jit, luaopen_bit, luaopen_ffi
